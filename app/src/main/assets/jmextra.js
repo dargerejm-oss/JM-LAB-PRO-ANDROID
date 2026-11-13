@@ -152,7 +152,7 @@ var ob = document.createElement("button"); ob.id = "jxOpen"; ob.textContent = "�
 function openImg(){ var i = document.querySelector("input[type=file]:not([multiple])"); if(i){ i.value = ""; i.click(); } }
 ob.onclick = openImg;
 var sv = document.createElement("button"); sv.id = "jxSave"; sv.textContent = "💾 ENREGISTRER"; document.body.appendChild(sv);
-sv.onclick = function(){ var b = Array.prototype.slice.call(document.querySelectorAll("button")).filter(function(e){ return /T[ée]l[ée]charger HD/i.test(e.textContent); })[0]; if(b) b.click(); else alert("Bouton d'enregistrement introuvable : va dans l'onglet EXPORT / LOT."); };
+sv.onclick = function(){ var b = Array.prototype.slice.call(document.querySelectorAll("button")).filter(function(e){ return /T[ée]l[ée]charger HD/i.test(e.textContent); })[0]; if(b) b.click(); else { window.__jmsNote("✖ Bouton introuvable : va dans l'onglet EXPORT / LOT", "err", 6000); } };
 document.addEventListener("click", function(e){
   var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target)) return;
   var c = document.getElementById("filteredCanvas"); if(c && c.style.display !== "none") return;

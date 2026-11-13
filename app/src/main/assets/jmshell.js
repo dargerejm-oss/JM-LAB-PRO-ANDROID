@@ -228,9 +228,23 @@ $("jmsClose").onclick = function(){ ov.classList.remove("show"); };
 /* ---------- 3. telechargements -> galerie / dossier JM LAB PRO ---------- */
 var keep = URL.revokeObjectURL.bind(URL);
 URL.revokeObjectURL = function(u){ setTimeout(function(){ keep(u); }, 120000); };
+/* bandeau de retour visible (le toast Android peut passer inapercu) */
+var noteEl = null, noteT = 0;
+window.__jmsNote = function(text, kind, ms){
+  if(!noteEl){ noteEl = document.createElement("div"); noteEl.id = "jmsNote"; document.body.appendChild(noteEl); }
+  noteEl.textContent = text; noteEl.className = "n-" + (kind || "info"); noteEl.style.display = "block"; clearTimeout(noteT);
+  if(ms !== 0) noteT = setTimeout(function(){ noteEl.style.display = "none"; }, ms || 4000);
+};
+var sTick = 0, sT0 = 0;
+function startSaveTimer(){
+  sT0 = Date.now(); clearInterval(sTick); window.__jmsNote("⏳ Enregistrement… 0 s", "info", 0);
+  sTick = setInterval(function(){ window.__jmsNote("⏳ Enregistrement… " + Math.round((Date.now()-sT0)/1000) + " s\n(traitement de la photo en pleine taille)", "info", 0); }, 1000);
+}
+document.addEventListener("click", function(e){ var b = e.target.closest && e.target.closest("button"); if(b && (b.id === "jxSave" || /T[ée]l[ée]charger HD/i.test(b.textContent))) startSaveTimer(); }, true);
 function save(name, blob, sub, quiet){
   return new Promise(function(done){
     if(!NAT){ return done(false); }
+    if(!quiet && NAT.setTarget){ try{ NAT.setTarget(false); }catch(e){} }
     NAT.saveBeginIn(name, blob.type || "application/octet-stream", sub || "");
     var CH = 768*1024, pos = 0;
     (function next(){
@@ -245,10 +259,12 @@ var origClick = HTMLAnchorElement.prototype.click;
 HTMLAnchorElement.prototype.click = function(){
   if(NAT && this.download && /^blob:/.test(this.href)){
     var name = this.download;
+    var tPrep = Date.now(); if(/\.jpe?g$|\.png$/i.test(name) && !sT0) startSaveTimer();
     fetch(this.href).then(function(r){return r.blob()}).then(function(b){
-      if(window.__jmsCS && (window.__jmsCS.get().on || (window.__jmsFX && window.__jmsFX.active({single:true}))) && /\.jpe?g$/i.test(name) && /JMD_LAB_PRO/.test(name)) return window.__jmsCS.process(b, {single:true}).then(function(b2){ return save(name,b2,"",false); });
-      return save(name,b,"",false);
-    });
+      if(window.__jmsCS && (window.__jmsCS.get().on || (window.__jmsFX && window.__jmsFX.active({single:true}))) && /\.jpe?g$/i.test(name) && /JMD_LAB_PRO/.test(name)) return window.__jmsCS.process(b, {single:true}).then(function(b2){ return save(name,b2,"",false).then(fin); });
+      return save(name,b,"",false).then(fin);
+    }).catch(function(e){ clearInterval(sTick); sT0 = 0; window.__jmsNote("✖ Échec de l'enregistrement : " + (e && e.message || e), "err", 9000); });
+    function fin(ok){ clearInterval(sTick); var tw = Math.round((Date.now()-tPrep)/1000), tp = sT0 ? Math.round((tPrep-sT0)/1000) : 0; sT0 = 0; if(/\.jpe?g$|\.png$/i.test(name)) window.__jmsNote(ok ? "✔ ENREGISTRÉ dans Images / JM LAB PRO\n" + name + "\n(traitement " + tp + " s • écriture " + tw + " s)" : "✖ Échec de l'enregistrement", ok ? "ok" : "err", ok ? 8000 : 9000); return ok; }
     return;
   }
   return origClick.apply(this, arguments);

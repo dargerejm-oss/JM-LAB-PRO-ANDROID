@@ -425,6 +425,9 @@ public class MainActivity extends Activity {
             }
             outUri = null;
             outFile = null;
+            if (!ok && say) {
+                toast("✖ Échec de l'enregistrement. Réessaie ou change de dossier.");
+            }
             if (ok && say) {
                 toast(useTree ? "✔ Enregistré dans " + treeName() + " : " + outName
                         : "✔ Enregistré : " + (outPictures ? "Images/" : "Téléchargements/")

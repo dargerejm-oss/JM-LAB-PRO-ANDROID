@@ -133,3 +133,5 @@ body[data-tab=reg] #jxUR{display:flex}
 #jxOpen{left:calc(50% - 121px);background:#FFB300;color:#000}
 #jxSave{left:calc(50% + 3px);background:#43A047}
 .jxPr{background:#2a2a2a;border-radius:12px;padding:10px 12px;margin:8px 0;color:#fff}.jxPr b{display:block;font-size:15px}.jxPr small{color:#bbb;display:block;margin-bottom:6px}
+#jmsNote{position:fixed;left:12px;right:12px;top:60px;z-index:3500;padding:16px 18px;border-radius:16px;font-weight:900;font-size:16px;text-align:center;white-space:pre-line;display:none;box-shadow:0 4px 18px #000c;pointer-events:none}
+#jmsNote.n-ok{background:#2E7D32;color:#fff;border:3px solid #FFB300}#jmsNote.n-err{background:#C62828;color:#fff}#jmsNote.n-info{background:#1E88E5;color:#fff}
