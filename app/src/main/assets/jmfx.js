@@ -170,7 +170,7 @@ async function brush(){
   var pc = previewCanvas(); if(!pc){ alert("Choisis d'abord une image (onglet RÉGLAGES)."); screen(); return; }
   var bmp = await createImageBitmap(pc), mode = 1, size = 0.08, str = 0.6;
   show('<div class="jmsTitle">🖌️ PINCEAU</div><canvas id="fxC" style="width:100%;border-radius:12px;touch-action:none;display:block"></canvas>'+
-   '<div class="fxRow"><button class="jmsBtn go" data-f="m1" id="fxM1">☀️ ÉCLAIRCIR</button><button class="jmsBtn close" data-f="m2" id="fxM2">🌑 ASSOMBRIR</button></div>'+
+   '<div id="fxModeT" class="jtSub" style="font-weight:900;font-size:15px"></div><div class="fxRow"><button class="jmsBtn close" data-f="m1" id="fxM1">☀️ ÉCLAIRCIR</button><button class="jmsBtn close" data-f="m2" id="fxM2">🌑 ASSOMBRIR</button></div>'+
    sl("fxSz","Taille",8,2,30)+sl("fxSt","Force",60,10,100)+
    '<div class="fxRow"><button class="jmsBtn close" data-f="undo">↩️ ANNULER</button><button class="jmsBtn close" data-f="clr">TOUT EFFACER</button></div><button class="jmsBtn go" data-f="done">✔ TERMINÉ (appliqué à l\'export de cette photo)</button>');
   var c = $("fxC"), W = Math.min(900, pc.width), Hh = Math.round(W*pc.height/pc.width); c.width = W; c.height = Hh;
@@ -183,7 +183,13 @@ async function brush(){
   c.onpointermove = function(e){ if(drawing){ dot(e); mark(e); } };
   c.onpointerup = function(){ drawing = false; redraw(); };
   function mark(e){ var p = pos(e), x = c.getContext("2d"); x.beginPath(); x.arc(p.x*W, p.y*Hh, size*W, 0, 7); x.fillStyle = mode > 0 ? "rgba(255,230,80,.25)" : "rgba(80,140,255,.25)"; x.fill(); }
-  HH.m1 = function(){ mode = 1; }; HH.m2 = function(){ mode = -1; };
+  function setMode(m){
+    mode = m; var a = $("fxM1"), d = $("fxM2");
+    a.style.cssText = m > 0 ? "background:#43A047;color:#fff;outline:4px solid #fff" : "background:#3a3a3a;color:#aaa"; a.textContent = m > 0 ? "✔ ☀️ ÉCLAIRCIR" : "☀️ ÉCLAIRCIR";
+    d.style.cssText = m < 0 ? "background:#1E88E5;color:#fff;outline:4px solid #fff" : "background:#3a3a3a;color:#aaa"; d.textContent = m < 0 ? "✔ 🌑 ASSOMBRIR" : "🌑 ASSOMBRIR";
+    var t = $("fxModeT"); if(t){ t.textContent = m > 0 ? "Mode : ÉCLAIRCIR (jaune)" : "Mode : ASSOMBRIR (bleu)"; t.style.color = m > 0 ? "#66BB6A" : "#64B5F6"; }
+  }
+  HH.m1 = function(){ setMode(1); }; HH.m2 = function(){ setMode(-1); }; setMode(1);
   $("fxSz").oninput = function(){ size = $("fxSz").value/100; $("fxSzv").textContent = $("fxSz").value; };
   $("fxSt").oninput = function(){ str = $("fxSt").value/100; $("fxStv").textContent = $("fxSt").value; };
   HH.undo = function(){ var n = strokes.length; strokes.splice(Math.max(0, n-25), 25); redraw(); }; HH.clr = function(){ strokes = []; redraw(); };

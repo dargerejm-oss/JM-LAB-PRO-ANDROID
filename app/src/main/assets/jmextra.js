@@ -139,6 +139,21 @@ window.__jmsX.x_dup = function(){
   H.xdup = function(){ var p = l[+$("jxDS").value], names = $("jxDN").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean); if(!names.length) return; var m = fmap(); names.forEach(function(n){ m[n] = p.name; }); localStorage.setItem(FM, JSON.stringify(m)); alert(names.length+" dossier(s) associé(s) au style « "+p.name+" »."); hide(); };
 };
 
+/* ---------- ouvrir une image depuis l'apercu ---------- */
+var ob = document.createElement("button"); ob.id = "jxOpen"; ob.textContent = "📂 OUVRIR UNE IMAGE"; document.body.appendChild(ob);
+function openImg(){ var i = document.querySelector("input[type=file]:not([multiple])"); if(i){ i.value = ""; i.click(); } }
+ob.onclick = openImg;
+document.addEventListener("click", function(e){
+  var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target)) return;
+  var c = document.getElementById("filteredCanvas"); if(c && c.style.display !== "none") return;
+  openImg();
+}, true);
+setInterval(function(){
+  var f = document.querySelector(".fixed-top"), r = f && f.getBoundingClientRect(), c = document.getElementById("filteredCanvas"), has = c && c.style.display !== "none";
+  ob.style.display = (r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show")) ? "block" : "none";
+  if(r) ob.style.top = (r.top + (has ? 40 : 8)) + "px";
+}, 400);
+
 /* ---------- grand texte ---------- */
 function applyBig(){ document.body.style.zoom = localStorage.getItem("jms_big") === "on" ? "1.18" : ""; }
 applyBig();

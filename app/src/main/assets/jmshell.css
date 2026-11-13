@@ -124,3 +124,4 @@ body[data-tab=exp] .scroll-content>:nth-child(4){display:none!important}
 #jxUR{position:fixed;left:10px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:1400;display:none;gap:8px}
 body[data-tab=reg] #jxUR{display:flex}
 #jxUR button{width:48px;height:48px;border-radius:50%;border:0;background:#1E88E5;color:#fff;font-size:26px;font-weight:900;box-shadow:0 2px 8px #000a}
+#jxOpen{position:fixed;right:10px;top:40px;z-index:1450;border:0;border-radius:14px;background:#FFB300;color:#000;font-weight:900;font-size:13px;padding:10px 14px;box-shadow:0 2px 8px #000a;display:none}
