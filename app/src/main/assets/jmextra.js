@@ -139,6 +139,53 @@ window.__jmsX.x_dup = function(){
   H.xdup = function(){ var p = l[+$("jxDS").value], names = $("jxDN").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean); if(!names.length) return; var m = fmap(); names.forEach(function(n){ m[n] = p.name; }); localStorage.setItem(FM, JSON.stringify(m)); alert(names.length+" dossier(s) associé(s) au style « "+p.name+" »."); hide(); };
 };
 
+/* ---------- grand texte ---------- */
+function applyBig(){ document.body.style.zoom = localStorage.getItem("jms_big") === "on" ? "1.18" : ""; }
+applyBig();
+window.__jmsX.x_big = function(){ localStorage.setItem("jms_big", localStorage.getItem("jms_big") === "on" ? "off" : "on"); applyBig(); };
+
+/* ---------- defi du jour ---------- */
+window.__jmsX.x_defi = function(){
+  var l = load(); if(!l.length){ alert("Enregistre d'abord quelques styles."); return; }
+  var d = new Date(), seed = d.getFullYear()*372 + d.getMonth()*31 + d.getDate(), p = l[seed % l.length];
+  applyValues(p.values); goTab("reg");
+  alert("🎯 Défi du jour : applique le style « "+p.name+" » à une photo, puis améliore-le avec un seul curseur.");
+};
+
+/* ---------- fiche de cours (avant / apres + reglages) ---------- */
+window.__jmsX.x_card = function(){
+  var cv = document.querySelector(".fixed-top canvas");
+  if(!lastFile || !cv || cv.width < 10){ alert("Choisis d'abord une image et fais tes réglages."); return; }
+  var url = URL.createObjectURL(lastFile), img = new Image();
+  img.onload = function(){
+    var W = 1080, pad = 40, cw = (W - 3*pad)/2, ih = Math.round(cw*img.naturalHeight/img.naturalWidth), sl2 = sliders(), lines = [];
+    sl2.forEach(function(r,i){ if(+r.value !== def(i)) lines.push(LABELS[i]+"  "+(+r.value > 0 && i > 0 ? "+" : "")+r.value); });
+    var Hh = 170 + ih + 60 + Math.max(1, lines.length)*44 + 90, c = document.createElement("canvas"); c.width = W; c.height = Hh; var x2 = c.getContext("2d");
+    x2.fillStyle = "#111"; x2.fillRect(0,0,W,Hh); x2.fillStyle = "#FFB300"; x2.font = "bold 54px sans-serif"; x2.fillText("FICHE DE RÉGLAGES", pad, 85);
+    x2.fillStyle = "#bbb"; x2.font = "28px sans-serif"; x2.fillText("JM.DARGERE • JM LAB PRO", pad, 130);
+    x2.drawImage(img, pad, 170, cw, ih);
+    var rect = {x:0,y:0,w:cv.width,h:cv.height}, d2 = cv.getContext("2d").getImageData(0,0,cv.width,cv.height).data, bg = [d2[0],d2[1],d2[2]], x0 = cv.width, x1 = -1, y0 = cv.height, y1 = -1;
+    for(var yy = 0; yy < cv.height; yy += 2) for(var xx = 0; xx < cv.width; xx += 2){ var i = (yy*cv.width+xx)*4; if(Math.abs(d2[i]-bg[0])+Math.abs(d2[i+1]-bg[1])+Math.abs(d2[i+2]-bg[2]) > 18){ if(xx < x0) x0 = xx; if(xx > x1) x1 = xx; if(yy < y0) y0 = yy; if(yy > y1) y1 = yy; } }
+    if(x1 > x0) rect = {x:x0+1, y:y0+1, w:x1-x0-2, h:y1-y0-2};
+    x2.drawImage(cv, rect.x, rect.y, rect.w, rect.h, 2*pad+cw, 170, cw, ih);
+    x2.fillStyle = "#fff"; x2.font = "bold 30px sans-serif"; x2.fillText("AVANT", pad, 170+ih+42); x2.fillText("APRÈS", 2*pad+cw, 170+ih+42);
+    x2.font = "34px sans-serif"; x2.fillStyle = "#FFB300"; var y = 170+ih+110; (lines.length ? lines : ["Aucun réglage modifié"]).forEach(function(t){ x2.fillText(t, pad, y); y += 44; });
+    URL.revokeObjectURL(url);
+    c.toBlob(function(b){ window.__jmsSave("JMLAB_fiche_"+Date.now()+".png", b); }, "image/png");
+  };
+  img.src = url;
+};
+
+/* ---------- annuler / retablir les reglages ---------- */
+var hist2 = [], hpos = -1, hbusy = false, ht = 0;
+function snap(){ return sliders().map(function(r){ return r.value; }); }
+function rec(){ if(hbusy) return; var s = snap(); if(!s.length) return; if(hpos >= 0 && hist2[hpos].join() === s.join()) return; hist2 = hist2.slice(0, hpos+1); hist2.push(s); if(hist2.length > 60) hist2.shift(); hpos = hist2.length-1; }
+document.addEventListener("input", function(e){ if(e.target && e.target.type === "range" && !hbusy){ clearTimeout(ht); ht = setTimeout(rec, 450); } }, true);
+function jump(p){ if(p < 0 || p >= hist2.length) return; hpos = p; hbusy = true; var v = hist2[p]; sliders().forEach(function(r,i){ setVal(r, v[i]); }); setTimeout(function(){ hbusy = false; }, 600); }
+setTimeout(function(){ rec(); }, 1500);
+var ur = document.createElement("div"); ur.id = "jxUR"; ur.innerHTML = '<button id="jxU">↶</button><button id="jxR2">↷</button>'; document.body.appendChild(ur);
+$("jxU").onclick = function(){ clearTimeout(ht); rec(); jump(hpos-1); }; $("jxR2").onclick = function(){ jump(hpos+1); };
+
 /* ---------- favoris (acces direct dans RÉGLAGES) ---------- */
 function favs(){ try{ return JSON.parse(localStorage.getItem("jms_fav")||"[]"); }catch(e){ return []; } }
 function drawFav(){

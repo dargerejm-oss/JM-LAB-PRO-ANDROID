@@ -121,3 +121,6 @@ body[data-tab=exp] .scroll-content>:nth-child(4){display:none!important}
 .jxHi small{color:#bbb}
 #jxCourse{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:3400;background:#000d;color:#fff;font-weight:900;font-size:30px;padding:14px 26px;border-radius:18px;display:none;border:3px solid #FFB300;pointer-events:none}
 .fxRow{display:flex;gap:8px;margin:8px 0}.fxRow .jmsBtn{flex:1;margin:0}
+#jxUR{position:fixed;left:10px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:1400;display:none;gap:8px}
+body[data-tab=reg] #jxUR{display:flex}
+#jxUR button{width:48px;height:48px;border-radius:50%;border:0;background:#1E88E5;color:#fff;font-size:26px;font-weight:900;box-shadow:0 2px 8px #000a}

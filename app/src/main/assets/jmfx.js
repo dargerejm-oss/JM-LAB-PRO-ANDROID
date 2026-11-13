@@ -2,17 +2,17 @@
 (function(){
 "use strict";
 var KEY = "jms_fx";
-var D = {sky:0, face:0, grad:0, grain:0, bw:"", angle:0};
+var D = {sky:0, face:0, grad:0, grain:0, bw:"", angle:0, smooth:0, sharp:0, denoise:0, crop:"", wm:"", wmop:30};
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 function get(){ try{ var o = JSON.parse(localStorage.getItem(KEY)||"{}"); return Object.assign({}, D, o); }catch(e){ return Object.assign({}, D); } }
 function put(o){ localStorage.setItem(KEY, JSON.stringify(o)); }
 var strokes = [];
-function active(Q){ var s = get(); return !!(s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && (s.angle || strokes.length))); }
+function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && (s.angle || strokes.length))); }
 function summary(){
   var s = get(), a = [];
-  if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw);
+  if(s.smooth) a.push("peau lissée "+s.smooth+"%"); if(s.sharp) a.push("netteté "+s.sharp+"%"); if(s.denoise) a.push("bruit "+s.denoise+"%"); if(s.crop) a.push("format "+s.crop); if(s.wm) a.push("filigrane"); if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw);
   return a.join(" • ");
 }
 function cvs(w,h){ var c = document.createElement("canvas"); c.width = Math.max(1,Math.round(w)); c.height = Math.max(1,Math.round(h)); return c; }
@@ -87,11 +87,32 @@ async function render(bmp, Q){
   if(s.face){ var fm = await faceMask(c, SW, SH); if(fm.area > 0) layer(x, w, h, maskToCanvas(fm.m, fm.w, fm.h, 3), "screen", Math.round(255*0.35*s.face/100)); }
   if(s.grad){ var gr = cvs(16,64), gx = gr.getContext("2d"), gg = gx.createLinearGradient(0,0,0,64); gg.addColorStop(0,"rgba(255,255,255,1)"); gg.addColorStop(0.6,"rgba(255,255,255,0)"); gx.fillStyle = gg; gx.fillRect(0,0,16,64); layer(x, w, h, gr, "multiply", Math.round(255*(1-0.6*s.grad/100))); }
   if(Q.single && strokes.length){ var bm = brushMasks(w,h); layer(x, w, h, bm.light, "screen", 120); layer(x, w, h, bm.dark, "multiply", 120); }
+  if(s.denoise){ var dn = cvs(w,h), dx2 = dn.getContext("2d"); dx2.filter = "blur("+Math.max(1,Math.min(w,h)/1400*1.3).toFixed(1)+"px)"; dx2.drawImage(c,0,0); x.globalAlpha = 0.6*s.denoise/100; x.drawImage(dn,0,0); x.globalAlpha = 1; }
+  if(s.smooth){
+    var sm2 = await faceMask(c, SW, SH);
+    if(sm2.area > 0){ var bl = cvs(w,h), bx2 = bl.getContext("2d"); bx2.filter = "blur("+Math.max(2,Math.min(w,h)/260).toFixed(1)+"px)"; bx2.drawImage(c,0,0); bx2.filter = "none"; bx2.globalCompositeOperation = "destination-in"; bx2.drawImage(maskToCanvas(sm2.m, sm2.w, sm2.h, 3),0,0,w,h);
+      x.globalAlpha = 0.65*s.smooth/100; x.drawImage(bl,0,0); x.globalAlpha = 1; }
+  }
+  if(s.sharp){
+    var hp = cvs(w,h), hx = hp.getContext("2d"); hx.drawImage(c,0,0);
+    var inv = cvs(w,h), ix = inv.getContext("2d"); ix.filter = "blur("+Math.max(1,Math.min(w,h)/900).toFixed(1)+"px) invert(1)"; ix.drawImage(c,0,0);
+    hx.globalAlpha = 0.5; hx.drawImage(inv,0,0); x.globalCompositeOperation = "overlay"; x.globalAlpha = Math.min(1, s.sharp/100*1.2); x.drawImage(hp,0,0); x.globalAlpha = 1; x.globalCompositeOperation = "source-over";
+  }
   if(s.grain){
     var tile = cvs(256,256), tx = tile.getContext("2d"), id = tx.createImageData(256,256);
     for(var i = 0; i < id.data.length; i += 4){ var v = 128 + (Math.random()+Math.random()+Math.random()-1.5)*70; id.data[i] = id.data[i+1] = id.data[i+2] = v; id.data[i+3] = 255; }
     tx.putImageData(id,0,0);
     var sc = Math.max(1, Math.min(w,h)/1100), pat = x.createPattern(tile,"repeat"); x.save(); x.scale(sc,sc); x.globalAlpha = 0.55*s.grain/100; x.globalCompositeOperation = "overlay"; x.fillStyle = pat; x.fillRect(0,0,w/sc,h/sc); x.restore();
+  }
+  if(s.wm){
+    var fs = Math.max(14, Math.min(w,h)/16); x.save(); x.globalAlpha = Math.max(0.05, Math.min(0.9, (s.wmop||30)/100)); x.fillStyle = "#fff"; x.shadowColor = "rgba(0,0,0,.5)"; x.shadowBlur = fs/8; x.font = "bold "+fs+"px sans-serif"; x.textAlign = "center"; x.translate(w/2,h/2); x.rotate(-0.5);
+    var step = fs*3.2, tw = x.measureText(s.wm).width + fs*2, R = Math.hypot(w,h);
+    for(var yy = -R; yy < R; yy += step) for(var xx = -R + ((Math.round(yy/step)%2)*tw/2); xx < R; xx += tw) x.fillText(s.wm, xx, yy);
+    x.restore();
+  }
+  if(s.crop){
+    var rr = {"1:1":1, "4:5":0.8, "9:16":0.5625, "16:9":1.7778, "3:2":1.5, "2:3":0.6667}[s.crop];
+    if(rr){ var cw = w, ch = Math.round(w/rr); if(ch > h){ ch = h; cw = Math.round(h*rr); } var ox = Math.round((w-cw)/2), oy = Math.round((h-ch)*0.35), o = cvs(cw,ch); o.getContext("2d").drawImage(c, ox, oy, cw, ch, 0, 0, cw, ch); return o; }
   }
   return c;
 }
@@ -125,14 +146,18 @@ function screen(){
   show('<div class="jmsTitle">✨ EFFETS & RETOUCHE LOCALE</div><div class="jtSub">Appliqués aux photos du lot et à l\'export HD. Mets à 0 pour désactiver.</div>'+
    sl("fxSky","🌤️ Assombrir le ciel (auto)",s.sky,0,100)+sl("fxFace","🙂 Éclaircir visage / peau (auto)",s.face,0,100)+sl("fxGrad","🌓 Dégradé sombre en haut",s.grad,0,100)+sl("fxGrain","🎞️ Grain argentique",s.grain,0,100)+
    '<label class="gL">⚫ Noir & blanc</label><select class="gIn" id="fxBw" style="width:100%"><option value="">Couleur (désactivé)</option><option value="n">Noir & blanc neutre</option><option value="red">N&B filtre rouge (ciel sombre)</option><option value="yellow">N&B filtre jaune</option><option value="green">N&B filtre vert</option><option value="blue">N&B filtre bleu</option></select>'+
+   sl("fxSm","💆 Peau lissée (visage)",s.smooth,0,100)+sl("fxSh","🔍 Netteté",s.sharp,0,100)+sl("fxDn","🌫️ Réduction du bruit",s.denoise,0,100)+
+   '<label class="gL">📱 Recadrage prêt à publier</label><select class="gIn" id="fxCr" style="width:100%"><option value="">Aucun</option><option value="1:1">Carré 1:1</option><option value="4:5">Instagram 4:5</option><option value="9:16">Story 9:16</option><option value="16:9">Paysage 16:9</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select>'+
+   '<label class="gL">©️ Filigrane de protection (texte, vide = aucun)</label><input class="gIn" id="fxWm" type="text" style="width:100%" value="'+esc(s.wm)+'">'+sl("fxWo","Opacité du filigrane",s.wmop,5,80)+
    sl("fxAng","📐 Redressement (photo seule)",s.angle,-10,10,"°")+
    '<button class="jmsBtn go" data-f="prev">👁️ VOIR LE RÉSULTAT SUR MA PHOTO</button>'+
    '<button class="jmsBtn go" data-f="brush">🖌️ PINCEAU : ÉCLAIRCIR / ASSOMBRIR AU DOIGT</button>'+
    '<button class="jmsBtn close" data-f="close">TERMINÉ</button>');
   $("fxBw").value = s.bw === "" ? "" : (["red","yellow","green","blue"].indexOf(s.bw) >= 0 ? s.bw : "n");
-  function save(){ var o = get(); o.sky = +$("fxSky").value; o.face = +$("fxFace").value; o.grad = +$("fxGrad").value; o.grain = +$("fxGrain").value; o.angle = +$("fxAng").value; var b = $("fxBw").value; o.bw = b === "n" ? "gray" : b; put(o);
+  $("fxCr").value = s.crop;
+  function save(){ var o = get(); o.smooth = +$("fxSm").value; o.sharp = +$("fxSh").value; o.denoise = +$("fxDn").value; o.crop = $("fxCr").value; o.wm = $("fxWm").value.trim(); o.wmop = +$("fxWo").value; $("fxSmv").textContent = o.smooth; $("fxShv").textContent = o.sharp; $("fxDnv").textContent = o.denoise; $("fxWov").textContent = o.wmop; o.sky = +$("fxSky").value; o.face = +$("fxFace").value; o.grad = +$("fxGrad").value; o.grain = +$("fxGrain").value; o.angle = +$("fxAng").value; var b = $("fxBw").value; o.bw = b === "n" ? "gray" : b; put(o);
     $("fxSkyv").textContent = o.sky; $("fxFacev").textContent = o.face; $("fxGradv").textContent = o.grad; $("fxGrainv").textContent = o.grain; $("fxAngv").textContent = o.angle; }
-  ["fxSky","fxFace","fxGrad","fxGrain","fxAng","fxBw"].forEach(function(id){ $(id).oninput = save; $(id).onchange = save; });
+  ["fxSky","fxFace","fxGrad","fxGrain","fxAng","fxBw","fxSm","fxSh","fxDn","fxCr","fxWm","fxWo"].forEach(function(id){ $(id).oninput = save; $(id).onchange = save; });
   HH.close = function(){ save(); hide(); }; HH.prev = function(){ save(); preview(); }; HH.brush = function(){ save(); brush(); };
 }
 async function preview(){

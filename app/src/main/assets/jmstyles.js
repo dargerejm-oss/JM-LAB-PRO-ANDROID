@@ -65,6 +65,9 @@ function menu(){
   '<button class="hubB b4" data-a="compare"><span class="i">🎞️</span><span>COMPARER LES PROFILS<small>Ta photo avec chaque profil Fuji, côte à côte</small></span></button>'+
   '<button class="hubB b6" data-a="learn"><span class="i">🟡</span><span>APPRENDRE UN STYLE SNAPSEED<small>Photo avant + photo retouchée → réglages</small></span></button>'+
   '<button class="hubB b1" data-a="x_fx"><span class="i">✨</span><span>EFFETS & RETOUCHE LOCALE<small>Ciel, visage, dégradé, grain, N&B, redressement, pinceau</small></span></button>'+
+  '<button class="hubB b4" data-a="x_card"><span class="i">🎓</span><span>FICHE DE COURS<small>Image avant / après + réglages, à donner aux élèves</small></span></button>'+
+  '<button class="hubB b5" data-a="x_defi"><span class="i">🎯</span><span>DÉFI DU JOUR<small>Un style au hasard pour s\'entraîner</small></span></button>'+
+  '<button class="hubB b3" data-a="x_big"><span class="i">🔠</span><span>GRAND TEXTE (on / off)<small>Agrandit toute l\'interface</small></span></button>'+
   '<button class="hubB b2" data-a="x_dup"><span class="i">📂</span><span>STYLE → PLUSIEURS DOSSIERS<small>Associer un style à plusieurs noms de dossier d\'un coup</small></span></button>'+
   '<button class="hubB b2" data-a="x_int"><span class="i">🎚️</span><span>INTENSITÉ & MÉLANGE<small>Un style à 60 %, ou 2 styles mélangés</small></span></button>'+
   '<button class="hubB b3" data-a="x_ba"><span class="i">↔️</span><span>AVANT / APRÈS<small>Curseur glissant sur ta photo</small></span></button>'+
