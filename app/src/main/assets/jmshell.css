@@ -13,7 +13,6 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 .scroll-content>.mt-5 button.border-\[\#ffcc00\]{outline:4px solid #FFB300;outline-offset:-1px;box-shadow:0 0 16px #FFB300aa}
 .gBtn.on,.hubB.on,.jxFavB.on{outline:4px solid #FFB300;outline-offset:2px}
 .gDest label:has(input:checked){outline:3px solid #FFB300;border-radius:10px}
-#jxSave{position:fixed;right:10px;top:40px;z-index:1450;border:0;border-radius:14px;background:#43A047;color:#fff;font-weight:900;font-size:13px;padding:10px 14px;box-shadow:0 2px 8px #000a;display:none}
 .scroll-content>.grid.grid-cols-2.mb-4 button{min-height:78px;font-size:15px!important;border-radius:18px!important;box-shadow:0 4px 10px rgba(0,0,0,.4)}
 .scroll-content>.mt-5 button{min-height:62px;border-radius:16px!important}
 
@@ -130,4 +129,6 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 #jxUR{position:fixed;left:10px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:1400;display:none;gap:8px}
 body[data-tab=reg] #jxUR{display:flex}
 #jxUR button{width:48px;height:48px;border-radius:50%;border:0;background:#1E88E5;color:#fff;font-size:26px;font-weight:900;box-shadow:0 2px 8px #000a}
-#jxOpen{position:fixed;right:10px;top:40px;z-index:1450;border:0;border-radius:14px;background:#FFB300;color:#000;font-weight:900;font-size:13px;padding:10px 14px;box-shadow:0 2px 8px #000a;display:none}
+#jxOpen,#jxSave{position:fixed;top:6px;width:118px;box-sizing:border-box;z-index:1450;border:0;border-radius:12px;color:#fff;font-weight:900;font-size:11px;line-height:1.1;padding:8px 4px;box-shadow:0 2px 8px #000a;display:none;text-align:center}
+#jxOpen{left:calc(50% - 121px);background:#FFB300;color:#000}
+#jxSave{left:calc(50% + 3px);background:#43A047}
