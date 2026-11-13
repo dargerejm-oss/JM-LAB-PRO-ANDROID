@@ -101,6 +101,9 @@ box.addEventListener("click", function(e){
   else if(a === "share"){ var t2 = document.getElementById("hubTa").value; if(NAT) NAT.shareText(t2); else note(t2); }
   else if(a === "doimport"){ var r = parseAny(document.getElementById("hubTa").value); if(!r.presets.length) return note("Aucun style reconnu dans ce texte."); addPresets(r.presets); note(r.presets.length+" style(s) importé(s) ✔"+(r.unmapped.length?"\nIgnorés (pas de réglage équivalent) : "+r.unmapped.join(", "):"")); menu(); }
   else if(a === "qr"){ drawQR(+b.dataset.i); }
+  else if(a === "qrsnap"){ var pp = load()[+b.dataset.i]; window.__jmsSnap.encode(pp.values, pp.name).then(function(u){
+      sub("🟡 QR POUR SNAPSEED", '<canvas id="hubQR" style="display:block;margin:10px auto;background:#fff;border-radius:12px;padding:10px"></canvas><div class="sub">Réglages de base (exposition, contraste, saturation, ambiance, ombres, hautes lumières, chaleur). Le vignettage n\'est pas inclus.</div><button class="hubB b3" data-a="qrsave"><span class="i">💾</span><span>ENREGISTRER DANS LA GALERIE</span></button>');
+      if(window.QRCode && window.QRCode.toCanvas) window.QRCode.toCanvas(document.getElementById("hubQR"), u, {width:320, margin:2, errorCorrectionLevel:"L"}); }); }
   else if(a === "qrsave"){ var c = document.getElementById("hubQR"); c.toBlob(function(bl){ window.__jmsSave("JMLAB_QR_"+stamp()+".png", bl); }, "image/png"); }
   else if(a === "snapcopy"){ try{ navigator.clipboard.writeText(document.getElementById("hubRaw").textContent); }catch(x){} note("Contenu copié."); }
 });
@@ -138,6 +141,7 @@ function drawQR(i){
   var code = toCode(p);
   sub("🖼️ "+esc(p.name), '<canvas id="hubQR" style="display:block;margin:10px auto;background:#fff;border-radius:12px;padding:10px"></canvas>'+
     '<div class="hubOut">'+esc(code)+'</div>'+
+    '<button class="hubB b6" data-a="qrsnap" data-i="'+i+'"><span class="i">🟡</span><span>QR POUR SNAPSEED<small>Créer le code que Snapseed sait lire</small></span></button>'+
     '<button class="hubB b3" data-a="qrsave"><span class="i">💾</span><span>ENREGISTRER DANS LA GALERIE</span></button>');
   if(window.QRCode && window.QRCode.toCanvas) window.QRCode.toCanvas(document.getElementById("hubQR"), code, {width:300, margin:2});
   else note("Le composant QR n'est pas chargé.");
@@ -169,6 +173,16 @@ async function inflate(bytes, fmt){
 }
 async function analyse(res){
   var text = res.data, bytes = new Uint8Array(res.binaryData || []);
+  if(/^https?:\/\/snapseed\.com\/qr\?/i.test(text) && window.__jmsSnap){
+    try{
+      var sr = await window.__jmsSnap.decode(text);
+      if(Object.keys(sr.values).length){
+        addPresets([{name:sr.name, values:sr.values, date:new Date().toISOString()}]);
+        var lst = Object.keys(sr.values).map(function(k){ return k+" "+sr.values[k]; }).join(" • ");
+        return sub("🟡 STYLE SNAPSEED IMPORTÉ ✔", '<div class="sub"><b>'+esc(sr.name)+'</b> est dans MES PRESETS.</div><div class="hubOut">'+esc(lst)+(sr.ignored.length?"\n\nFiltres Snapseed sans équivalent ici (ignorés) : "+sr.ignored.length+" (n° "+sr.ignored.join(", ")+")":"")+'</div><div class="sub">Conversion approchée : compare avec ta photo et ajuste si besoin.</div>');
+      }
+    }catch(e){ note("QR Snapseed reconnu mais illisible : "+e.message); }
+  }
   var imp = parseAny(text);
   if(imp.presets.length){ addPresets(imp.presets); return note(imp.presets.length+" style(s) JM LAB importé(s) ✔"); }
   var rep = "Longueur : "+bytes.length+" octets\n";
