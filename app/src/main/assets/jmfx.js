@@ -12,7 +12,7 @@ var strokes = [];
 function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && (s.angle || strokes.length))); }
 function summary(){
   var s = get(), a = [];
-  if(s.smooth) a.push("peau lissée "+s.smooth+"%"); if(s.sharp) a.push("netteté "+s.sharp+"%"); if(s.denoise) a.push("bruit "+s.denoise+"%"); if(s.crop) a.push("format "+s.crop); if(s.wm) a.push("filigrane"); if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw);
+  if(s.smooth) a.push("peau lissée "+s.smooth+"%"); if(s.sharp) a.push("netteté "+s.sharp+"%"); if(s.denoise) a.push("bruit "+s.denoise+"%"); if(s.crop) a.push("format "+s.crop); if(s.wm) a.push("filigrane"); if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw); if(s.angle) a.push("redressement "+s.angle+"°");
   return a.join(" • ");
 }
 function cvs(w,h){ var c = document.createElement("canvas"); c.width = Math.max(1,Math.round(w)); c.height = Math.max(1,Math.round(h)); return c; }
@@ -124,7 +124,7 @@ if(window.__jmsCS){
   window.__jmsCS.process = function(blob, Q){ Q = Q || {}; var p = active(Q) ? run(blob, Q) : Promise.resolve(blob); return p.then(function(b){ return orig(b, Q); }); };
 }
 window.__jmsFX = {active:active, summary:summary, run:run, render:render, get:get};
-document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple) strokes = []; }, true);
+document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple){ strokes = []; try{ var o = get(); if(o.angle){ o.angle = 0; put(o); var sl = document.getElementById("fxAng"); if(sl){ sl.value = 0; var v = document.getElementById("fxAngv"); if(v) v.textContent = 0; } } }catch(e){} } }, true);
 
 /* ---------- interface ---------- */
 var ov = document.createElement("div"); ov.id = "jmsFXo"; ov.className = "jmsOvl"; ov.style.zIndex = 3360;
