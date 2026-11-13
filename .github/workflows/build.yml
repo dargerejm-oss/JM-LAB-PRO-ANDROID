@@ -23,6 +23,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/libs" && cd "$RUNNER_TEMP/libs"
           npm init -y >/dev/null
           npm install qrcode@1.4.4 jsqr@1.4.0 --no-audit --no-fund
+          mkdir -p "$GITHUB_WORKSPACE/app/src/main/assets/libs"
           cp node_modules/qrcode/build/qrcode.min.js "$GITHUB_WORKSPACE/app/src/main/assets/libs/qrcode.min.js"
           cp node_modules/jsqr/dist/jsQR.js "$GITHUB_WORKSPACE/app/src/main/assets/libs/jsQR.js"
           ls -la "$GITHUB_WORKSPACE/app/src/main/assets/libs"
