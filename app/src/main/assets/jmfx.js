@@ -1,18 +1,18 @@
-/* JM LAB PRO - EFFETS : ciel auto, visage/peau auto, degrade, grain, noir & blanc, redressement, pinceau */
+/* JM LAB PRO - EFFETS : ciel auto, visage/peau auto, degrade, grain, noir & blanc, pinceau */
 (function(){
 "use strict";
 var KEY = "jms_fx";
-var D = {sky:0, face:0, grad:0, grain:0, bw:"", angle:0, smooth:0, sharp:0, denoise:0, crop:"", wm:"", wmop:30};
+var D = {sky:0, face:0, grad:0, grain:0, bw:"", smooth:0, sharp:0, denoise:0, crop:"", wm:"", wmop:30};
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
 function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 function get(){ try{ var o = JSON.parse(localStorage.getItem(KEY)||"{}"); return Object.assign({}, D, o); }catch(e){ return Object.assign({}, D); } }
 function put(o){ localStorage.setItem(KEY, JSON.stringify(o)); }
 var strokes = [];
-function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && (s.angle || strokes.length))); }
+function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && strokes.length)); }
 function summary(){
   var s = get(), a = [];
-  if(s.smooth) a.push("peau lissée "+s.smooth+"%"); if(s.sharp) a.push("netteté "+s.sharp+"%"); if(s.denoise) a.push("bruit "+s.denoise+"%"); if(s.crop) a.push("format "+s.crop); if(s.wm) a.push("filigrane"); if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw); if(s.angle) a.push("redressement "+s.angle+"°");
+  if(s.smooth) a.push("peau lissée "+s.smooth+"%"); if(s.sharp) a.push("netteté "+s.sharp+"%"); if(s.denoise) a.push("bruit "+s.denoise+"%"); if(s.crop) a.push("format "+s.crop); if(s.wm) a.push("filigrane"); if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw);
   return a.join(" • ");
 }
 function cvs(w,h){ var c = document.createElement("canvas"); c.width = Math.max(1,Math.round(w)); c.height = Math.max(1,Math.round(h)); return c; }
@@ -75,8 +75,7 @@ function brushMasks(w,h){
 /* ---------- rendu ---------- */
 async function render(bmp, Q){
   Q = Q || {}; var s = get(), w = bmp.width, h = bmp.height, c = cvs(w,h), x = c.getContext("2d");
-  if(Q.single && s.angle){ var a = s.angle*Math.PI/180, k = Math.cos(Math.abs(a)) + Math.sin(Math.abs(a))*Math.max(w/h, h/w); x.save(); x.translate(w/2,h/2); x.rotate(a); x.scale(k,k); x.drawImage(bmp,-w/2,-h/2); x.restore(); }
-  else x.drawImage(bmp,0,0);
+  x.drawImage(bmp,0,0);
   if(s.bw){
     var tint = {red:"rgb(255,130,130)", yellow:"rgb(255,230,120)", green:"rgb(140,255,150)", blue:"rgb(140,170,255)"}[s.bw];
     if(tint){ x.globalCompositeOperation = "multiply"; x.fillStyle = tint; x.fillRect(0,0,w,h); x.globalCompositeOperation = "source-over"; }
@@ -124,7 +123,7 @@ if(window.__jmsCS){
   window.__jmsCS.process = function(blob, Q){ Q = Q || {}; var p = active(Q) ? run(blob, Q) : Promise.resolve(blob); return p.then(function(b){ return orig(b, Q); }); };
 }
 window.__jmsFX = {active:active, summary:summary, run:run, render:render, get:get};
-document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple){ strokes = []; try{ var o = get(); if(o.angle){ o.angle = 0; put(o); var sl = document.getElementById("fxAng"); if(sl){ sl.value = 0; var v = document.getElementById("fxAngv"); if(v) v.textContent = 0; } } }catch(e){} } }, true);
+document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple) strokes = []; }, true);
 
 /* ---------- interface ---------- */
 var ov = document.createElement("div"); ov.id = "jmsFXo"; ov.className = "jmsOvl"; ov.style.zIndex = 3360;
@@ -149,15 +148,14 @@ function screen(){
    sl("fxSm","💆 Peau lissée (visage)",s.smooth,0,100)+sl("fxSh","🔍 Netteté",s.sharp,0,100)+sl("fxDn","🌫️ Réduction du bruit",s.denoise,0,100)+
    '<label class="gL">📱 Recadrage prêt à publier</label><select class="gIn" id="fxCr" style="width:100%"><option value="">Aucun</option><option value="1:1">Carré 1:1</option><option value="4:5">Instagram 4:5</option><option value="9:16">Story 9:16</option><option value="16:9">Paysage 16:9</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select>'+
    '<label class="gL">©️ Filigrane de protection (texte, vide = aucun)</label><input class="gIn" id="fxWm" type="text" style="width:100%" value="'+esc(s.wm)+'">'+sl("fxWo","Opacité du filigrane",s.wmop,5,80)+
-   sl("fxAng","📐 Redressement (photo seule)",s.angle,-10,10,"°")+
    '<button class="jmsBtn go" data-f="prev">👁️ VOIR LE RÉSULTAT SUR MA PHOTO</button>'+
    '<button class="jmsBtn go" data-f="brush">🖌️ PINCEAU : ÉCLAIRCIR / ASSOMBRIR AU DOIGT</button>'+
    '<button class="jmsBtn close" data-f="close">TERMINÉ</button>');
   $("fxBw").value = s.bw === "" ? "" : (["red","yellow","green","blue"].indexOf(s.bw) >= 0 ? s.bw : "n");
   $("fxCr").value = s.crop;
-  function save(){ var o = get(); o.smooth = +$("fxSm").value; o.sharp = +$("fxSh").value; o.denoise = +$("fxDn").value; o.crop = $("fxCr").value; o.wm = $("fxWm").value.trim(); o.wmop = +$("fxWo").value; $("fxSmv").textContent = o.smooth; $("fxShv").textContent = o.sharp; $("fxDnv").textContent = o.denoise; $("fxWov").textContent = o.wmop; o.sky = +$("fxSky").value; o.face = +$("fxFace").value; o.grad = +$("fxGrad").value; o.grain = +$("fxGrain").value; o.angle = +$("fxAng").value; var b = $("fxBw").value; o.bw = b === "n" ? "gray" : b; put(o);
-    $("fxSkyv").textContent = o.sky; $("fxFacev").textContent = o.face; $("fxGradv").textContent = o.grad; $("fxGrainv").textContent = o.grain; $("fxAngv").textContent = o.angle; }
-  ["fxSky","fxFace","fxGrad","fxGrain","fxAng","fxBw","fxSm","fxSh","fxDn","fxCr","fxWm","fxWo"].forEach(function(id){ $(id).oninput = save; $(id).onchange = save; });
+  function save(){ var o = get(); o.smooth = +$("fxSm").value; o.sharp = +$("fxSh").value; o.denoise = +$("fxDn").value; o.crop = $("fxCr").value; o.wm = $("fxWm").value.trim(); o.wmop = +$("fxWo").value; $("fxSmv").textContent = o.smooth; $("fxShv").textContent = o.sharp; $("fxDnv").textContent = o.denoise; $("fxWov").textContent = o.wmop; o.sky = +$("fxSky").value; o.face = +$("fxFace").value; o.grad = +$("fxGrad").value; o.grain = +$("fxGrain").value; var b = $("fxBw").value; o.bw = b === "n" ? "gray" : b; put(o);
+    $("fxSkyv").textContent = o.sky; $("fxFacev").textContent = o.face; $("fxGradv").textContent = o.grad; $("fxGrainv").textContent = o.grain; }
+  ["fxSky","fxFace","fxGrad","fxGrain","fxBw","fxSm","fxSh","fxDn","fxCr","fxWm","fxWo"].forEach(function(id){ $(id).oninput = save; $(id).onchange = save; });
   HH.close = function(){ save(); hide(); }; HH.prev = function(){ save(); preview(); }; HH.brush = function(){ save(); brush(); };
 }
 async function preview(){
