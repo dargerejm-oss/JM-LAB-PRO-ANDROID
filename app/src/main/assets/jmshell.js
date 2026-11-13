@@ -1,0 +1,165 @@
+/* JM LAB PRO - habillage APK : onglets, sablier 3D, TERMINE, enregistrement galerie */
+(function(){
+"use strict";
+var NAT = window.JMNative || null;
+var $ = function(id){return document.getElementById(id)};
+
+/* ---------- 1. onglets ---------- */
+var tabs = document.createElement("div"); tabs.id = "jmsTabs";
+[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FUJI"],["exp","📤","EXPORT / LOT"],["qr","🎨","STYLES / QR"]].forEach(function(t){
+  var b = document.createElement("button"); b.className = "t-"+t[0]; b.dataset.k = t[0];
+  b.innerHTML = '<span class="i">'+t[1]+'</span>'+t[2];
+  b.onclick = function(){ go(t[0]); };
+  tabs.appendChild(b);
+});
+document.body.appendChild(tabs);
+function go(k){
+  if(k === "qr"){ if(window.__jmsHub) window.__jmsHub(); return; }
+  document.body.dataset.tab = k;
+  Array.prototype.forEach.call(tabs.children, function(b){ b.classList.toggle("on", b.dataset.k === k); });
+  window.scrollTo(0,0);
+  var sc = document.querySelector(".scroll-content"); if(sc) sc.scrollTop = 0;
+}
+go("reg");
+
+/* masque le bouton INSTALLER APP (inutile dans une vraie appli) */
+function tidy(){
+  document.querySelectorAll("button").forEach(function(b){
+    if(/INSTALLER APP/i.test(b.textContent)) b.style.display = "none";
+  });
+}
+new MutationObserver(tidy).observe(document.body,{childList:true,subtree:true}); tidy();
+
+/* ---------- 2. sablier 3D (meme sablier que NETTOYAGE PRO) ---------- */
+function hgSVG(){return '<svg viewBox="0 0 150 220" id="hg"><defs>'+
+'<linearGradient id="hgGl" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".25" stop-color="#cfe9f5" stop-opacity=".25"/><stop offset=".75" stop-color="#9fd0e8" stop-opacity=".18"/><stop offset="1" stop-color="#fff" stop-opacity=".6"/></linearGradient>'+
+'<linearGradient id="hgWd" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#a1672f"/><stop offset=".5" stop-color="#7b4a1d"/><stop offset="1" stop-color="#4e2c0e"/></linearGradient>'+
+'<radialGradient id="hgSh" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></radialGradient>'+
+'<clipPath id="hgcT"><path d="M30 28 H120 C120 70 88 92 80 110 H70 C62 92 30 70 30 28Z"/></clipPath>'+
+'<clipPath id="hgcB"><path d="M70 110 H80 C88 128 120 150 120 192 H30 C30 150 62 128 70 110Z"/></clipPath></defs>'+
+'<ellipse cx="75" cy="212" rx="62" ry="7" fill="#000" opacity=".22"/>'+
+'<rect x="16" y="196" width="118" height="16" rx="6" fill="url(#hgWd)"/><rect x="16" y="196" width="118" height="4" rx="2" fill="#fff" opacity=".25"/>'+
+'<g clip-path="url(#hgcT)"><rect id="hgT" x="20" y="28" width="110" height="82" fill="#E53935"/><rect id="hgTh" x="20" y="28" width="110" height="82" fill="url(#hgSh)"/></g>'+
+'<g clip-path="url(#hgcB)"><path id="hgB" d="" fill="#E53935"/><path id="hgBh" d="" fill="url(#hgSh)"/></g>'+
+'<line id="hgS" class="hgs" x1="75" x2="75" y1="108" y2="108" stroke="#E53935" stroke-width="2.6"/>'+
+'<path d="M30 28 H120 C120 70 88 92 80 110 H70 C62 92 30 70 30 28Z M70 110 H80 C88 128 120 150 120 192 H30 C30 150 62 128 70 110Z" fill="url(#hgGl)" stroke="#8fb9cc" stroke-width="2.5"/>'+
+'<path d="M40 36 C42 66 60 84 66 104" stroke="#fff" stroke-width="5" stroke-linecap="round" fill="none" opacity=".75"/>'+
+'<path d="M40 184 C42 160 52 148 58 138" stroke="#fff" stroke-width="4" stroke-linecap="round" fill="none" opacity=".45"/>'+
+'<rect x="18" y="14" width="114" height="16" rx="6" fill="url(#hgWd)"/><rect x="18" y="14" width="114" height="4" rx="2" fill="#fff" opacity=".25"/></svg>';}
+function hgCol(p){var a=[[0,[229,57,53]],[.45,[251,140,0]],[.75,[253,216,53]],[1,[67,160,71]]];
+  for(var i=1;i<a.length;i++) if(p<=a[i][0]){var x=a[i-1],y=a[i],k=(p-x[0])/(y[0]-x[0]);
+    return "rgb("+x[1].map(function(v,j){return Math.round(v+(y[1][j]-v)*k)}).join(",")+")";}
+  return "rgb(67,160,71)";}
+function hgSet(pct,run){
+  var p=Math.max(0,Math.min(1,pct/100)),c=hgCol(p),h=82*(1-p);
+  var T=$("hgT"),Th=$("hgTh"); T.setAttribute("y",110-h);T.setAttribute("height",h);T.setAttribute("fill",c);
+  Th.setAttribute("y",110-h);Th.setAttribute("height",h);
+  var d="M20 192 H130 V"+(192-58*p)+" Q100 "+(192-58*p)+" 75 "+(192-70*p-6)+" Q50 "+(192-58*p)+" 20 "+(192-58*p)+"Z";
+  $("hgB").setAttribute("d",d);$("hgB").setAttribute("fill",c);$("hgBh").setAttribute("d",d);
+  var S=$("hgS");S.setAttribute("y2",run&&p<1&&p>0?(192-70*p-6):108);S.setAttribute("stroke",c);
+  $("ptxt").textContent=Math.round(pct)+" %";$("ptxt").style.color=c;
+  $("jmsFill").style.width=pct+"%";$("jmsFill").style.background=c;}
+
+var ov = document.createElement("div"); ov.id = "jmsOv";
+ov.innerHTML = '<div id="jmsBox"><div class="jmsTitle">🎞️ JM LAB PRO • LOT</div>'+
+ '<div id="jmsBan" class="jmsBan">PRÊT</div>'+
+ '<div class="hgw"><div class="hgflip" id="hgflip">'+hgSVG()+'</div><div class="hgr"><div class="hgp" id="ptxt">0 %</div>'+
+ '<div class="clocks"><span>⏱ ÉCOULÉ <span id="cEl">00:00</span></span><span>⌛ RESTE <span id="cLeft">--:--</span></span></div></div></div>'+
+ '<div class="jmsBar"><div id="jmsFill"></div></div><div class="jmsCnt" id="jmsCnt"></div>'+
+ '<div class="jmsSum" id="jmsSum" style="display:none"></div>'+
+ '<button class="jmsBtn stop" id="jmsStop">⛔ STOP</button>'+
+ '<button class="jmsBtn zip" id="jmsZip" style="display:none">📦 TÉLÉCHARGER LE ZIP</button>'+
+ '<button class="jmsBtn close" id="jmsClose" style="display:none">FERMER</button></div>';
+document.body.appendChild(ov);
+
+var st = {total:0, done:0, err:0, t0:0, timer:null, running:false, stopped:false};
+function mmss(s){s=Math.max(0,Math.round(s));return ("0"+Math.floor(s/60)).slice(-2)+":"+("0"+(s%60)).slice(-2)}
+function tick(){
+  var el = (Date.now()-st.t0)/1000; $("cEl").textContent = mmss(el);
+  $("cLeft").textContent = st.done>0 ? mmss(el/st.done*(st.total-st.done)) : "--:--";
+}
+function refresh(){
+  var pct = st.total ? st.done/st.total*100 : 0;
+  hgSet(pct, st.running);
+  $("jmsCnt").textContent = st.done+" / "+st.total+" images traitées";
+}
+function beep(){
+  try{
+    var A = window.AudioContext||window.webkitAudioContext, c = new A();
+    [660,880,1100].forEach(function(f,i){
+      var o=c.createOscillator(),g=c.createGain(); o.frequency.value=f; o.connect(g); g.connect(c.destination);
+      g.gain.setValueAtTime(.25,c.currentTime+i*.22); g.gain.exponentialRampToValueAtTime(.001,c.currentTime+i*.22+.2);
+      o.start(c.currentTime+i*.22); o.stop(c.currentTime+i*.22+.21);
+    });
+  }catch(e){}
+}
+
+var ps = window.__jmpQueueStart, pi = window.__jmpQueueItem, pf = window.__jmpQueueFinish;
+window.__jmpQueueStart = function(names){
+  window.__jmsStop = false;
+  st = {total:names.length, done:0, err:0, t0:Date.now(), timer:setInterval(tick,500), running:true, stopped:false};
+  $("jmsBan").className = "jmsBan run"; $("jmsBan").textContent = "EN COURS…";
+  $("jmsSum").style.display="none"; $("jmsZip").style.display="none"; $("jmsClose").style.display="none";
+  $("jmsStop").style.display=""; $("jmsStop").disabled=false; $("hgflip").className="hgflip";
+  ov.classList.add("show"); refresh(); tick();
+  if(ps) ps(names);
+};
+window.__jmpQueueItem = function(i,name,blob){
+  st.done++; if(!blob) st.err++; refresh();
+  if(pi) pi(i,name,blob);
+};
+window.__jmpQueueFinish = function(){
+  if(pf) pf();
+  clearInterval(st.timer); st.running = false; tick();
+  var ok = st.done - st.err, stopped = !!window.__jmsStop;
+  hgSet(stopped ? (st.done/st.total*100) : 100, false);
+  $("hgflip").className = "hgflip fin";
+  $("jmsBan").className = "jmsBan " + (stopped ? "stop" : "done");
+  $("jmsBan").textContent = stopped ? "ARRÊTÉ" : "✔ TERMINÉ";
+  $("jmsSum").style.display = "";
+  $("jmsSum").innerHTML = "<b>"+ok+"</b> image(s) prête(s)"+(st.err?" • <b style='color:#ff8a80'>"+st.err+" erreur(s)</b>":"")+
+    "<br>Temps : "+$("cEl").textContent;
+  $("jmsStop").style.display = "none"; $("jmsClose").style.display = "";
+  $("jmsZip").style.display = ok>0 ? "" : "none";
+  beep(); if(NAT){ try{ NAT.vibrate(); NAT.toFront(); }catch(e){} }
+};
+$("jmsStop").onclick = function(){ window.__jmsStop = true; this.disabled = true; $("jmsBan").textContent = "ARRÊT EN COURS…"; };
+$("jmsZip").onclick = function(){ var z = document.querySelector(".jmq-full.jmq-yellow"); if(z) z.click(); };
+$("jmsClose").onclick = function(){ ov.classList.remove("show"); };
+
+/* ---------- 3. telechargements -> galerie / dossier JM LAB PRO ---------- */
+var keep = URL.revokeObjectURL.bind(URL);
+URL.revokeObjectURL = function(u){ setTimeout(function(){ keep(u); }, 120000); };
+function save(name, blob){
+  if(!NAT){ return false; }
+  NAT.saveBegin(name, blob.type || "application/octet-stream");
+  var CH = 768*1024, pos = 0;
+  (function next(){
+    if(pos >= blob.size){ NAT.saveEnd(); return; }
+    var r = new FileReader();
+    r.onload = function(){ NAT.saveChunk(String(r.result).split(",")[1]||""); pos += CH; next(); };
+    r.readAsDataURL(blob.slice(pos, pos+CH));
+  })();
+  return true;
+}
+var origClick = HTMLAnchorElement.prototype.click;
+HTMLAnchorElement.prototype.click = function(){
+  if(NAT && this.download && /^blob:/.test(this.href)){
+    var name = this.download;
+    fetch(this.href).then(function(r){return r.blob()}).then(function(b){ save(name,b); });
+    return;
+  }
+  return origClick.apply(this, arguments);
+};
+
+/* ---------- 4. bouton retour ---------- */
+window.__jmsSave = save;
+window.__jmsBack = function(){
+  var h = document.getElementById("jmsHub"); if(h && h.classList.contains("show")){ h.classList.remove("show"); return 1; }
+  var c = document.querySelector(".jmp-overlay .jmp-close"); if(c){ c.click(); return 1; }
+  var q = document.querySelector(".jmq-overlay .jmq-gray"); if(q){ q.click(); return 1; }
+  if(ov.classList.contains("show")){ if(!st.running) ov.classList.remove("show"); return 1; }
+  if(document.body.dataset.tab !== "reg"){ go("reg"); return 1; }
+  return 0;
+};
+})();

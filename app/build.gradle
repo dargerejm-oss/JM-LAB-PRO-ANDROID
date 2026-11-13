@@ -1,0 +1,50 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.jmdargere.jmlab'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.jmdargere.jmlab"
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName "3.0"
+    }
+
+    // Cle de signature PRIVEE : fournie par GitHub (secrets), jamais dans le depot.
+    signingConfigs {
+        fixe {
+            def ksFile = System.getenv("KEYSTORE_FILE")
+            def ksPass = System.getenv("KEYSTORE_PASSWORD")
+            if (ksFile == null || ksPass == null || !new File(ksFile).exists()) {
+                throw new GradleException("Cle privee absente : ajouter les secrets KEYSTORE_B64 et KEYSTORE_PASSWORD dans GitHub.")
+            }
+            storeFile file(ksFile)
+            storePassword ksPass
+            keyAlias "jmlab"
+            keyPassword ksPass
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.fixe
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.fixe
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation "androidx.webkit:webkit:1.12.1"
+}
