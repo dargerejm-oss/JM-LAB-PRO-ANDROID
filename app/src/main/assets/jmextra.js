@@ -69,13 +69,21 @@ window.__jmsX.x_int = function(){
   upd();
 };
 
+/* ---------- recadrage de l'apercu (sans les bandes sombres) ---------- */
+window.__jmsCrop = function(cv){
+  var W = cv.width, Hh = cv.height, d = cv.getContext("2d").getImageData(0,0,W,Hh).data, bg = [d[0],d[1],d[2]], x0 = W, x1 = -1, y0 = Hh, y1 = -1;
+  for(var yy = 0; yy < Hh; yy += 2) for(var xx = 0; xx < W; xx += 2){ var i = (yy*W+xx)*4; if(Math.abs(d[i]-bg[0])+Math.abs(d[i+1]-bg[1])+Math.abs(d[i+2]-bg[2]) > 18){ if(xx < x0) x0 = xx; if(xx > x1) x1 = xx; if(yy < y0) y0 = yy; if(yy > y1) y1 = yy; } }
+  if(x1 - x0 < 20 || y1 - y0 < 20) return cv;
+  var o = document.createElement("canvas"); o.width = x1-x0-1; o.height = y1-y0-1; o.getContext("2d").drawImage(cv, x0+1, y0+1, o.width, o.height, 0, 0, o.width, o.height); return o;
+};
+
 /* ---------- avant / apres ---------- */
 var lastFile = null;
 document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple && t.files && t.files[0] && /^image/.test(t.files[0].type)) lastFile = t.files[0]; }, true);
 window.__jmsX.x_ba = function(){
   var cv = document.querySelector(".fixed-top canvas");
   if(!lastFile || !cv || cv.width < 10){ alert("Choisis d'abord une image (onglet RÉGLAGES)."); return; }
-  var url = URL.createObjectURL(lastFile), after = cv.toDataURL("image/jpeg", 0.9);
+  var url = URL.createObjectURL(lastFile), after = window.__jmsCrop(cv).toDataURL("image/jpeg", 0.92);
   show('<div class="jmsTitle">↔️ AVANT / APRÈS</div>'+
    '<div id="jxBA" style="position:relative;border-radius:12px;overflow:hidden;background:#000;touch-action:none"><img id="jxBefore" src="'+url+'" style="width:100%;display:block"><img src="'+after+'" id="jxAfter" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;clip-path:inset(0 0 0 50%)">'+
    '<div id="jxLine" style="position:absolute;top:0;bottom:0;left:50%;width:3px;background:#fff;box-shadow:0 0 6px #000"></div>'+

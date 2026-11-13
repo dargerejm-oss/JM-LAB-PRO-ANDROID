@@ -32,7 +32,7 @@ var handlers = {};
 
 /* ---------- 1. comparer les profils ---------- */
 window.__jmsCompare = async function(){
-  var cv = appCanvas(), btns = profileButtons();
+  var cv0 = appCanvas(), cv = cv0 && window.__jmsCrop ? window.__jmsCrop(cv0) : cv0, btns = profileButtons();
   if(!cv){ alert("Choisis d'abord une image (onglet RÉGLAGES ou EXPORT, bouton CHOISIR IMAGE)."); return; }
   if(!btns.length){ alert("Profils introuvables."); return; }
   var sl = sliders(), keep = sl.map(function(r){ return r.value; });
@@ -41,7 +41,7 @@ window.__jmsCompare = async function(){
   for(var i = 0; i < btns.length; i++){
     if(window.__jmsStop) break;
     btns[i].click(); await wait(320);
-    var t = document.createElement("canvas"); t.width = W; t.height = H; t.getContext("2d").drawImage(appCanvas(), 0, 0, W, H);
+    var t = document.createElement("canvas"); t.width = W; t.height = H; t.getContext("2d").drawImage(window.__jmsCrop ? window.__jmsCrop(appCanvas()) : appCanvas(), 0, 0, W, H);
     thumbs.push({n:(btns[i].innerText||"").split("\n")[0].trim(), u:t.toDataURL("image/jpeg", 0.8), i:i});
     window.__jmsProgress.set((i+1)/btns.length*100, (i+1)+" / "+btns.length+" profils");
   }
