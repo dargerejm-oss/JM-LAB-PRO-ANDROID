@@ -181,6 +181,7 @@ window.__jmsX.x_mysave = function(){
   show('<div class="jmsTitle">💾 ENREGISTRER MON RÉGLAGE</div><div class="jtSub"><b>Profil Fuji :</b> '+esc(prof || "aucun")+'<br><b>Curseurs :</b> '+esc(txt)+(fxOn ? '<br><b>Effets :</b> '+esc(window.__jmsFX.summary()) : "")+'</div>'+
    '<label class="gL">Nom du preset</label><input class="gIn" id="jxPN" type="text" style="width:100%" value="Mon réglage '+new Date().toLocaleDateString("fr-FR")+'">'+
    '<button class="jmsBtn go" data-x="xps">✔ ENREGISTRER LE PRESET</button>'+
+   '<button class="jmsBtn go" data-x="xpl">⬇ ENREGISTRER + CRÉER UN LUT (.cube)</button>'+
    '<button class="jmsBtn close" data-x="close">ANNULER</button>');
   function doSave(){ var nm = ($("jxPN").value||"").trim() || "Mon réglage", l = load(); l.push({name:nm, values:vals, profile:prof, fx:fxOn ? fx : null, date:new Date().toISOString()}); store(l); return nm; }
   H.xps = function(){ var nm = doSave(); hide(); alert("Preset « "+nm+" » enregistré ✔\\nTu le retrouves dans MES PRESETS."); };
@@ -190,7 +191,7 @@ window.__jmsX.x_mylist = function(){
   var l = load();
   show('<div class="jmsTitle">📚 MES PRESETS</div>'+(l.length ? l.map(function(p,i){
     var sub = (p.profile ? "Profil "+p.profile+" • " : "") + (Object.keys(p.values||{}).length + " curseur(s)") + (p.fx ? " • effets" : "");
-    return '<div class="jxPr"><b>'+esc(p.name)+'</b><small>'+esc(sub)+'</small><div class="fxRow"><button class="jmsBtn go" data-x="pa" data-i="'+i+'">APPLIQUER</button><button class="jmsBtn close" data-x="pd" data-i="'+i+'">🗑</button></div></div>';
+    return '<div class="jxPr"><b>'+esc(p.name)+'</b><small>'+esc(sub)+'</small><div class="fxRow"><button class="jmsBtn go" data-x="pa" data-i="'+i+'">APPLIQUER</button><button class="jmsBtn close" data-x="pl" data-i="'+i+'">LUT</button><button class="jmsBtn close" data-x="pd" data-i="'+i+'">🗑</button></div></div>';
   }).join("") : '<div class="jtSub">Aucun preset. Fais tes réglages puis « ENREGISTRER MON RÉGLAGE ».</div>')+'<button class="jmsBtn close" data-x="close">FERMER</button>');
   H.pa = function(b){ var p = l[+b.dataset.i]; hide(); applyPreset(p); goTab("reg"); };
   H.pl = function(b){ var p = l[+b.dataset.i]; hide(); applyPreset(p); setTimeout(function(){ makeLUT(p.name, false); }, 900); };
@@ -200,33 +201,34 @@ window.__jmsX.x_mylist = function(){
 /* LUT 3D (.cube) : on fait traiter une mire de couleurs par l'appli et on relit le resultat */
 async function makeLUT(name, restoreImage){
   var N = 17, COLS = 70, B = 5, rows = Math.ceil(N*N*N/COLS), PR = window.__jmsProgress;
-  var keepFile = lastFile, vals = sliders().map(function(r){ return r.value; }), prof = curProfile(), vig = sliders()[13];
-  if(!document.querySelector("input[type=file]:not([multiple])")){ alert("Ouvre d'abord une image."); return; }
+  var inp = document.querySelector("input[type=file]:not([multiple])");
+  if(!inp || !window.__jmsU){ alert("Ouvre d'abord une image."); return; }
+  var keepFile = lastFile, vals = sliders().map(function(r){ return r.value; }), prof = curProfile(), SPATIAL = [9,12,13];
   PR.start("🎨 CRÉATION DU LUT"); PR.set(5, "Préparation de la mire");
   var t = document.createElement("canvas"); t.width = COLS*B; t.height = rows*B; var tx = t.getContext("2d");
   tx.fillStyle = "#000"; tx.fillRect(0,0,t.width,t.height);
   for(var b = 0; b < N; b++) for(var g = 0; g < N; g++) for(var r = 0; r < N; r++){ var idx = r + N*(g + N*b); tx.fillStyle = "rgb("+Math.round(r*255/(N-1))+","+Math.round(g*255/(N-1))+","+Math.round(b*255/(N-1))+")"; tx.fillRect((idx%COLS)*B, Math.floor(idx/COLS)*B, B, B); }
   var blob = await new Promise(function(res){ t.toBlob(res, "image/png"); });
-  var inp = document.querySelector("input[type=file]:not([multiple])"), dt = new DataTransfer(); dt.items.add(new File([blob], "mire.png", {type:"image/png"}));
-  var vigOld = vig ? vig.value : 0; if(vig) setVal(vig, 0);
+  var dt = new DataTransfer(); dt.items.add(new File([blob], "mire.png", {type:"image/png"}));
   inp.files = dt.files; inp.dispatchEvent(new Event("change", {bubbles:true}));
-  PR.set(30, "Traitement de la mire"); await wait(2200);
-  /* l'exposition automatique depend de la photo : on la neutralise pour que le LUT soit valable sur toutes les photos */
-  var hd = document.querySelector(".scroll-content > div") ? document.querySelector(".scroll-content > div").innerText : "", mEV = hd.match(/EV\s*([+-]?\d+(?:\.\d+)?)/), autoEV = mEV ? parseFloat(mEV[1]) : 0, expS = sliders()[1];
-  if(expS && autoEV){ setVal(expS, Math.max(-5, Math.min(5, Math.round((parseFloat(vals[1]) - autoEV)*10)/10))); await wait(1500); }
+  PR.set(25, "Chargement de la mire"); await wait(1200);
+  var sl0 = sliders(); SPATIAL.forEach(function(i){ if(sl0[i]) setVal(sl0[i], 0); });   // effets locaux : impossibles dans un LUT
+  window.__jmsNoAuto = true;                                                           // exposition automatique : dépend de la photo, hors LUT
+  await wait(400); window.__jmsU(); await wait(250);
+  PR.set(55, "Lecture des couleurs");
   var cv = document.getElementById("filteredCanvas"), crop = window.__jmsCrop(cv), cx = crop.getContext("2d"), W = crop.width, Hh = crop.height, lines = [];
-  PR.set(60, "Lecture des couleurs");
   var d = cx.getImageData(0,0,W,Hh).data;
   function px(u, v){ var X = Math.max(1, Math.min(W-2, Math.round(u*W))), Y = Math.max(1, Math.min(Hh-2, Math.round(v*Hh))), s = [0,0,0], n = 0; for(var dy = -1; dy <= 1; dy++) for(var dx = -1; dx <= 1; dx++){ var i = ((Y+dy)*W + X+dx)*4; s[0] += d[i]; s[1] += d[i+1]; s[2] += d[i+2]; n++; } return [s[0]/n/255, s[1]/n/255, s[2]/n/255]; }
-  for(var b2 = 0; b2 < N; b2++) for(var g2 = 0; g2 < N; g2++) for(var r2 = 0; r2 < N; r2++){ var id2 = r2 + N*(g2 + N*b2), c = px(((id2%COLS)+0.5)/COLS, (Math.floor(id2/COLS)+0.5)/rows); lines.push(c[0].toFixed(5)+" "+c[1].toFixed(5)+" "+c[2].toFixed(5)); }
+  for(var b2 = 0; b2 < N; b2++) for(var g2 = 0; g2 < N; g2++) for(var r2 = 0; r2 < N; r2++){ var id2 = r2 + N*(g2 + N*b2), c = px(((id2%COLS)+0.5)/COLS, (Math.floor(id2/COLS)+0.5)/rows); lines.push(c.map(function(v){ return Math.max(0, Math.min(1, v)).toFixed(5); }).join(" ")); }
   var safe = String(name).replace(/[^A-Za-z0-9_-]+/g, "_");
-  var cube = "TITLE \""+name.replace(/"/g,"")+"\"\n# JM LAB PRO - LUT 3D\nLUT_3D_SIZE "+N+"\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n"+lines.join("\n")+"\n";
-  PR.set(90, "Enregistrement");
-  // retour a la photo de l'utilisateur
-  sliders().forEach(function(r,i){ setVal(r, vals[i]); }); if(vig) setVal(vig, vigOld);
-  if(keepFile){ var d2 = new DataTransfer(); d2.items.add(keepFile); inp.files = d2.files; inp.dispatchEvent(new Event("change", {bubbles:true})); lastFile = keepFile; await wait(900); sliders().forEach(function(r,i){ setVal(r, vals[i]); }); setProfile(prof); }
-  var ok = await window.__jmsSaveQ("JMLAB_" + safe + ".cube", new Blob([cube], {type:"application/octet-stream"}), "LUT");
-  PR.end("<b>LUT « "+esc(name)+" » créé</b> (17×17×17, format .cube).<br>Dossier : Images / JM LAB PRO / LUT<br><small>Il reprend les réglages de couleur (profil, exposition, contraste, saturation…). Le vignettage, la clarté et les effets locaux ne peuvent pas être dans un LUT.</small>", false);
+  var cube = "TITLE \""+String(name).replace(/"/g,"")+"\"\n# JM LAB PRO - LUT 3D (sans exposition automatique, vignettage, clarte, dehaze)\nLUT_3D_SIZE "+N+"\nDOMAIN_MIN 0 0 0\nDOMAIN_MAX 1 1 1\n"+lines.join("\n")+"\n";
+  PR.set(85, "Remise en place de ta photo");
+  window.__jmsNoAuto = false;
+  if(keepFile){ var d2 = new DataTransfer(); d2.items.add(keepFile); inp.files = d2.files; inp.dispatchEvent(new Event("change", {bubbles:true})); lastFile = keepFile; await wait(900); }
+  sliders().forEach(function(r,i){ setVal(r, vals[i]); }); setProfile(prof);
+  window.__jmsLastCube = cube;
+  await window.__jmsSaveQ("JMLAB_" + safe + ".cube", new Blob([cube], {type:"application/octet-stream"}), "LUT");
+  PR.end("<b>LUT « "+esc(name)+" » créé</b> (17×17×17, format .cube).<br>Dossier : Images / JM LAB PRO / LUT<br><small>Il reprend les réglages de couleur (profil, exposition manuelle, contraste, saturation…). L'exposition automatique, le vignettage, la clarté et le dehaze ne peuvent pas être dans un LUT.</small>", false);
 }
 window.__jmsX.x_lut = function(){ makeLUT("Reglage actuel", true); };
 
