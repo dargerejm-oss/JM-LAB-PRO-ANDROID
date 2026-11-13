@@ -143,6 +143,8 @@ window.__jmsX.x_dup = function(){
 var ob = document.createElement("button"); ob.id = "jxOpen"; ob.textContent = "📂 OUVRIR UNE IMAGE"; document.body.appendChild(ob);
 function openImg(){ var i = document.querySelector("input[type=file]:not([multiple])"); if(i){ i.value = ""; i.click(); } }
 ob.onclick = openImg;
+var sv = document.createElement("button"); sv.id = "jxSave"; sv.textContent = "💾 ENREGISTRER LA PHOTO"; document.body.appendChild(sv);
+sv.onclick = function(){ var b = Array.prototype.slice.call(document.querySelectorAll("button")).filter(function(e){ return /T[ée]l[ée]charger HD/i.test(e.textContent); })[0]; if(b) b.click(); else alert("Bouton d'enregistrement introuvable : va dans l'onglet EXPORT / LOT."); };
 document.addEventListener("click", function(e){
   var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target)) return;
   var c = document.getElementById("filteredCanvas"); if(c && c.style.display !== "none") return;
@@ -151,7 +153,7 @@ document.addEventListener("click", function(e){
 setInterval(function(){
   var f = document.querySelector(".fixed-top"), r = f && f.getBoundingClientRect(), c = document.getElementById("filteredCanvas"), has = c && c.style.display !== "none";
   ob.style.display = (r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show")) ? "block" : "none";
-  if(r) ob.style.top = (r.top + (has ? 40 : 8)) + "px";
+  if(r){ ob.style.top = (r.top + (has ? 40 : 8)) + "px"; sv.style.top = (r.top + (has ? 40 : 8) + 46) + "px"; } sv.style.display = (has && ob.style.display === "block") ? "block" : "none";
 }, 400);
 
 /* ---------- grand texte ---------- */

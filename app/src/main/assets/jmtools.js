@@ -12,7 +12,7 @@ function setVal(input, v){
   setter.call(input, String(v)); input.dispatchEvent(new Event("input", {bubbles:true}));
 }
 function appCanvas(){ var c = document.querySelector(".fixed-top canvas"); return (c && c.width > 10) ? c : null; }
-function profileButtons(){ return Array.prototype.slice.call(document.querySelectorAll(".scroll-content > :nth-child(4) .grid button")); }
+function profileButtons(){ return Array.prototype.slice.call(document.querySelectorAll(".scroll-content > .mt-5 button")); }
 function setFile(input, files){
   var dt = new DataTransfer(); files.forEach(function(f){ dt.items.add(f); });
   input.files = dt.files; input.dispatchEvent(new Event("change", {bubbles:true}));

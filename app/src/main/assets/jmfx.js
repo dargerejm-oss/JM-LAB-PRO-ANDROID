@@ -185,8 +185,8 @@ async function brush(){
   function mark(e){ var p = pos(e), x = c.getContext("2d"); x.beginPath(); x.arc(p.x*W, p.y*Hh, size*W, 0, 7); x.fillStyle = mode > 0 ? "rgba(255,230,80,.25)" : "rgba(80,140,255,.25)"; x.fill(); }
   function setMode(m){
     mode = m; var a = $("fxM1"), d = $("fxM2");
-    a.style.cssText = m > 0 ? "background:#43A047;color:#fff;outline:4px solid #fff" : "background:#3a3a3a;color:#aaa"; a.textContent = m > 0 ? "✔ ☀️ ÉCLAIRCIR" : "☀️ ÉCLAIRCIR";
-    d.style.cssText = m < 0 ? "background:#1E88E5;color:#fff;outline:4px solid #fff" : "background:#3a3a3a;color:#aaa"; d.textContent = m < 0 ? "✔ 🌑 ASSOMBRIR" : "🌑 ASSOMBRIR";
+    a.style.cssText = m > 0 ? "background:#43A047;color:#fff;outline:4px solid #FFB300" : "background:#3a3a3a;color:#aaa"; a.textContent = m > 0 ? "✔ ☀️ ÉCLAIRCIR" : "☀️ ÉCLAIRCIR";
+    d.style.cssText = m < 0 ? "background:#1E88E5;color:#fff;outline:4px solid #FFB300" : "background:#3a3a3a;color:#aaa"; d.textContent = m < 0 ? "✔ 🌑 ASSOMBRIR" : "🌑 ASSOMBRIR";
     var t = $("fxModeT"); if(t){ t.textContent = m > 0 ? "Mode : ÉCLAIRCIR (jaune)" : "Mode : ASSOMBRIR (bleu)"; t.style.color = m > 0 ? "#66BB6A" : "#64B5F6"; }
   }
   HH.m1 = function(){ setMode(1); }; HH.m2 = function(){ setMode(-1); }; setMode(1);
