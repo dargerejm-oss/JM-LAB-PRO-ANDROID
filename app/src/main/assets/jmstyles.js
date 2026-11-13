@@ -61,7 +61,19 @@ function menu(){
   '<button class="hubB b3" data-a="importf"><span class="i">📥</span><span>IMPORTER UN FICHIER<small>Fichier .json / .txt de styles</small></span></button>'+
   '<button class="hubB b4" data-a="code"><span class="i">🔗</span><span>CODE TEXTE<small>Copier, partager (WhatsApp…) ou coller un code</small></span></button>'+
   '<button class="hubB b5" data-a="qrimg"><span class="i">🖼️</span><span>QR EN IMAGE<small>Un style → QR enregistré dans la galerie</small></span></button>'+
-  '<button class="hubB b6" data-a="snap"><span class="i">🟡</span><span>LIRE UN QR SNAPSEED<small>Depuis une capture d\'écran du QR</small></span></button>'+
+  '<button class="hubB b1" data-a="cs"><span class="i">🖼️</span><span>CADRE + SIGNATURE<small>Cadre, initiales / signature, texte, couleurs</small></span></button>'+
+  '<button class="hubB b4" data-a="compare"><span class="i">🎞️</span><span>COMPARER LES PROFILS<small>Ta photo avec chaque profil Fuji, côte à côte</small></span></button>'+
+  '<button class="hubB b6" data-a="learn"><span class="i">🟡</span><span>APPRENDRE UN STYLE SNAPSEED<small>Photo avant + photo retouchée → réglages</small></span></button>'+
+  '<button class="hubB b2" data-a="x_int"><span class="i">🎚️</span><span>INTENSITÉ & MÉLANGE<small>Un style à 60 %, ou 2 styles mélangés</small></span></button>'+
+  '<button class="hubB b3" data-a="x_ba"><span class="i">↔️</span><span>AVANT / APRÈS<small>Curseur glissant sur ta photo</small></span></button>'+
+  '<button class="hubB b5" data-a="x_ref"><span class="i">🎯</span><span>STYLE DEPUIS UNE RÉFÉRENCE<small>Une photo dont tu aimes le rendu</small></span></button>'+
+  '<button class="hubB b1" data-a="x_qrm"><span class="i">🔳</span><span>QR DE PLUSIEURS STYLES<small>Un ou plusieurs QR pour tout transférer</small></span></button>'+
+  '<button class="hubB b4" data-a="x_bak"><span class="i">💾</span><span>SAUVEGARDE AUTO DES STYLES<small id="bakSt"></small></span></button>'+
+  '<button class="hubB b2" data-a="x_fav"><span class="i">⭐</span><span>MES FAVORIS<small>Tes styles préférés en boutons dans RÉGLAGES</small></span></button>'+
+  '<button class="hubB b3" data-a="x_hist"><span class="i">🕘</span><span>HISTORIQUE DES LOTS<small>Tes derniers lots, dossiers et styles</small></span></button>'+
+  '<button class="hubB b5" data-a="x_auto"><span class="i">✨</span><span>AUTO : CORRIGER LA LUMIÈRE<small>Exposition / contraste adaptés à ta photo</small></span></button>'+
+  '<button class="hubB b4" data-a="x_course"><span class="i">🎓</span><span>MODE COURS (on / off)<small>Affiche en grand le réglage que tu bouges</small></span></button>'+
+  '<button class="hubB b6" data-a="snap"><span class="i">🔳</span><span>LIRE UN QR SNAPSEED<small>Depuis une capture d\'écran du QR</small></span></button>'+
   '<button class="hubClose" data-a="close">FERMER</button>';
 }
 function sub(title, html){
@@ -75,6 +87,10 @@ box.addEventListener("click", function(e){
   var a = b.dataset.a;
   if(a === "close") hub.classList.remove("show");
   else if(a === "menu") menu();
+  else if(a === "cs"){ hub.classList.remove("show"); window.__jmsCS.open(null); }
+  else if(a.indexOf("x_") === 0 && window.__jmsX && window.__jmsX[a]){ hub.classList.remove("show"); window.__jmsX[a](); }
+  else if(a === "compare"){ hub.classList.remove("show"); window.__jmsCompare(); }
+  else if(a === "learn"){ hub.classList.remove("show"); window.__jmsLearn(); }
   else if(a === "presets"){ hub.classList.remove("show"); var f = document.querySelector(".jmp-fab"); if(f) f.click(); }
   else if(a === "exportf") doExport();
   else if(a === "importf"){ fileIn.accept = "*/*"; fileIn.onchange = readFile; fileIn.value = ""; fileIn.click(); }
@@ -137,6 +153,9 @@ function readSnap(){
     var x = c.getContext("2d"); x.drawImage(img,0,0,c.width,c.height);
     var d = x.getImageData(0,0,c.width,c.height), res = window.jsQR && window.jsQR(d.data,c.width,c.height,{inversionAttempts:"attemptBoth"});
     URL.revokeObjectURL(url);
+    if(res && /JMLAB_PRESET:/.test(res.data||"")){
+      var rr = parseAny(res.data); if(rr.presets.length){ addPresets(rr.presets); return note(rr.presets.length+" style(s) lu(s) dans le QR et importé(s) ✔"); }
+    }
     if(!res) return sub("🟡 SNAPSEED", '<div class="hubOut">Aucun QR trouvé dans cette image. Recadre la capture sur le QR (fond bien visible) et réessaie.</div>');
     analyse(res);
   };

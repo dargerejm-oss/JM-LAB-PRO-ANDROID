@@ -78,8 +78,12 @@ var gate = document.createElement("div"); gate.id = "jmsGate"; gate.className = 
 gate.innerHTML = '<div class="jmsBoxG"><div class="jmsTitle">🚀 PRÊT À LANCER</div>'+
  '<div class="gN" id="gN"></div>'+
  '<div class="gSt" id="gSt"></div>'+
+ '<button class="gBtn csb" id="gCS">🖼️ CADRE + SIGNATURE<small id="gCSs"></small></button>'+
+ '<label class="gL">⚙️ Qualité / taille</label><select id="gQ" class="gIn sel"><option value="orig">Maximum : taille d\'origine, qualité 92</option><option value="web">Web léger : 2480 px, qualité 85</option><option value="mini">Très léger : 1600 px, qualité 80</option><option value="mail">Mail : 1200 px, qualité 75</option></select><div class="gOrig" id="gOrig"></div>'+
  '<label class="gL">📁 Nom du dossier</label><input id="gName" class="gIn" type="text">'+
- '<label class="gC"><input type="checkbox" id="gDirect" checked> Photos corrigées directement dans la galerie<small id="gPath"></small></label>'+
+ '<label class="gC"><input type="checkbox" id="gDirect" checked> Photos corrigées enregistrées directement<small id="gPath"></small></label>'+
+ '<div class="gDest"><label><input type="radio" name="gDest" value="gal" checked> 🖼️ Galerie</label><label><input type="radio" name="gDest" value="dir"> 📂 Dossier choisi</label></div>'+
+ '<button class="gBtn" id="gPick">📂 CHOISIR UN DOSSIER (carte SD, clé USB…)<small id="gDirN"></small></button>'+
  '<label class="gC"><input type="checkbox" id="gZip"> Créer aussi un ZIP (Téléchargements/JM LAB PRO)</label>'+
  '<button class="jmsBtn go" id="gGo">▶ LANCER LA CORRECTION</button>'+
  '<button class="jmsBtn close" id="gNo">ANNULER</button></div>';
@@ -96,7 +100,8 @@ function styleSummary(){
 }
 function updPath(){
   var n = ($("gName").value||"").trim() || "Lot";
-  $("gPath").textContent = "Images / JM LAB PRO / " + n;
+  var dir = document.querySelector('input[name=gDest]:checked'); dir = dir && dir.value === "dir";
+  $("gPath").textContent = (dir ? ($("gDirN").textContent || "dossier choisi") + " / " : "Images / JM LAB PRO / ") + n;
 }
 window.__jmsLotGate = function(files){
   return new Promise(function(resolve){
@@ -106,19 +111,34 @@ window.__jmsLotGate = function(files){
     $("gName").value = "Lot_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"_"+pad(d.getHours())+pad(d.getMinutes());
     var o; try{ o = JSON.parse(localStorage.getItem("jms_opts")||"{}"); }catch(e){ o = {}; }
     $("gDirect").checked = o.direct !== false; $("gZip").checked = !!o.zip;
+    var tot = 0; files.forEach(function(f){ tot += f.size; });
+    $("gOrig").textContent = "Originaux : " + (tot/1048576).toFixed(1) + " Mo";
+    $("gQ").value = o.q || "orig";
+    var fn = (NAT && NAT.folderName) ? NAT.folderName() : ""; $("gDirN").textContent = fn ? "Actuel : " + fn : "";
+    var rd = document.querySelectorAll("input[name=gDest]"); rd[0].checked = !(o.dest === "dir" && fn); rd[1].checked = (o.dest === "dir" && !!fn);
+    var csUpd = function(){ $("gCSs").textContent = window.__jmsCS ? window.__jmsCS.summary() : ""; $("gCS").className = "gBtn csb" + (window.__jmsCS && window.__jmsCS.get().on ? " on" : ""); };
+    csUpd();
+    $("gCS").onclick = function(){ window.__jmsCS.open(files[0], csUpd); };
+    $("gPick").onclick = function(){ if(NAT) NAT.pickFolder(); };
+    window.__jmsFolder = function(n){ $("gDirN").textContent = "Actuel : " + n; document.querySelectorAll("input[name=gDest]")[1].checked = true; updPath(); };
+    Array.prototype.forEach.call(rd, function(r){ r.onchange = updPath; });
     updPath(); gate.classList.add("show");
     $("gName").oninput = updPath;
     $("gGo").onclick = function(){
       var direct = $("gDirect").checked, zip = $("gZip").checked;
       if(!direct && !zip) direct = true;
-      localStorage.setItem("jms_opts", JSON.stringify({direct:direct, zip:zip}));
-      lot = {direct:direct, zip:zip, sub:($("gName").value||"").trim() || "Lot", chain:Promise.resolve(), saved:0, failed:0};
+      var dest = document.querySelector("input[name=gDest]:checked").value;
+      if(dest === "dir" && NAT && !NAT.folderName()){ alert("Choisis d'abord un dossier (bouton « CHOISIR UN DOSSIER »)."); return; }
+      var qk = $("gQ").value, QS = {orig:{}, web:{max:2480,q:0.85}, mini:{max:1600,q:0.8}, mail:{max:1200,q:0.75}};
+      localStorage.setItem("jms_opts", JSON.stringify({direct:direct, zip:zip, q:qk, dest:dest}));
+      if(NAT) NAT.setTarget(dest === "dir");
+      lot = {Q:QS[qk], direct:direct, zip:zip, sub:($("gName").value||"").trim() || "Lot", chain:Promise.resolve(), saved:0, failed:0};
       gate.classList.remove("show"); resolve(files);
     };
     $("gNo").onclick = function(){ gate.classList.remove("show"); resolve(null); };
   });
 };
-var lot = {direct:true, zip:false, sub:"Lot", chain:Promise.resolve(), saved:0, failed:0};
+var lot = {Q:{}, direct:true, zip:false, sub:"Lot", chain:Promise.resolve(), saved:0, failed:0};
 
 var st = {total:0, done:0, err:0, t0:0, timer:null, running:false, stopped:false};
 function mmss(s){s=Math.max(0,Math.round(s));return ("0"+Math.floor(s/60)).slice(-2)+":"+("0"+(s%60)).slice(-2)}
@@ -154,16 +174,18 @@ window.__jmpQueueStart = function(names){
 };
 window.__jmpQueueItem = function(i,name,blob){
   st.done++; if(!blob) st.err++; refresh();
-  if(blob && lot.direct){
-    var L = lot;
-    L.chain = L.chain.then(function(){ return save(name, blob, L.sub, true); }).then(function(ok){ if(ok) L.saved++; else L.failed++; });
-  }
-  if(pi) pi(i,name,blob);
+  var L = lot;
+  L.chain = L.chain.then(function(){
+    if(!blob) return null;
+    return window.__jmsCS ? window.__jmsCS.process(blob, L.Q) : blob;
+  }).catch(function(){ return blob; }).then(function(b2){
+    if(pi) pi(i, name, b2 || blob);
+    if(b2 && L.direct) return save(name, b2, L.sub, true).then(function(ok){ if(ok) L.saved++; else L.failed++; });
+  });
 };
 window.__jmpQueueFinish = function(){
-  if(pf) pf();
   $("jmsBan").textContent = "ENREGISTREMENT…";
-  lot.chain.then(finishLot);
+  lot.chain.then(function(){ if(pf) pf(); finishLot(); });
 };
 function finishLot(){
   clearInterval(st.timer); st.running = false; tick();
@@ -180,6 +202,25 @@ function finishLot(){
   $("jmsZip").style.display = (ok>0 && lot.zip) ? "" : "none";
   beep(); if(NAT){ try{ NAT.vibrate(); NAT.toFront(); }catch(e){} }
 }
+/* progression generique (sablier) pour les autres modules */
+window.__jmsProgress = {
+  start:function(title){
+    window.__jmsStop = false; st = {total:100, done:0, err:0, t0:Date.now(), timer:setInterval(tick,500), running:true, stopped:false};
+    document.querySelector("#jmsBox .jmsTitle").textContent = title;
+    $("jmsBan").className = "jmsBan run"; $("jmsBan").textContent = "EN COURS…";
+    $("jmsSum").style.display = "none"; $("jmsZip").style.display = "none"; $("jmsClose").style.display = "none";
+    $("jmsStop").style.display = ""; $("jmsStop").disabled = false; $("hgflip").className = "hgflip";
+    ov.classList.add("show"); hgSet(0,true); $("jmsCnt").textContent = ""; tick();
+  },
+  set:function(pct,label){ hgSet(pct,true); $("jmsCnt").textContent = label || ""; },
+  end:function(html,stopped){
+    clearInterval(st.timer); st.running = false; tick(); hgSet(stopped ? st.done : 100, false);
+    $("hgflip").className = "hgflip fin"; $("jmsBan").className = "jmsBan " + (stopped ? "stop" : "done");
+    $("jmsBan").textContent = stopped ? "ARRÊTÉ" : "✔ TERMINÉ"; $("jmsSum").style.display = ""; $("jmsSum").innerHTML = html || "";
+    $("jmsStop").style.display = "none"; $("jmsClose").style.display = ""; beep(); if(NAT){ try{ NAT.vibrate(); NAT.toFront(); }catch(e){} }
+  },
+  hide:function(){ clearInterval(st.timer); ov.classList.remove("show"); }
+};
 $("jmsStop").onclick = function(){ window.__jmsStop = true; this.disabled = true; $("jmsBan").textContent = "ARRÊT EN COURS…"; };
 $("jmsZip").onclick = function(){ var z = document.querySelector(".jmq-full.jmq-yellow"); if(z) z.click(); };
 $("jmsClose").onclick = function(){ ov.classList.remove("show"); };
@@ -204,7 +245,10 @@ var origClick = HTMLAnchorElement.prototype.click;
 HTMLAnchorElement.prototype.click = function(){
   if(NAT && this.download && /^blob:/.test(this.href)){
     var name = this.download;
-    fetch(this.href).then(function(r){return r.blob()}).then(function(b){ save(name,b,"",false); });
+    fetch(this.href).then(function(r){return r.blob()}).then(function(b){
+      if(window.__jmsCS && window.__jmsCS.get().on && /\.jpe?g$/i.test(name) && /JMD_LAB_PRO/.test(name)) return window.__jmsCS.process(b, {}).then(function(b2){ return save(name,b2,"",false); });
+      return save(name,b,"",false);
+    });
     return;
   }
   return origClick.apply(this, arguments);
@@ -212,8 +256,12 @@ HTMLAnchorElement.prototype.click = function(){
 
 /* ---------- 4. bouton retour ---------- */
 window.__jmsSave = function(n,b){ return save(n,b,"",false); };
+window.__jmsSaveQ = function(n,b,sub){ return save(n,b,sub||"",true); };
 window.__jmsBack = function(){
+  if(window.__jmsBack2 && window.__jmsBack2()) return 1;
+  var tl = document.getElementById("jmsTools"); if(tl && tl.classList.contains("show")){ tl.classList.remove("show"); return 1; }
   if($("jmsGate").classList.contains("show")){ $("gNo").click(); return 1; }
+  if($("jmsCS") && $("jmsCS").classList.contains("show")){ $("jmsCS").classList.remove("show"); return 1; }
   var h = document.getElementById("jmsHub"); if(h && h.classList.contains("show")){ h.classList.remove("show"); return 1; }
   var c = document.querySelector(".jmp-overlay .jmp-close"); if(c){ c.click(); return 1; }
   var q = document.querySelector(".jmq-overlay .jmq-gray"); if(q){ q.click(); return 1; }

@@ -71,3 +71,52 @@ body[data-tab=exp] .scroll-content>:nth-child(4){display:none!important}
 .gC input{width:24px;height:24px;flex:none;accent-color:#43A047}
 .gC small{display:block;font-weight:600;font-size:11px;color:#8d9;margin-top:2px}
 .jmsBtn.go{background:#2E9E3F;font-size:19px;padding:18px;margin-top:16px}
+
+/* ---------- CADRE + SIGNATURE ---------- */
+#jmsCS{z-index:3200}
+.csBox{width:100%;max-width:420px;max-height:96vh;display:flex;flex-direction:column;background:#1b1b1b;border-radius:24px;color:#fff;font-family:system-ui,sans-serif;overflow:hidden}
+.csHead{padding:10px 12px 6px;text-align:center;background:#111;flex:none}
+#csPrev{max-width:100%;border-radius:8px;background:#333;display:block;margin:4px auto;min-height:40px}
+.csMsg{font-size:11px;color:#ffb74d;min-height:14px}
+#csBody{overflow-y:auto;padding:10px 14px 18px;flex:1}
+.csMaster{width:100%;border:0;border-radius:16px;padding:14px;font-weight:900;font-size:15px;color:#fff;background:#6b6b6b}
+.csMaster.on{background:#2E9E3F}
+.csSec{margin:16px 0 4px;padding:8px 12px;border-radius:12px;font-weight:900;font-size:14px;letter-spacing:.05em}
+.csSec.c1{background:#8E24AA}.csSec.c2{background:#1E88E5}.csSec.c3{background:#FB8C00}
+.csGrid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px}
+.csP{border:0;border-radius:14px;background:#2a2a2a;color:#fff;font-weight:800;font-size:10px;padding:8px 2px}.csP span{display:block;font-size:24px}
+.csL{display:block;font-size:12px;font-weight:800;color:#bbb;margin:12px 0 4px}
+.csC{display:flex;gap:10px;align-items:center;font-size:14px;font-weight:700;margin:10px 0 2px}
+.csC input{width:22px;height:22px;accent-color:#43A047;flex:none}
+.csS,.csT{width:100%;box-sizing:border-box;background:#0f0f0f;border:2px solid #444;border-radius:12px;color:#fff;font-size:15px;padding:11px}
+.csR{width:calc(100% - 64px);vertical-align:middle;accent-color:#FB8C00}
+.csV{display:inline-block;width:58px;text-align:right;font-weight:900;color:#FFD600}
+.csCols{display:flex;gap:10px}.csCols input,.csSw input{width:56px;height:42px;border:0;border-radius:10px;background:none;padding:0}
+.csSw{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;align-items:center}
+.csSw span{width:34px;height:34px;border-radius:50%;border:2px solid #555}.csSw span.on{border:3px solid #FFD600}
+.csPos{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.csPos button{border:0;border-radius:12px;background:#2a2a2a;color:#fff;font-size:20px;font-weight:900;padding:12px 0}.csPos button.on{background:#FB8C00}
+
+.gBtn{width:100%;border:0;border-radius:14px;padding:12px;margin-top:10px;background:#3a3a3a;color:#fff;font-weight:900;font-size:14px;text-align:left}
+.gBtn small{display:block;font-weight:600;font-size:11px;opacity:.85;margin-top:2px}
+.gBtn.csb{background:#8E24AA}.gBtn.csb.on{background:#2E9E3F}
+.gIn.sel{font-size:14px;font-weight:600}
+.gOrig{font-size:11px;color:#8d9;margin-top:4px}
+.gDest{display:flex;gap:14px;margin:8px 0 0 34px;font-size:13px;font-weight:700}
+.gDest input{accent-color:#43A047}
+
+/* ---------- outils : comparer / apprendre ---------- */
+#jmsTools{z-index:3300}
+.jtSub{font-size:12px;color:#bbb;text-align:center;margin:6px 0 8px;line-height:1.4}
+.jtGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.jtTh{border:0;border-radius:12px;background:#2a2a2a;color:#fff;padding:5px;font-weight:800;font-size:11px}
+.jtTh img{width:100%;border-radius:8px;display:block;margin-bottom:4px}
+.jxCk{display:block;font-weight:700;font-size:13px;color:#ddd;padding:7px 4px}
+.jxCk input{width:18px;height:18px;vertical-align:middle;margin-right:6px}
+#jxBox select.gIn{width:100%}
+#jxFav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px;align-items:center}
+.jxFavT{font-weight:900;font-size:12px;color:#FFB300;width:100%}
+.jxFavB{border:0;border-radius:14px;background:#FFB300;color:#000;font-weight:900;font-size:13px;padding:9px 14px}
+.jxHi{background:#2a2a2a;border-radius:10px;padding:9px 12px;margin:6px 0;color:#fff;font-size:14px}
+.jxHi small{color:#bbb}
+#jxCourse{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:3400;background:#000d;color:#fff;font-weight:900;font-size:30px;padding:14px 26px;border-radius:18px;display:none;border:3px solid #FFB300;pointer-events:none}

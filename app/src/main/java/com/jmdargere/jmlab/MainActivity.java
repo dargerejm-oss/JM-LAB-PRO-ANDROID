@@ -5,7 +5,9 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -13,6 +15,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
+import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.view.ViewGroup;
@@ -35,7 +38,10 @@ import androidx.webkit.WebViewAssetLoader;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 /**
  * JM LAB PRO : la web app JM.DARGERE LAB PRO dans une vraie appli Android.
@@ -55,6 +61,15 @@ public class MainActivity extends Activity {
     private File outFile;
     private String outName = "";
     private boolean outPictures;
+    private boolean outPending;
+
+    // dossier choisi par l'utilisateur (carte SD, cle USB, dossier du telephone...)
+    private Uri treeUri;
+    private boolean useTree;
+    private final HashMap<String, Uri> dirCache = new HashMap<>();
+
+    // images recues par "Partager vers JM LAB PRO" (Snapseed, galerie...)
+    private String sharedJson = "";
 
     @Override
     protected void onCreate(Bundle b) {
@@ -84,6 +99,8 @@ public class MainActivity extends Activity {
 
         final WebViewAssetLoader loader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+                .addPathHandler("/shared/", new WebViewAssetLoader.InternalStoragePathHandler(
+                        this, new File(getCacheDir(), "shared")))
                 .build();
 
         WebSettings s = web.getSettings();
@@ -161,12 +178,109 @@ public class MainActivity extends Activity {
                 != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 4);
         }
+        String saved = getSharedPreferences("jmlab", MODE_PRIVATE).getString("tree", null);
+        if (saved != null) {
+            treeUri = Uri.parse(saved);
+        }
+        collectShared(getIntent());
         web.loadUrl(HOME);
+    }
+
+    @Override
+    protected void onNewIntent(Intent i) {
+        super.onNewIntent(i);
+        setIntent(i);
+        collectShared(i);
+        if (!sharedJson.isEmpty()) {
+            final String j = sharedJson;
+            sharedJson = "";
+            web.evaluateJavascript("window.__jmsShared&&window.__jmsShared("
+                    + org.json.JSONObject.quote(j) + ")", null);
+        }
+    }
+
+    /** Copie les images partagees dans le cache et prepare la liste pour la page. */
+    private void collectShared(Intent in) {
+        if (in == null) {
+            return;
+        }
+        String act = in.getAction();
+        if (!Intent.ACTION_SEND.equals(act) && !Intent.ACTION_SEND_MULTIPLE.equals(act)) {
+            return;
+        }
+        ArrayList<Uri> uris = new ArrayList<>();
+        if (Intent.ACTION_SEND.equals(act)) {
+            Uri u = in.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (u != null) {
+                uris.add(u);
+            }
+        } else {
+            ArrayList<Uri> l = in.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (l != null) {
+                uris.addAll(l);
+            }
+        }
+        if (uris.isEmpty()) {
+            return;
+        }
+        File dir = new File(getCacheDir(), "shared");
+        if (dir.exists()) {
+            File[] old = dir.listFiles();
+            if (old != null) {
+                for (File f : old) {
+                    f.delete();
+                }
+            }
+        }
+        dir.mkdirs();
+        org.json.JSONArray arr = new org.json.JSONArray();
+        int n = 0;
+        for (Uri u : uris) {
+            try (InputStream is = getContentResolver().openInputStream(u)) {
+                if (is == null) {
+                    continue;
+                }
+                n++;
+                String fn = "img" + n + "_" + System.currentTimeMillis() + ".jpg";
+                try (FileOutputStream os = new FileOutputStream(new File(dir, fn))) {
+                    byte[] buf = new byte[65536];
+                    int r;
+                    while ((r = is.read(buf)) > 0) {
+                        os.write(buf, 0, r);
+                    }
+                }
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("url", "https://appassets.androidplatform.net/shared/" + fn);
+                o.put("name", "Snapseed_" + n + ".jpg");
+                arr.put(o);
+            } catch (Exception e) {
+                // image illisible : on passe a la suivante
+            }
+        }
+        if (arr.length() > 0) {
+            sharedJson = arr.toString();
+        }
     }
 
     @Override
     protected void onActivityResult(int code, int res, Intent data) {
         super.onActivityResult(code, res, data);
+        if (code == 8) {
+            if (res == RESULT_OK && data != null && data.getData() != null) {
+                treeUri = data.getData();
+                try {
+                    getContentResolver().takePersistableUriPermission(treeUri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                } catch (Exception ignored) {
+                }
+                getSharedPreferences("jmlab", MODE_PRIVATE).edit()
+                        .putString("tree", treeUri.toString()).apply();
+                dirCache.clear();
+                String n = org.json.JSONObject.quote(treeName());
+                web.evaluateJavascript("window.__jmsFolder&&window.__jmsFolder(" + n + ")", null);
+            }
+            return;
+        }
         if (code == 7 && chooser != null) {
             chooser.onReceiveValue(res == RESULT_OK && data != null
                     ? android.webkit.WebChromeClient.FileChooserParams.parseResult(res, data) : null);
@@ -208,6 +322,13 @@ public class MainActivity extends Activity {
     /** Pont page -> Android : enregistrement des images / ZIP dans la galerie ou Telechargements. */
     class Bridge {
         @JavascriptInterface
+        public String takeShared() {
+            String j = sharedJson;
+            sharedJson = "";
+            return j;
+        }
+
+        @JavascriptInterface
         public void saveBegin(String name, String mime) {
             saveBeginIn(name, mime, "");
         }
@@ -221,9 +342,19 @@ public class MainActivity extends Activity {
             sub = sub.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
             outName = name;
             outPictures = mime != null && mime.startsWith("image/");
+            outPending = false;
             try {
                 String dir = "JM LAB PRO" + (sub.isEmpty() ? "" : "/" + sub);
-                if (Build.VERSION.SDK_INT >= 29) {
+                if (useTree && treeUri != null) {
+                    ContentResolver cr = getContentResolver();
+                    Uri parent = DocumentsContract.buildDocumentUriUsingTree(treeUri,
+                            DocumentsContract.getTreeDocumentId(treeUri));
+                    if (!sub.isEmpty()) {
+                        parent = childDir(cr, parent, sub);
+                    }
+                    outUri = DocumentsContract.createDocument(cr, parent, mime, name);
+                    out = cr.openOutputStream(outUri);
+                } else if (Build.VERSION.SDK_INT >= 29) {
                     ContentValues v = new ContentValues();
                     v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
                     v.put(MediaStore.MediaColumns.MIME_TYPE, mime);
@@ -231,6 +362,7 @@ public class MainActivity extends Activity {
                             (outPictures ? Environment.DIRECTORY_PICTURES
                                     : Environment.DIRECTORY_DOWNLOADS) + "/" + dir);
                     v.put(MediaStore.MediaColumns.IS_PENDING, 1);
+                    outPending = true;
                     ContentResolver cr = getContentResolver();
                     outUri = cr.insert(outPictures
                             ? MediaStore.Images.Media.EXTERNAL_CONTENT_URI
@@ -280,7 +412,7 @@ public class MainActivity extends Activity {
                     out.close();
                 }
                 out = null;
-                if (outUri != null) {
+                if (outUri != null && outPending) {
                     ContentValues v = new ContentValues();
                     v.put(MediaStore.MediaColumns.IS_PENDING, 0);
                     getContentResolver().update(outUri, v, null, null);
@@ -294,7 +426,8 @@ public class MainActivity extends Activity {
             outUri = null;
             outFile = null;
             if (ok && say) {
-                toast("✔ Enregistré : " + (outPictures ? "Images/" : "Téléchargements/")
+                toast(useTree ? "✔ Enregistré dans " + treeName() + " : " + outName
+                        : "✔ Enregistré : " + (outPictures ? "Images/" : "Téléchargements/")
                         + "JM LAB PRO/" + outName);
             }
             return ok;
@@ -308,6 +441,27 @@ public class MainActivity extends Activity {
                 i.putExtra(Intent.EXTRA_TEXT, text);
                 startActivity(Intent.createChooser(i, "Partager mon style"));
             });
+        }
+
+        @JavascriptInterface
+        public void pickFolder() {
+            runOnUiThread(() -> {
+                try {
+                    startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 8);
+                } catch (Exception e) {
+                    toast("Impossible d'ouvrir le sélecteur de dossier.");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void setTarget(boolean tree) {
+            useTree = tree && treeUri != null;
+        }
+
+        @JavascriptInterface
+        public String folderName() {
+            return treeUri == null ? "" : treeName();
         }
 
         @JavascriptInterface
@@ -331,6 +485,44 @@ public class MainActivity extends Activity {
                 startActivity(i);
             });
         }
+    }
+
+    private String treeName() {
+        try {
+            String id = DocumentsContract.getTreeDocumentId(treeUri);
+            return Uri.decode(id).replace("primary:", "Téléphone/");
+        } catch (Exception e) {
+            return "dossier choisi";
+        }
+    }
+
+    private Uri childDir(ContentResolver cr, Uri parent, String name) throws Exception {
+        String key = parent + "|" + name;
+        Uri cached = dirCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri,
+                DocumentsContract.getDocumentId(parent));
+        Uri found = null;
+        try (Cursor c = cr.query(children, new String[]{
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE}, null, null, null)) {
+            while (c != null && c.moveToNext()) {
+                if (name.equals(c.getString(1))
+                        && DocumentsContract.Document.MIME_TYPE_DIR.equals(c.getString(2))) {
+                    found = DocumentsContract.buildDocumentUriUsingTree(treeUri, c.getString(0));
+                    break;
+                }
+            }
+        }
+        if (found == null) {
+            found = DocumentsContract.createDocument(cr, parent,
+                    DocumentsContract.Document.MIME_TYPE_DIR, name);
+        }
+        dirCache.put(key, found);
+        return found;
     }
 
     private void closeQuiet() {
