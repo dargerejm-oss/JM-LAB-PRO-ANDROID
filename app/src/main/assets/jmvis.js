@@ -11,7 +11,7 @@ function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").rep
 var cfg = (function(){ try{ return Object.assign({rec:true,next:true}, JSON.parse(localStorage.getItem(CK)||"{}")); }catch(e){ return {rec:true,next:true}; } })();
 function saveCfg(){ try{ localStorage.setItem(CK, JSON.stringify(cfg)); }catch(e){} }
 
-var S = { gen:0, items:[], i:0, saved:{}, pending:{}, rot:{}, undo:[], dims:{}, names:{src:"",dst:""}, openOK:false, flashT:0, lastTap:0 };
+var S = { gen:0, items:[], i:0, saved:{}, pending:{}, marked:{}, delQ:[], delOk:0, delKo:0, rot:{}, undo:[], dims:{}, names:{src:"",dst:""}, openOK:false, flashT:0, lastTap:0 };
 
 /* ---------- page ---------- */
 var ov = document.createElement("div"); ov.id = "jmv";
@@ -19,7 +19,7 @@ ov.innerHTML =
 '<div class="vTop">'+
  '<div class="vRow"><span class="vLb">Regarder :</span><span class="vPath" id="vSrcN">—</span><button class="vB blue" data-v="pickS">Choisir…</button></div>'+
  '<div class="vRow"><span class="vLb g">Enregistrer :</span><span class="vPath g" id="vDstN">—</span><button class="vB green" data-v="pickD">Choisir…</button><button class="vB gray" data-v="openD">Ouvrir</button></div>'+
- '<div class="vRow vRow2"><label class="vChk"><input type="checkbox" id="vRec"> sous-dossiers</label><span class="vSp"></span><button class="vB close" data-v="close">✕ FERMER</button></div>'+
+ '<div class="vRow vRow2"><label class="vChk"><input type="checkbox" id="vRec"> sous-dossiers</label><span class="vSp"></span><button class="vB delall" id="vDelAll" data-v="delall" style="display:none"></button><button class="vB close" data-v="close">✕ FERMER</button></div>'+
 '</div>'+
 '<div id="vBan" class="vBan"></div>'+
 '<div id="vMain"><div id="vBox"><img id="vImg" alt=""></div><div id="vPast"></div><div id="vMsg"></div></div>'+
@@ -40,7 +40,7 @@ ov.innerHTML =
  '<label class="vChk vNx"><input type="checkbox" id="vNext"> image suivante après enregistrement</label>'+
 '</div>'+
 '<div id="vConf"><div class="vConfB"><div class="vConfT" id="vConfT"></div>'+
- '<button class="vConfY" data-v="delyes">🗑 SUPPRIMER</button><button class="vConfN" data-v="delno">ANNULER</button></div></div>';
+ '<button class="vConfY" data-v="delyes">🗑 OUI, SUPPRIMER</button><button class="vConfN" data-v="delno">ANNULER</button></div></div>';
 document.body.appendChild(ov);
 
 /* ---------- sons ---------- */
@@ -60,7 +60,7 @@ function rest(){
   S.flashT = 0;
   if(!S.items.length) ban("Choisissez le dossier d'images à regarder", C_GRIS);
   else if(!S.names.dst) ban("Choisissez le dossier où enregistrer (bouton vert « Choisir… »)", C_ORANGE);
-  else ban("← → naviguer  ·  double-tap = ENREGISTRER  ·  🗑 = SUPPRIMER (récupérable)", C_GRIS, "#ccc");
+  else ban("← → naviguer  ·  double-tap = ENREGISTRER  ·  🗑 = MARQUER à supprimer", C_GRIS, "#ccc");
 }
 function flash(text, color, ms){
   ban(text, color); if(S.flashT) clearTimeout(S.flashT);
@@ -73,6 +73,11 @@ function p2(n){ return (n < 10 ? "0" : "") + n; }
 function dateTxt(ms){ if(!ms) return ""; var d = new Date(+ms); return d.getFullYear()+"-"+p2(d.getMonth()+1)+"-"+p2(d.getDate())+" "+p2(d.getHours())+":"+p2(d.getMinutes()); }
 function cur(){ return S.items[S.i] || null; }
 function nSaved(){ var n = 0; S.items.forEach(function(it){ if(S.saved[it.k]) n++; }); return n; }
+function nMarked(){ var n = 0; S.items.forEach(function(it){ if(S.marked[it.k]) n++; }); return n; }
+function marksUI(){
+  var n = nMarked(), b = $("vDelAll");
+  b.style.display = n ? "" : "none"; b.textContent = "🗑 Supprimer les " + n + " marquée" + (n > 1 ? "s" : "");
+}
 function rotOf(it){ return ((S.rot[it.k] || 0) % 360 + 360) % 360; }
 
 /* ---------- dossiers ---------- */
@@ -96,7 +101,7 @@ window.__jmvList = function(gen){
   var j; try{ j = JSON.parse(NAT.vListGet()); }catch(e){ flash("Erreur de lecture du dossier", C_ROUGE, 4000); return; }
   if(j.gen !== gen) return;
   if(j.err){ flash("Erreur de lecture du dossier : " + j.err, C_ROUGE, 5000); S.items = []; draw(); strip(); return; }
-  S.gen = j.gen; S.saved = {}; S.pending = {}; S.rot = {}; S.undo = []; S.dims = {};
+  S.gen = j.gen; S.saved = {}; S.pending = {}; S.marked = {}; S.rot = {}; S.undo = []; S.dims = {};
   S.items = j.items.map(function(o, k){ if(o.s) S.saved[k] = { uri:"", size:o.z }; return { k:k, n:o.n, r:o.r, z:o.z, m:o.m, w:o.w }; });
   S.i = 0;
   if(S.keepKey){ for(var q = 0; q < S.items.length; q++){ if(S.items[q].r + "|" + S.items[q].n === S.keepKey){ S.i = q; break; } } }
@@ -132,6 +137,7 @@ function texts(){
   if(it.r) parts.push("dossier : " + it.r);
   $("vInfo").textContent = parts.join("  ·  ");
   $("vCnt").textContent = "Enregistrées : " + nSaved() + " sur " + n;
+  marksUI();
 }
 function fit(){
   var im = $("vImg"), m = $("vMain"), it = cur();
@@ -145,7 +151,8 @@ function fit(){
 }
 function pastille(){
   var it = cur(), p = $("vPast");
-  if(it && S.saved[it.k]){ p.textContent = "✔  ENREGISTRÉE"; p.style.background = C_VERT; p.style.display = "block"; }
+  if(it && S.marked[it.k]){ p.textContent = "🗑  À SUPPRIMER"; p.style.background = C_ROUGE; p.style.display = "block"; }
+  else if(it && S.saved[it.k]){ p.textContent = "✔  ENREGISTRÉE"; p.style.background = C_VERT; p.style.display = "block"; }
   else if(it && S.pending[it.k]){ p.textContent = "enregistrement…"; p.style.background = C_ORANGE; p.style.display = "block"; }
   else p.style.display = "none";
 }
@@ -177,7 +184,7 @@ function strip(){
   var html = "";
   for(var j = a; j < b; j++){
     var it = S.items[j], cls = "vTh" + (j === S.i ? " cur" : ""), badge = "";
-    if(S.saved[it.k]) badge = '<i class="vBd">✔</i>'; else if(S.pending[it.k]) badge = '<i class="vBd o"></i>';
+    if(S.marked[it.k]) badge = '<i class="vBd r">🗑</i>'; else if(S.saved[it.k]) badge = '<i class="vBd">✔</i>'; else if(S.pending[it.k]) badge = '<i class="vBd o"></i>';
     var nm = it.n.length > 18 ? it.n.slice(0, 8) + "…" + it.n.slice(-8) : it.n;
     html += '<div class="' + cls + '" data-j="' + j + '"><div class="vThI"><img src="' + url(it, "t") + '" style="transform:rotate(' + rotOf(it) + 'deg)" alt="">' + badge + '</div><span>' + esc(nm) + '</span></div>';
   }
@@ -233,30 +240,48 @@ window.__jmvRot = function(tag, js){
   if(sv){ sv.size = r.size; S.undo.forEach(function(u){ if(u.k === k) u.size = r.size; }); }
   flash("✔  Copie tournée : " + r.name, C_VERT, 1800);
 };
-function askDelete(){
+function mark(){
   var it = cur(); if(!it) return;
-  if(S.pending[it.k]){ flash("Copie en cours pour cette image : réessayez dans un instant", C_ORANGE, 2500); return; }
-  $("vConfT").innerHTML = "Supprimer cette photo ?<br><b>" + esc(it.n) + "</b><br><small>Elle est déplacée dans le dossier « _SUPPRIMES » (récupérable).</small>";
+  if(S.marked[it.k]){ delete S.marked[it.k]; flash("Marque retirée : " + it.n, C_GRIS, 1500); texts(); draw(); strip(); return; }
+  S.marked[it.k] = 1;
+  flash("🗑  MARQUÉE à supprimer (" + nMarked() + ")  —  suppression à la fin, bouton rouge en haut", C_ROUGE, 1800);
+  texts(); draw(); strip();
+  if(cfg.next) go(S.i + 1);
+}
+function askAll(){
+  var n = nMarked(); if(!n) return;
+  $("vConfT").innerHTML = "Supprimer les <b>" + n + "</b> photo" + (n > 1 ? "s" : "") + " marquée" + (n > 1 ? "s" : "") + " ?<br><small>Elles sont déplacées dans le dossier « _SUPPRIMES » (récupérable).</small>";
   $("vConf").classList.add("show");
 }
-function doDelete(){
-  var it = cur(); $("vConf").classList.remove("show"); if(!it) return;
-  flash("Suppression…  " + it.n, C_ORANGE, 4000);
-  NAT.vDelete(S.gen, it.k);
+function doAll(){
+  $("vConf").classList.remove("show");
+  S.delQ = S.items.filter(function(it){ return S.marked[it.k]; }).map(function(it){ return it.k; });
+  S.delOk = 0; S.delKo = 0; nextDel();
+}
+function nextDel(){
+  if(!S.delQ.length){
+    bip(S.delKo === 0);
+    flash("🗑  " + S.delOk + " photo" + (S.delOk > 1 ? "s" : "") + " supprimée" + (S.delOk > 1 ? "s" : "") + " (dossier _SUPPRIMES)" + (S.delKo ? "  —  " + S.delKo + " impossible(s)" : ""), S.delKo ? C_ORANGE : C_ROUGE, 3500);
+    return;
+  }
+  var k = S.delQ.shift();
+  flash("Suppression…  " + (S.delOk + S.delKo + 1) + " / " + (S.delOk + S.delKo + 1 + S.delQ.length), C_ORANGE, 8000);
+  NAT.vDelete(S.gen, k);
 }
 window.__jmvDel = function(gen, k, js){
   if(gen !== S.gen) return;
   var r; try{ r = JSON.parse(js); }catch(e){ r = { ok:false, err:"réponse illisible" }; }
-  var idx = -1; for(var q = 0; q < S.items.length; q++){ if(S.items[q].k === k){ idx = q; break; } }
-  if(!r.ok){ bip(false); flash("Suppression impossible : " + r.err, C_ROUGE, 4000); return; }
-  var nom = idx >= 0 ? S.items[idx].n : "image";
-  if(idx >= 0) S.items.splice(idx, 1);
-  delete S.saved[k]; delete S.rot[k]; delete S.dims[k];
-  S.undo = S.undo.filter(function(u){ return u.k !== k; });
+  if(!r.ok){ S.delKo++; delete S.marked[k]; }
+  else {
+    S.delOk++;
+    var idx = -1; for(var q = 0; q < S.items.length; q++){ if(S.items[q].k === k){ idx = q; break; } }
+    if(idx >= 0){ if(idx < S.i) S.i--; S.items.splice(idx, 1); }
+    delete S.marked[k]; delete S.saved[k]; delete S.rot[k]; delete S.dims[k];
+    S.undo = S.undo.filter(function(u){ return u.k !== k; });
+  }
   if(S.i >= S.items.length) S.i = Math.max(0, S.items.length - 1);
   $("vImg").removeAttribute("data-u");
-  flash("🗑  SUPPRIMÉE (" + r.where + ") : " + nom, C_ROUGE, 2500);
-  texts(); draw(); strip(); preload();
+  texts(); draw(); strip(); nextDel();
 };
 function undo(){
   while(S.undo.length){
@@ -300,7 +325,7 @@ var H = {
   openD:function(){ if(!S.names.dst) flash("Choisissez d'abord le dossier d'enregistrement", C_ORANGE, 2500); else NAT.vOpenDst(); },
   close:close, prev:function(){ go(S.i - 1); }, next:function(){ go(S.i + 1); }, save:save,
   rotL:function(){ turn(-90); }, rotR:function(){ turn(90); }, rot180:function(){ turn(180); },
-  del:askDelete, delyes:doDelete, delno:function(){ $("vConf").classList.remove("show"); },
+  del:mark, delall:askAll, delyes:doAll, delno:function(){ $("vConf").classList.remove("show"); },
   undo:undo, nextun:nextUnsaved
 };
 ov.addEventListener("click", function(e){
@@ -342,7 +367,7 @@ document.addEventListener("keydown", function(e){
   else if(k === "PageDown") go(S.i + 10); else if(k === "PageUp") go(S.i - 10);
   else if(k === "Home") go(0); else if(k === "End") go(S.items.length - 1);
   else if(k === " " || k === "Enter" || k === "s" || k === "S") save();
-  else if(k === "Delete") askDelete();
+  else if(k === "Delete") mark();
   else if(k === "g" || k === "G") turn(-90); else if(k === "d" || k === "D") turn(90); else if(k === "x" || k === "X") turn(180);
   else if(k === "Backspace" || (e.ctrlKey && k === "z")) undo();
   else if(k === "n" || k === "N") nextUnsaved();

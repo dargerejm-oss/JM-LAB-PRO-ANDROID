@@ -183,3 +183,5 @@ body[data-tab=reg] #jxUR{display:flex}
 #jmv .vConfT small{font-size:12px;color:#aaa}
 #jmv .vConfY,#jmv .vConfN{width:100%;border:0;border-radius:12px;color:#fff;font-weight:900;font-size:17px;padding:14px;margin-top:8px}
 #jmv .vConfY{background:#c0392b}#jmv .vConfN{background:#444}
+#jmv .vB.delall{background:#c0392b;font-size:13px}
+#jmv .vBd.r{background:#c0392b;font-size:11px}
