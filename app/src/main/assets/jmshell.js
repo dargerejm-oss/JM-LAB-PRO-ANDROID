@@ -72,6 +72,54 @@ ov.innerHTML = '<div id="jmsBox"><div class="jmsTitle">🎞️ JM LAB PRO • LO
  '<button class="jmsBtn close" id="jmsClose" style="display:none">FERMER</button></div>';
 document.body.appendChild(ov);
 
+
+/* ---------- 2b. ecran PRET A LANCER (choix du dossier, galerie / ZIP) ---------- */
+var gate = document.createElement("div"); gate.id = "jmsGate"; gate.className = "jmsOvl";
+gate.innerHTML = '<div class="jmsBoxG"><div class="jmsTitle">🚀 PRÊT À LANCER</div>'+
+ '<div class="gN" id="gN"></div>'+
+ '<div class="gSt" id="gSt"></div>'+
+ '<label class="gL">📁 Nom du dossier</label><input id="gName" class="gIn" type="text">'+
+ '<label class="gC"><input type="checkbox" id="gDirect" checked> Photos corrigées directement dans la galerie<small id="gPath"></small></label>'+
+ '<label class="gC"><input type="checkbox" id="gZip"> Créer aussi un ZIP (Téléchargements/JM LAB PRO)</label>'+
+ '<button class="jmsBtn go" id="gGo">▶ LANCER LA CORRECTION</button>'+
+ '<button class="jmsBtn close" id="gNo">ANNULER</button></div>';
+document.body.appendChild(gate);
+function pad(n){ return ("0"+n).slice(-2); }
+function styleSummary(){
+  var L = ["Dosage","Exposition","Contraste","Temperature","Teinte","Hautes","Ombres","Vibrance","Saturation","Clarté","Noir","Blanc","Dehaze","Vignette"];
+  var c = document.querySelector(".space-y-3.mb-4"), out = [];
+  if(c) Array.prototype.forEach.call(c.querySelectorAll('input[type="range"]'), function(r,i){
+    var v = Number(r.value), d = (i===0) ? 50 : 0;
+    if(v !== d) out.push(L[i]+" "+(v>0&&i>0?"+":"")+v);
+  });
+  return out.length ? out.join(" • ") : "Aucun réglage modifié (image d'origine)";
+}
+function updPath(){
+  var n = ($("gName").value||"").trim() || "Lot";
+  $("gPath").textContent = "Images / JM LAB PRO / " + n;
+}
+window.__jmsLotGate = function(files){
+  return new Promise(function(resolve){
+    var d = new Date();
+    $("gN").textContent = files.length + " image" + (files.length>1?"s":"") + " choisie" + (files.length>1?"s":"");
+    $("gSt").innerHTML = "<b>Style appliqué :</b><br>" + styleSummary() + "<br><small>Pour le changer : annule, change de profil ou de réglage, puis relance.</small>";
+    $("gName").value = "Lot_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"_"+pad(d.getHours())+pad(d.getMinutes());
+    var o; try{ o = JSON.parse(localStorage.getItem("jms_opts")||"{}"); }catch(e){ o = {}; }
+    $("gDirect").checked = o.direct !== false; $("gZip").checked = !!o.zip;
+    updPath(); gate.classList.add("show");
+    $("gName").oninput = updPath;
+    $("gGo").onclick = function(){
+      var direct = $("gDirect").checked, zip = $("gZip").checked;
+      if(!direct && !zip) direct = true;
+      localStorage.setItem("jms_opts", JSON.stringify({direct:direct, zip:zip}));
+      lot = {direct:direct, zip:zip, sub:($("gName").value||"").trim() || "Lot", chain:Promise.resolve(), saved:0, failed:0};
+      gate.classList.remove("show"); resolve(files);
+    };
+    $("gNo").onclick = function(){ gate.classList.remove("show"); resolve(null); };
+  });
+};
+var lot = {direct:true, zip:false, sub:"Lot", chain:Promise.resolve(), saved:0, failed:0};
+
 var st = {total:0, done:0, err:0, t0:0, timer:null, running:false, stopped:false};
 function mmss(s){s=Math.max(0,Math.round(s));return ("0"+Math.floor(s/60)).slice(-2)+":"+("0"+(s%60)).slice(-2)}
 function tick(){
@@ -106,10 +154,18 @@ window.__jmpQueueStart = function(names){
 };
 window.__jmpQueueItem = function(i,name,blob){
   st.done++; if(!blob) st.err++; refresh();
+  if(blob && lot.direct){
+    var L = lot;
+    L.chain = L.chain.then(function(){ return save(name, blob, L.sub, true); }).then(function(ok){ if(ok) L.saved++; else L.failed++; });
+  }
   if(pi) pi(i,name,blob);
 };
 window.__jmpQueueFinish = function(){
   if(pf) pf();
+  $("jmsBan").textContent = "ENREGISTREMENT…";
+  lot.chain.then(finishLot);
+};
+function finishLot(){
   clearInterval(st.timer); st.running = false; tick();
   var ok = st.done - st.err, stopped = !!window.__jmsStop;
   hgSet(stopped ? (st.done/st.total*100) : 100, false);
@@ -117,12 +173,13 @@ window.__jmpQueueFinish = function(){
   $("jmsBan").className = "jmsBan " + (stopped ? "stop" : "done");
   $("jmsBan").textContent = stopped ? "ARRÊTÉ" : "✔ TERMINÉ";
   $("jmsSum").style.display = "";
-  $("jmsSum").innerHTML = "<b>"+ok+"</b> image(s) prête(s)"+(st.err?" • <b style='color:#ff8a80'>"+st.err+" erreur(s)</b>":"")+
+  $("jmsSum").innerHTML = "<b>"+ok+"</b> image(s) corrigée(s)"+(st.err?" • <b style='color:#ff8a80'>"+st.err+" erreur(s)</b>":"")+
+    (lot.direct ? "<br>📁 <b>Images / JM LAB PRO / "+lot.sub+"</b><br>"+lot.saved+" enregistrée(s)"+(lot.failed?" • <b style='color:#ff8a80'>"+lot.failed+" échec(s)</b>":"") : "")+
     "<br>Temps : "+$("cEl").textContent;
   $("jmsStop").style.display = "none"; $("jmsClose").style.display = "";
-  $("jmsZip").style.display = ok>0 ? "" : "none";
+  $("jmsZip").style.display = (ok>0 && lot.zip) ? "" : "none";
   beep(); if(NAT){ try{ NAT.vibrate(); NAT.toFront(); }catch(e){} }
-};
+}
 $("jmsStop").onclick = function(){ window.__jmsStop = true; this.disabled = true; $("jmsBan").textContent = "ARRÊT EN COURS…"; };
 $("jmsZip").onclick = function(){ var z = document.querySelector(".jmq-full.jmq-yellow"); if(z) z.click(); };
 $("jmsClose").onclick = function(){ ov.classList.remove("show"); };
@@ -130,31 +187,33 @@ $("jmsClose").onclick = function(){ ov.classList.remove("show"); };
 /* ---------- 3. telechargements -> galerie / dossier JM LAB PRO ---------- */
 var keep = URL.revokeObjectURL.bind(URL);
 URL.revokeObjectURL = function(u){ setTimeout(function(){ keep(u); }, 120000); };
-function save(name, blob){
-  if(!NAT){ return false; }
-  NAT.saveBegin(name, blob.type || "application/octet-stream");
-  var CH = 768*1024, pos = 0;
-  (function next(){
-    if(pos >= blob.size){ NAT.saveEnd(); return; }
-    var r = new FileReader();
-    r.onload = function(){ NAT.saveChunk(String(r.result).split(",")[1]||""); pos += CH; next(); };
-    r.readAsDataURL(blob.slice(pos, pos+CH));
-  })();
-  return true;
+function save(name, blob, sub, quiet){
+  return new Promise(function(done){
+    if(!NAT){ return done(false); }
+    NAT.saveBeginIn(name, blob.type || "application/octet-stream", sub || "");
+    var CH = 768*1024, pos = 0;
+    (function next(){
+      if(pos >= blob.size){ done(quiet ? NAT.saveEndQuiet() : NAT.saveEnd()); return; }
+      var r = new FileReader();
+      r.onload = function(){ NAT.saveChunk(String(r.result).split(",")[1]||""); pos += CH; next(); };
+      r.readAsDataURL(blob.slice(pos, pos+CH));
+    })();
+  });
 }
 var origClick = HTMLAnchorElement.prototype.click;
 HTMLAnchorElement.prototype.click = function(){
   if(NAT && this.download && /^blob:/.test(this.href)){
     var name = this.download;
-    fetch(this.href).then(function(r){return r.blob()}).then(function(b){ save(name,b); });
+    fetch(this.href).then(function(r){return r.blob()}).then(function(b){ save(name,b,"",false); });
     return;
   }
   return origClick.apply(this, arguments);
 };
 
 /* ---------- 4. bouton retour ---------- */
-window.__jmsSave = save;
+window.__jmsSave = function(n,b){ return save(n,b,"",false); };
 window.__jmsBack = function(){
+  if($("jmsGate").classList.contains("show")){ $("gNo").click(); return 1; }
   var h = document.getElementById("jmsHub"); if(h && h.classList.contains("show")){ h.classList.remove("show"); return 1; }
   var c = document.querySelector(".jmp-overlay .jmp-close"); if(c){ c.click(); return 1; }
   var q = document.querySelector(".jmq-overlay .jmq-gray"); if(q){ q.click(); return 1; }

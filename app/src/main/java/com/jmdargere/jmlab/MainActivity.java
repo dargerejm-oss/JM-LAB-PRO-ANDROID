@@ -209,11 +209,20 @@ public class MainActivity extends Activity {
     class Bridge {
         @JavascriptInterface
         public void saveBegin(String name, String mime) {
+            saveBeginIn(name, mime, "");
+        }
+
+        @JavascriptInterface
+        public void saveBeginIn(String name, String mime, String sub) {
             closeQuiet();
+            if (sub == null) {
+                sub = "";
+            }
+            sub = sub.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
             outName = name;
             outPictures = mime != null && mime.startsWith("image/");
             try {
-                String dir = "JM LAB PRO";
+                String dir = "JM LAB PRO" + (sub.isEmpty() ? "" : "/" + sub);
                 if (Build.VERSION.SDK_INT >= 29) {
                     ContentValues v = new ContentValues();
                     v.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
@@ -255,6 +264,15 @@ public class MainActivity extends Activity {
 
         @JavascriptInterface
         public boolean saveEnd() {
+            return finishSave(true);
+        }
+
+        @JavascriptInterface
+        public boolean saveEndQuiet() {
+            return finishSave(false);
+        }
+
+        private boolean finishSave(boolean say) {
             boolean ok = out != null;
             try {
                 if (out != null) {
@@ -275,7 +293,7 @@ public class MainActivity extends Activity {
             }
             outUri = null;
             outFile = null;
-            if (ok) {
+            if (ok && say) {
                 toast("✔ Enregistré : " + (outPictures ? "Images/" : "Téléchargements/")
                         + "JM LAB PRO/" + outName);
             }
