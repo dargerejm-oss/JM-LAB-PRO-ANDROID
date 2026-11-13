@@ -196,7 +196,7 @@ function open(file, cb){
   }).catch(function(){ msg("Aperçu impossible pour cette image."); }); }
   else {
     var cv = document.querySelector(".fixed-top canvas");
-    if(cv && cv.width > 10){ var c2 = document.createElement("canvas"); c2.width = cv.width; c2.height = cv.height; c2.getContext("2d").drawImage(cv,0,0); prevBmp = c2; }
+    if(cv && cv.width > 10){ var src = window.__jmsCrop ? window.__jmsCrop(cv) : cv, c2 = document.createElement("canvas"); c2.width = src.width; c2.height = src.height; c2.getContext("2d").drawImage(src,0,0); prevBmp = c2; }
     draw();
   }
 }

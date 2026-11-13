@@ -64,6 +64,8 @@ function menu(){
   '<button class="hubB b1" data-a="cs"><span class="i">🖼️</span><span>CADRE + SIGNATURE<small>Cadre, initiales / signature, texte, couleurs</small></span></button>'+
   '<button class="hubB b4" data-a="compare"><span class="i">🎞️</span><span>COMPARER LES PROFILS<small>Ta photo avec chaque profil Fuji, côte à côte</small></span></button>'+
   '<button class="hubB b6" data-a="learn"><span class="i">🟡</span><span>APPRENDRE UN STYLE SNAPSEED<small>Photo avant + photo retouchée → réglages</small></span></button>'+
+  '<button class="hubB b2" data-a="x_mysave"><span class="i">💾</span><span>ENREGISTRER MON RÉGLAGE<small>Style + curseurs + effets → un preset à réutiliser</small></span></button>'+
+  '<button class="hubB b3" data-a="x_mylist"><span class="i">📚</span><span>MES PRESETS (LISTE)<small>Appliquer ou supprimer tes réglages enregistrés</small></span></button>'+
   '<button class="hubB b1" data-a="x_fx"><span class="i">✨</span><span>EFFETS & RETOUCHE LOCALE<small>Ciel, visage, dégradé, grain, N&B, redressement, pinceau</small></span></button>'+
   '<button class="hubB b4" data-a="x_card"><span class="i">🎓</span><span>FICHE DE COURS<small>Image avant / après + réglages, à donner aux élèves</small></span></button>'+
   '<button class="hubB b5" data-a="x_defi"><span class="i">🎯</span><span>DÉFI DU JOUR<small>Un style au hasard pour s\'entraîner</small></span></button>'+
