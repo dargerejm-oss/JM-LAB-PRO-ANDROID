@@ -6,7 +6,7 @@ var $ = function(id){return document.getElementById(id)};
 
 /* ---------- 1. onglets ---------- */
 var tabs = document.createElement("div"); tabs.id = "jmsTabs";
-[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FUJI"],["exp","📤","EXPORT / LOT"],["qr","🎨","STYLES / QR"]].forEach(function(t){
+[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FUJI"],["exp","📤","EXPORT / LOT"],["qr","🎨","STYLES / QR"],["vis","👁️","VISIONNEUSE"]].forEach(function(t){
   var b = document.createElement("button"); b.className = "t-"+t[0]; b.dataset.k = t[0];
   b.innerHTML = '<span class="i">'+t[1]+'</span>'+t[2];
   b.onclick = function(){ go(t[0]); };
@@ -15,6 +15,7 @@ var tabs = document.createElement("div"); tabs.id = "jmsTabs";
 document.body.appendChild(tabs);
 function go(k){
   if(k === "qr"){ if(window.__jmsHub) window.__jmsHub(); return; }
+  if(k === "vis"){ if(window.__jmsVis) window.__jmsVis.open(); return; }
   document.body.dataset.tab = k;
   Array.prototype.forEach.call(tabs.children, function(b){ b.classList.toggle("on", b.dataset.k === k); });
   window.scrollTo(0,0);

@@ -61,6 +61,7 @@ function menu(){
   '<button class="hubB b3" data-a="importf"><span class="i">📥</span><span>IMPORTER UN FICHIER<small>Fichier .json / .txt de styles</small></span></button>'+
   '<button class="hubB b4" data-a="code"><span class="i">🔗</span><span>CODE TEXTE<small>Copier, partager (WhatsApp…) ou coller un code</small></span></button>'+
   '<button class="hubB b5" data-a="qrimg"><span class="i">🖼️</span><span>QR EN IMAGE<small>Un style → QR enregistré dans la galerie</small></span></button>'+
+  '<button class="hubB b5" data-a="x_vis"><span class="i">👁️</span><span>VISIONNEUSE<small>Regarder un dossier, enregistrer une photo d\'un geste</small></span></button>'+
   '<button class="hubB b1" data-a="cs"><span class="i">🖼️</span><span>CADRE + SIGNATURE<small>Cadre, initiales / signature, texte, couleurs</small></span></button>'+
   '<button class="hubB b4" data-a="compare"><span class="i">🎞️</span><span>COMPARER LES PROFILS<small>Ta photo avec chaque profil Fuji, côte à côte</small></span></button>'+
   '<button class="hubB b6" data-a="learn"><span class="i">🟡</span><span>APPRENDRE UN STYLE SNAPSEED<small>Photo avant + photo retouchée → réglages</small></span></button>'+
