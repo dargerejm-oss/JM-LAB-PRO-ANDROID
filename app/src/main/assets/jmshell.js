@@ -246,7 +246,7 @@ HTMLAnchorElement.prototype.click = function(){
   if(NAT && this.download && /^blob:/.test(this.href)){
     var name = this.download;
     fetch(this.href).then(function(r){return r.blob()}).then(function(b){
-      if(window.__jmsCS && window.__jmsCS.get().on && /\.jpe?g$/i.test(name) && /JMD_LAB_PRO/.test(name)) return window.__jmsCS.process(b, {}).then(function(b2){ return save(name,b2,"",false); });
+      if(window.__jmsCS && (window.__jmsCS.get().on || (window.__jmsFX && window.__jmsFX.active({single:true}))) && /\.jpe?g$/i.test(name) && /JMD_LAB_PRO/.test(name)) return window.__jmsCS.process(b, {single:true}).then(function(b2){ return save(name,b2,"",false); });
       return save(name,b,"",false);
     });
     return;

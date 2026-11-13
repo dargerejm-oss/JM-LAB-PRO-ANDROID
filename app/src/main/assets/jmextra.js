@@ -130,6 +130,15 @@ window.__jmsX.x_bak = function(){
 setTimeout(function(){ if(bakOn()) try{ doBackup(false); }catch(e){} }, 5000);
 
 
+/* ---------- un style -> plusieurs dossiers ---------- */
+window.__jmsX.x_dup = function(){
+  var l = load(); if(!l.length){ alert("Aucun style enregistré."); return; }
+  show('<div class="jmsTitle">📂 STYLE → PLUSIEURS DOSSIERS</div><label class="gL">Style</label><select class="gIn" id="jxDS" style="width:100%">'+opts(l)+'</select>'+
+   '<label class="gL">Noms de dossiers (séparés par une virgule)</label><textarea class="gIn" id="jxDN" rows="3" style="width:100%" placeholder="Portraits Pattaya, Mariage Anne, Voyage Laos"></textarea>'+
+   '<button class="jmsBtn go" data-x="xdup">✔ ASSOCIER</button><button class="jmsBtn close" data-x="close">FERMER</button>');
+  H.xdup = function(){ var p = l[+$("jxDS").value], names = $("jxDN").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean); if(!names.length) return; var m = fmap(); names.forEach(function(n){ m[n] = p.name; }); localStorage.setItem(FM, JSON.stringify(m)); alert(names.length+" dossier(s) associé(s) au style « "+p.name+" »."); hide(); };
+};
+
 /* ---------- favoris (acces direct dans RÉGLAGES) ---------- */
 function favs(){ try{ return JSON.parse(localStorage.getItem("jms_fav")||"[]"); }catch(e){ return []; } }
 function drawFav(){
