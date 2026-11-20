@@ -9,10 +9,11 @@ function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 function get(){ try{ var o = JSON.parse(localStorage.getItem(KEY)||"{}"); return Object.assign({}, D, o); }catch(e){ return Object.assign({}, D); } }
 function put(o){ localStorage.setItem(KEY, JSON.stringify(o)); }
 var strokes = [];
-function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && strokes.length)); }
+function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && strokes.length)) || !!(window.__jmsFX2 && window.__jmsFX2.active(Q)); }
 function summary(){
   var s = get(), a = [];
   if(s.smooth) a.push("peau lissée "+s.smooth+"%"); if(s.sharp) a.push("netteté "+s.sharp+"%"); if(s.denoise) a.push("bruit "+s.denoise+"%"); if(s.crop) a.push("format "+s.crop); if(s.wm) a.push("filigrane"); if(s.sky) a.push("ciel "+s.sky+"%"); if(s.face) a.push("visage "+s.face+"%"); if(s.grad) a.push("dégradé "+s.grad+"%"); if(s.grain) a.push("grain "+s.grain+"%"); if(s.bw) a.push("N&B "+s.bw);
+  if(window.__jmsFX2){ var s2 = window.__jmsFX2.summary(); if(s2) a.push(s2); }
   return a.join(" • ");
 }
 function cvs(w,h){ var c = document.createElement("canvas"); c.width = Math.max(1,Math.round(w)); c.height = Math.max(1,Math.round(h)); return c; }
@@ -74,7 +75,9 @@ function brushMasks(w,h){
 }
 /* ---------- rendu ---------- */
 async function render(bmp, Q){
-  Q = Q || {}; var s = get(), w = bmp.width, h = bmp.height, c = cvs(w,h), x = c.getContext("2d");
+  Q = Q || {}; if(window.__jmsFX2) bmp = await window.__jmsFX2.pre(bmp, Q);
+  function fin(k){ return window.__jmsFX2 ? window.__jmsFX2.post(k, Q) : k; }
+  var s = get(), w = bmp.width, h = bmp.height, c = cvs(w,h), x = c.getContext("2d");
   x.drawImage(bmp,0,0);
   if(s.bw){
     var tint = {red:"rgb(255,130,130)", yellow:"rgb(255,230,120)", green:"rgb(140,255,150)", blue:"rgb(140,170,255)"}[s.bw];
@@ -111,11 +114,11 @@ async function render(bmp, Q){
   }
   if(s.crop){
     var rr = {"1:1":1, "4:5":0.8, "9:16":0.5625, "16:9":1.7778, "3:2":1.5, "2:3":0.6667}[s.crop];
-    if(rr){ var cw = w, ch = Math.round(w/rr); if(ch > h){ ch = h; cw = Math.round(h*rr); } var ox = Math.round((w-cw)/2), oy = Math.round((h-ch)*0.35), o = cvs(cw,ch); o.getContext("2d").drawImage(c, ox, oy, cw, ch, 0, 0, cw, ch); return o; }
+    if(rr){ var cw = w, ch = Math.round(w/rr); if(ch > h){ ch = h; cw = Math.round(h*rr); } var ox = Math.round((w-cw)/2), oy = Math.round((h-ch)*0.35), o = cvs(cw,ch); o.getContext("2d").drawImage(c, ox, oy, cw, ch, 0, 0, cw, ch); return fin(o); }
   }
-  return c;
+  return fin(c);
 }
-function run(blob, Q){ return createImageBitmap(blob).then(function(bmp){ return render(bmp, Q).then(function(c){ if(bmp.close) bmp.close(); return new Promise(function(res){ c.toBlob(function(b){ res(b); }, "image/jpeg", 0.95); }); }); }); }
+function run(blob, Q){ var dp = window.__jmsFX2 ? window.__jmsFX2.exifDate(blob) : Promise.resolve(null); return dp.then(function(dt){ Q = Object.assign({}, Q || {}, dt ? {date:dt} : {}); return createImageBitmap(blob); }).then(function(bmp){ return render(bmp, Q).then(function(c){ if(bmp.close) bmp.close(); return new Promise(function(res){ c.toBlob(function(b){ res(b); }, "image/jpeg", 0.95); }); }); }); }
 
 /* ---------- branchement sur le moteur CADRE + SIGNATURE ---------- */
 if(window.__jmsCS){
