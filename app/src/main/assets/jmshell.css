@@ -199,3 +199,6 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 .gPv{background:#0f0f0f;border-radius:14px;margin:0 0 8px;min-height:60px;display:flex;align-items:center;justify-content:center;overflow:hidden}
 .gPv img{display:none;max-width:100%;max-height:34vh;border-radius:10px}
 #gPvM{color:#999;font-size:13px;padding:18px}
+/* ---------- petits ecrans / paysage : apercu proportionnel a la hauteur ---------- */
+@media (max-height:760px){.fixed-top{height:47vh!important}.scroll-content{margin-top:47vh!important}}
+@media (max-height:480px){.fixed-top{height:62vh!important}.scroll-content{margin-top:62vh!important}}

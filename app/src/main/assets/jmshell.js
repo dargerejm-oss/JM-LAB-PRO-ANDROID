@@ -6,7 +6,7 @@ var $ = function(id){return document.getElementById(id)};
 
 /* ---------- 1. onglets ---------- */
 var tabs = document.createElement("div"); tabs.id = "jmsTabs";
-[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FUJI"],["qr","🎨","STYLES / QR"],["vis","👁️","VISIONNEUSE"]].forEach(function(t){
+[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FILM"],["qr","🎨","STYLES / QR"],["vis","👁️","VISIONNEUSE"]].forEach(function(t){
   var b = document.createElement("button"); b.className = "t-"+t[0]; b.dataset.k = t[0];
   b.innerHTML = '<span class="i">'+t[1]+'</span>'+t[2];
   b.onclick = function(){ go(t[0]); };

@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'claude/**']
   workflow_dispatch:
 
 permissions:
@@ -44,17 +44,23 @@ jobs:
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/cle.keystore"
           echo "KEYSTORE_FILE=$RUNNER_TEMP/cle.keystore" >> "$GITHUB_ENV"
 
-      - name: Construire l'APK
+      - name: Construire l'APK et l'AAB (Google Play)
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-        run: gradle assembleDebug --no-daemon
+        run: gradle assembleDebug bundleRelease --no-daemon
 
-      - name: Renommer l'APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk JM_LAB_PRO.apk
+      - name: Renommer l'APK et l'AAB
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk JM_LAB_PRO.apk
+          cp app/build/outputs/bundle/release/app-release.aab JM_LAB_PRO.aab
 
-      - name: Publier l'APK
+      - name: Publier l'APK et l'AAB
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: apk-${{ github.run_number }}
-          name: JM LAB PRO (version ${{ github.run_number }})
-          files: JM_LAB_PRO.apk
+          tag_name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && format('apk-{0}', github.run_number) || format('test-{0}', github.run_number) }}
+          name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && format('JM LAB PRO (version {0})', github.run_number) || format('JM LAB PRO TEST (essai {0})', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.ref_name != 'main' && github.ref_name != 'master' }}
+          files: |
+            JM_LAB_PRO.apk
+            JM_LAB_PRO.aab

@@ -302,7 +302,7 @@ public class MainActivity extends Activity {
                     if (other != null && u.getAuthority().equals(other.getAuthority())
                             && DocumentsContract.getTreeDocumentId(u)
                             .equals(DocumentsContract.getTreeDocumentId(other))) {
-                        toast("Le dossier à regarder et le dossier d'enregistrement doivent être différents.");
+                        toast(tr("Le dossier à regarder et le dossier d'enregistrement doivent être différents.", "The folder to view and the save folder must be different."));
                         return;
                     }
                 } catch (Exception ignored) {
@@ -362,7 +362,27 @@ public class MainActivity extends Activity {
     }
 
     /** Pont page -> Android : enregistrement des images / ZIP dans la galerie ou Telechargements. */
+    private volatile boolean langEn = !"fr".equals(java.util.Locale.getDefault().getLanguage());
+
+    private String tr(String fr, String en) {
+        return langEn ? en : fr;
+    }
+
     class Bridge {
+        @JavascriptInterface
+        public String appVersion() {
+            try {
+                return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public void setLang(String l) {
+            langEn = "en".equals(l);
+        }
+
         @JavascriptInterface
         public String takeShared() {
             String j = sharedJson;
@@ -420,7 +440,7 @@ public class MainActivity extends Activity {
                 }
             } catch (Exception e) {
                 out = null;
-                toast("Enregistrement impossible : " + e.getMessage());
+                toast(tr("Enregistrement impossible : ", "Cannot save: ") + e.getMessage());
             }
         }
 
@@ -432,7 +452,7 @@ public class MainActivity extends Activity {
                 }
             } catch (Exception e) {
                 closeQuiet();
-                toast("Erreur d'écriture : " + e.getMessage());
+                toast(tr("Erreur d'écriture : ", "Write error: ") + e.getMessage());
             }
         }
 
@@ -468,11 +488,11 @@ public class MainActivity extends Activity {
             outUri = null;
             outFile = null;
             if (!ok && say) {
-                toast("✖ Échec de l'enregistrement. Réessaie ou change de dossier.");
+                toast(tr("✖ Échec de l'enregistrement. Réessaie ou change de dossier.", "✖ Save failed. Try again or choose another folder."));
             }
             if (ok && say) {
-                toast(useTree ? "✔ Enregistré dans " + treeName() + " : " + outName
-                        : "✔ Enregistré : " + (outPictures ? "Images/" : "Téléchargements/")
+                toast(useTree ? tr("✔ Enregistré dans ", "✔ Saved in ") + treeName() + " : " + outName
+                        : tr("✔ Enregistré : ", "✔ Saved: ") + (outPictures ? tr("Images/", "Pictures/") : tr("Téléchargements/", "Downloads/"))
                         + "JM LAB PRO/" + outName);
             }
             return ok;
@@ -484,7 +504,7 @@ public class MainActivity extends Activity {
                 Intent i = new Intent(Intent.ACTION_SEND);
                 i.setType("text/plain");
                 i.putExtra(Intent.EXTRA_TEXT, text);
-                startActivity(Intent.createChooser(i, "Partager mon style"));
+                startActivity(Intent.createChooser(i, tr("Partager mon style", "Share my style")));
             });
         }
 
@@ -494,7 +514,7 @@ public class MainActivity extends Activity {
                 try {
                     startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), 8);
                 } catch (Exception e) {
-                    toast("Impossible d'ouvrir le sélecteur de dossier.");
+                    toast(tr("Impossible d'ouvrir le sélecteur de dossier.", "Cannot open the folder picker."));
                 }
             });
         }
@@ -525,7 +545,7 @@ public class MainActivity extends Activity {
                 try {
                     startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), code);
                 } catch (Exception e) {
-                    toast("Impossible d'ouvrir le sélecteur de dossier.");
+                    toast(tr("Impossible d'ouvrir le sélecteur de dossier.", "Cannot open the folder picker."));
                 }
             });
         }
@@ -585,7 +605,7 @@ public class MainActivity extends Activity {
                     i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
                     startActivity(i);
                 } catch (Exception e) {
-                    toast("Impossible d'ouvrir le dossier : " + e.getMessage());
+                    toast(tr("Impossible d'ouvrir le dossier : ", "Cannot open the folder: ") + e.getMessage());
                 }
             });
         }
@@ -763,7 +783,7 @@ public class MainActivity extends Activity {
         vPool.execute(() -> {
             try {
                 if (src == null) {
-                    throw new Exception("Choisis d'abord le dossier à regarder.");
+                    throw new Exception(tr("Choisis d'abord le dossier à regarder.", "First choose the folder to view."));
                 }
                 ContentResolver cr = getContentResolver();
                 String dstId = null;
@@ -1103,7 +1123,7 @@ public class MainActivity extends Activity {
             try (InputStream is = cr.openInputStream(src); OutputStream os = new FileOutputStream(tmp)) {
                 copyTo(is, os);
             }
-            return "Ce format ne peut pas être tourné : copie faite sans rotation.";
+            return tr("Ce format ne peut pas être tourné : copie faite sans rotation.", "This format cannot be rotated: copied without rotation.");
         }
         android.graphics.Bitmap bm;
         try (InputStream is = cr.openInputStream(src)) {

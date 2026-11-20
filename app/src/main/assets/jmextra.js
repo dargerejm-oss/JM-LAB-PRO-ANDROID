@@ -177,14 +177,14 @@ setInterval(function(){
     if(/^\s*(MON INSTAGRAM|CHOISIR IMAGE|T[ÉE]L[ÉE]CHARGER HD|LOT \(FILE D.ATTENTE\))\s*$/i.test(b.textContent)) b.classList.add("jxHid");
   });
   var f = document.querySelector(".fixed-top"), r = f && f.getBoundingClientRect(), u = document.getElementById("jxUR");
-  if(u){ var on = document.body.dataset.tab === "reg" && r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show"); u.style.display = on ? "flex" : "none"; if(r) u.style.top = (r.bottom - 52) + "px"; }
+  if(u){ var on = document.body.dataset.tab === "reg" && r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show"); u.style.display = on ? "flex" : "none"; if(r){ u.style.top = (r.bottom - 52) + "px"; u.style.right = Math.max(10, window.innerWidth - r.right + 10) + "px"; } }
 }, 400);
 
 
 /* ---------- MES REGLAGES : enregistrer l'etat actuel, liste, appliquer, LUT ---------- */
 function profBtns(){ return Array.prototype.slice.call(document.querySelectorAll(".scroll-content > .mt-5 button")); }
 function curProfile(){ var b = profBtns().filter(function(e){ return /ffcc00/i.test(e.className) || /border-\[#ffcc00\]/.test(e.className); })[0]; return b ? (b.innerText||"").split("\n")[0].trim() : ""; }
-function setProfile(n){ if(!n) return; var b = profBtns().filter(function(e){ return (e.innerText||"").split("\n")[0].trim() === n; })[0]; if(b) b.click(); }
+function setProfile(n){ if(!n) return; var cn = window.__jmsProfCanon || function(x){ return String(x).trim().toLowerCase(); }, k = cn(n); var b = profBtns().filter(function(e){ return cn((e.innerText||"").split("\n")[0]) === k; })[0]; if(b) b.click(); }
 function curValues(){ var v = {}; sliders().forEach(function(r,i){ if(+r.value !== def(i)) v[LABELS[i]] = +r.value; }); return v; }
 function applyPreset(p){
   setProfile(p.profile || "");
@@ -194,7 +194,7 @@ window.__jmsX.x_mysave = function(){
   if(!document.querySelector(".fixed-top canvas") || !sliders().length){ alert("Choisis d'abord une image."); return; }
   var vals = curValues(), prof = curProfile(), fx = window.__jmsFX ? window.__jmsFX.get() : null, fxOn = window.__jmsFX && window.__jmsFX.active({single:false});
   var txt = Object.keys(vals).map(function(k){ return k+" "+vals[k]; }).join(" • ") || "aucun curseur modifié";
-  show('<div class="jmsTitle">💾 ENREGISTRER MON RÉGLAGE</div><div class="jtSub"><b>Profil Fuji :</b> '+esc(prof || "aucun")+'<br><b>Curseurs :</b> '+esc(txt)+(fxOn ? '<br><b>Effets :</b> '+esc(window.__jmsFX.summary()) : "")+'</div>'+
+  show('<div class="jmsTitle">💾 ENREGISTRER MON RÉGLAGE</div><div class="jtSub"><b>Profil :</b> '+esc(prof || "aucun")+'<br><b>Curseurs :</b> '+esc(txt)+(fxOn ? '<br><b>Effets :</b> '+esc(window.__jmsFX.summary()) : "")+'</div>'+
    '<label class="gL">Nom du preset</label><input class="gIn" id="jxPN" type="text" style="width:100%" value="Mon réglage '+new Date().toLocaleDateString("fr-FR")+'">'+
    '<button class="jmsBtn go" data-x="xps">✔ ENREGISTRER LE PRESET</button>'+
    '<button class="jmsBtn go" data-x="xpl">⬇ ENREGISTRER + CRÉER UN LUT (.cube)</button>'+
