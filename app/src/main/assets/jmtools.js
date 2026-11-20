@@ -33,7 +33,7 @@ var handlers = {};
 /* ---------- 1. comparer les profils ---------- */
 window.__jmsCompare = async function(){
   var cv0 = appCanvas(), cv = cv0 && window.__jmsCrop ? window.__jmsCrop(cv0) : cv0, btns = profileButtons();
-  if(!cv){ alert("Choisis d'abord une image (onglet RÉGLAGES ou EXPORT, bouton CHOISIR IMAGE)."); return; }
+  if(!cv){ alert("Choisis d'abord une image (bouton OUVRIR IMAGE en haut)."); return; }
   if(!btns.length){ alert("Profils introuvables."); return; }
   var sl = sliders(), keep = sl.map(function(r){ return r.value; });
   window.__jmsProgress.start("🎞️ COMPARAISON DES PROFILS");

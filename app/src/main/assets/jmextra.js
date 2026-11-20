@@ -171,6 +171,14 @@ setInterval(function(){
 }, 400);
 
 
+/* ---------- page EXPORT / LOT : on cache les doublons des boutons du haut et MON INSTAGRAM ---------- */
+setInterval(function(){
+  Array.prototype.slice.call(document.querySelectorAll(".scroll-content button")).forEach(function(b){
+    if(/^\s*(MON INSTAGRAM|CHOISIR IMAGE|T[ÉE]L[ÉE]CHARGER HD)\s*$/i.test(b.textContent)) b.style.display = "none";
+  });
+}, 400);
+
+
 /* ---------- MES REGLAGES : enregistrer l'etat actuel, liste, appliquer, LUT ---------- */
 function profBtns(){ return Array.prototype.slice.call(document.querySelectorAll(".scroll-content > .mt-5 button")); }
 function curProfile(){ var b = profBtns().filter(function(e){ return /ffcc00/i.test(e.className) || /border-\[#ffcc00\]/.test(e.className); })[0]; return b ? (b.innerText||"").split("\n")[0].trim() : ""; }
