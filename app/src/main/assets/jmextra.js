@@ -147,11 +147,15 @@ window.__jmsX.x_dup = function(){
   H.xdup = function(){ var p = l[+$("jxDS").value], names = $("jxDN").value.split(",").map(function(s){ return s.trim(); }).filter(Boolean); if(!names.length) return; var m = fmap(); names.forEach(function(n){ m[n] = p.name; }); localStorage.setItem(FM, JSON.stringify(m)); alert(names.length+" dossier(s) associé(s) au style « "+p.name+" »."); hide(); };
 };
 
-/* ---------- ouvrir une image depuis l'apercu ---------- */
-var ob = document.createElement("button"); ob.id = "jxOpen"; ob.textContent = "📂 OUVRIR IMAGE"; document.body.appendChild(ob);
+/* ---------- ouvrir une image / un lot / enregistrer : barre en haut de l'apercu ---------- */
+var bar = document.createElement("div"); bar.id = "jxBar"; document.body.appendChild(bar);
+var ob = document.createElement("button"); ob.id = "jxOpen"; ob.textContent = "📂 OUVRIR IMAGE"; bar.appendChild(ob);
+var lb = document.createElement("button"); lb.id = "jxLot"; lb.textContent = "🗂 OUVRIR UN LOT"; bar.appendChild(lb);
+var sv = document.createElement("button"); sv.id = "jxSave"; sv.textContent = "💾 ENREGISTRER"; bar.appendChild(sv);
 function openImg(){ var i = document.querySelector("input[type=file]:not([multiple])"); if(i){ i.value = ""; i.click(); } }
+function openLot(){ var i = document.querySelector("input[type=file][multiple]"); if(!i){ window.__jmsNote("✖ Import du lot introuvable", "err", 6000); return; } goTab("exp"); i.value = ""; i.click(); }
 ob.onclick = openImg;
-var sv = document.createElement("button"); sv.id = "jxSave"; sv.textContent = "💾 ENREGISTRER"; document.body.appendChild(sv);
+lb.onclick = openLot;
 sv.onclick = function(){ var b = Array.prototype.slice.call(document.querySelectorAll("button")).filter(function(e){ return /T[ée]l[ée]charger HD/i.test(e.textContent); })[0]; if(b) b.click(); else { window.__jmsNote("✖ Bouton introuvable : va dans l'onglet EXPORT / LOT", "err", 6000); } };
 document.addEventListener("click", function(e){
   var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target)) return;
@@ -160,8 +164,10 @@ document.addEventListener("click", function(e){
 }, true);
 setInterval(function(){
   var f = document.querySelector(".fixed-top"), r = f && f.getBoundingClientRect(), c = document.getElementById("filteredCanvas"), has = c && c.style.display !== "none";
-  ob.style.display = (r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show")) ? "block" : "none";
-  if(r){ ob.style.top = sv.style.top = (r.top + 6) + "px"; } sv.style.display = (has && ob.style.display === "block") ? "block" : "none";
+  var vis = r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show");
+  bar.style.display = vis ? "flex" : "none";
+  if(r) bar.style.top = (r.top + 6) + "px";
+  sv.style.display = has ? "block" : "none";
 }, 400);
 
 
