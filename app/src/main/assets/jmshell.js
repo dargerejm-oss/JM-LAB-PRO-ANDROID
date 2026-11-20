@@ -6,7 +6,7 @@ var $ = function(id){return document.getElementById(id)};
 
 /* ---------- 1. onglets ---------- */
 var tabs = document.createElement("div"); tabs.id = "jmsTabs";
-[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FUJI"],["exp","📤","EXPORT / LOT"],["qr","🎨","STYLES / QR"],["vis","👁️","VISIONNEUSE"]].forEach(function(t){
+[["reg","🎛️","RÉGLAGES"],["fuji","🎞️","PROFILS FUJI"],["qr","🎨","STYLES / QR"],["vis","👁️","VISIONNEUSE"]].forEach(function(t){
   var b = document.createElement("button"); b.className = "t-"+t[0]; b.dataset.k = t[0];
   b.innerHTML = '<span class="i">'+t[1]+'</span>'+t[2];
   b.onclick = function(){ go(t[0]); };
@@ -78,6 +78,7 @@ document.body.appendChild(ov);
 var gate = document.createElement("div"); gate.id = "jmsGate"; gate.className = "jmsOvl";
 gate.innerHTML = '<div class="jmsBoxG"><div class="jmsTitle">🚀 PRÊT À LANCER</div>'+
  '<div class="gN" id="gN"></div>'+
+ '<div class="gPv" id="gPv"><img id="gPvI" alt=""><div id="gPvM">⏳ Aperçu de la 1re photo…</div></div>'+
  '<div class="gSt" id="gSt"></div>'+
  '<button class="gBtn csb" id="gCS">🖼️ CADRE + SIGNATURE<small id="gCSs"></small></button>'+
  '<label class="gL">⚙️ Qualité / taille</label><select id="gQ" class="gIn sel"><option value="orig">Maximum : taille d\'origine, qualité 92</option><option value="web">Web léger : 2480 px, qualité 85</option><option value="mini">Très léger : 1600 px, qualité 80</option><option value="mail">Mail : 1200 px, qualité 75</option></select><div class="gOrig" id="gOrig"></div>'+
@@ -90,6 +91,28 @@ gate.innerHTML = '<div class="jmsBoxG"><div class="jmsTitle">🚀 PRÊT À LANCE
  '<button class="jmsBtn close" id="gNo">ANNULER</button></div>';
 document.body.appendChild(gate);
 function pad(n){ return ("0"+n).slice(-2); }
+/* apercu : la 1re photo du lot passe dans l'apercu principal avec le style actuel, puis on la recopie ici */
+function lotPreview(f){
+  var img = $("gPvI"), msg = $("gPvM"), inp = document.querySelector("input[type=file]:not([multiple])");
+  img.style.display = "none"; img.removeAttribute("src"); delete img.dataset.w; msg.style.display = ""; msg.textContent = "⏳ Aperçu de la 1re photo…";
+  if(!f || !inp || typeof DataTransfer === "undefined"){ msg.textContent = "Aperçu indisponible"; return; }
+  function sig(c){ if(!c || !c.width || c.style.display === "none") return ""; try{ var t = document.createElement("canvas"); t.width = t.height = 12; t.getContext("2d").drawImage(c, 0, 0, 12, 12); return c.width+"x"+c.height+":"+Array.prototype.join.call(t.getContext("2d").getImageData(0,0,12,12).data, ","); }catch(e){ return "?"; } }
+  var before = sig(document.getElementById("filteredCanvas"));
+  try{ var dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files; inp.dispatchEvent(new Event("change", {bubbles:true})); }catch(e){ msg.textContent = "Aperçu indisponible"; return; }
+  var tries = 0;
+  (function poll(){
+    tries++;
+    var c = document.getElementById("filteredCanvas");
+    var now = sig(c), ok = now && now !== "?" && (now !== before || tries > 12);
+    if(ok && !img.dataset.w){ img.dataset.w = 1; setTimeout(poll, 400); return; }
+    if(ok){ delete img.dataset.w;
+      try{ img.src = (window.__jmsCrop ? window.__jmsCrop(c) : c).toDataURL("image/jpeg", 0.85); img.style.display = "block"; msg.style.display = "none"; }catch(e){ msg.textContent = "Aperçu indisponible"; }
+      return;
+    }
+    if(tries > 25){ msg.textContent = "Aperçu indisponible"; return; }
+    setTimeout(poll, 300);
+  })();
+}
 function styleSummary(){
   var L = ["Dosage","Exposition","Contraste","Temperature","Teinte","Hautes","Ombres","Vibrance","Saturation","Clarté","Noir","Blanc","Dehaze","Vignette"];
   var c = document.querySelector(".space-y-3.mb-4"), out = [];
@@ -124,6 +147,7 @@ window.__jmsLotGate = function(files){
     window.__jmsFolder = function(n){ $("gDirN").textContent = "Actuel : " + n; document.querySelectorAll("input[name=gDest]")[1].checked = true; updPath(); };
     Array.prototype.forEach.call(rd, function(r){ r.onchange = updPath; });
     updPath(); gate.classList.add("show");
+    lotPreview(files[0]);
     $("gName").oninput = updPath;
     $("gGo").onclick = function(){
       var direct = $("gDirect").checked, zip = $("gZip").checked;

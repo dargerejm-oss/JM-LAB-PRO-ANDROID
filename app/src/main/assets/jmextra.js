@@ -153,10 +153,10 @@ var ob = document.createElement("button"); ob.id = "jxOpen"; ob.textContent = "�
 var lb = document.createElement("button"); lb.id = "jxLot"; lb.textContent = "🗂 OUVRIR UN LOT"; bar.appendChild(lb);
 var sv = document.createElement("button"); sv.id = "jxSave"; sv.textContent = "💾 ENREGISTRER"; bar.appendChild(sv);
 function openImg(){ var i = document.querySelector("input[type=file]:not([multiple])"); if(i){ i.value = ""; i.click(); } }
-function openLot(){ var i = document.querySelector("input[type=file][multiple]"); if(!i){ window.__jmsNote("✖ Import du lot introuvable", "err", 6000); return; } goTab("exp"); i.value = ""; i.click(); }
+function openLot(){ var i = document.querySelector("input[type=file][multiple]"); if(!i){ window.__jmsNote("✖ Import du lot introuvable", "err", 6000); return; } i.value = ""; i.click(); }
 ob.onclick = openImg;
 lb.onclick = openLot;
-sv.onclick = function(){ var b = Array.prototype.slice.call(document.querySelectorAll("button")).filter(function(e){ return /T[ée]l[ée]charger HD/i.test(e.textContent); })[0]; if(b) b.click(); else { window.__jmsNote("✖ Bouton introuvable : va dans l'onglet EXPORT / LOT", "err", 6000); } };
+sv.onclick = function(){ var b = Array.prototype.slice.call(document.querySelectorAll("button")).filter(function(e){ return /T[ée]l[ée]charger HD/i.test(e.textContent); })[0]; if(b) b.click(); else { window.__jmsNote("✖ Ouvre d'abord une image", "err", 6000); } };
 document.addEventListener("click", function(e){
   var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target)) return;
   var c = document.getElementById("filteredCanvas"); if(c && c.style.display !== "none") return;
@@ -171,11 +171,13 @@ setInterval(function(){
 }, 400);
 
 
-/* ---------- page EXPORT / LOT : on cache les doublons des boutons du haut et MON INSTAGRAM ---------- */
+/* ---------- boutons d'origine : on ne garde que RESET (les autres sont en haut) ---------- */
 setInterval(function(){
   Array.prototype.slice.call(document.querySelectorAll(".scroll-content button")).forEach(function(b){
-    if(/^\s*(MON INSTAGRAM|CHOISIR IMAGE|T[ÉE]L[ÉE]CHARGER HD)\s*$/i.test(b.textContent)) b.style.display = "none";
+    if(/^\s*(MON INSTAGRAM|CHOISIR IMAGE|T[ÉE]L[ÉE]CHARGER HD|LOT \(FILE D.ATTENTE\))\s*$/i.test(b.textContent)) b.classList.add("jxHid");
   });
+  var f = document.querySelector(".fixed-top"), r = f && f.getBoundingClientRect(), u = document.getElementById("jxUR");
+  if(u){ var on = document.body.dataset.tab === "reg" && r && r.height > 60 && !document.querySelector(".jmsOvl.show, #jmsOv.show, #jmsHub.show"); u.style.display = on ? "flex" : "none"; if(r) u.style.top = (r.bottom - 52) + "px"; }
 }, 400);
 
 

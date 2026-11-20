@@ -3,7 +3,6 @@
 .scroll-content>:last-child{display:none!important}
 .scroll-content{padding-bottom:110px!important}
 body:not([data-tab=reg]) #jxFav{display:none!important}
-body[data-tab=reg] .scroll-content>.grid.grid-cols-2,
 body[data-tab=reg] .scroll-content>.mt-5,
 body[data-tab=fuji] .scroll-content>.space-y-3,
 body[data-tab=fuji] .scroll-content>.grid.grid-cols-2,
@@ -16,8 +15,8 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 .scroll-content>.grid.grid-cols-2.mb-4 button{min-height:78px;font-size:15px!important;border-radius:18px!important;box-shadow:0 4px 10px rgba(0,0,0,.4)}
 .scroll-content>.mt-5 button{min-height:62px;border-radius:16px!important}
 
-#jmsTabs{position:fixed;left:0;right:0;bottom:0;z-index:1500;display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:#0f0f0fee;backdrop-filter:blur(6px);max-width:440px;margin:0 auto}
-#jmsTabs button{position:relative;border:0;border-radius:16px;color:#fff;font-weight:900;font-size:9.5px;letter-spacing:.3px;padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;box-shadow:0 4px 8px rgba(0,0,0,.45);opacity:.78;transition:transform .15s,opacity .15s}
+#jmsTabs{position:fixed;left:0;right:0;bottom:0;z-index:1500;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:#0f0f0fee;backdrop-filter:blur(6px);max-width:440px;margin:0 auto}
+#jmsTabs button{position:relative;border:0;border-radius:16px;color:#fff;font-weight:900;font-size:11px;letter-spacing:.3px;padding:9px 2px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;box-shadow:0 4px 8px rgba(0,0,0,.45);opacity:.78;transition:transform .15s,opacity .15s}
 #jmsTabs button .i{font-size:26px;line-height:1}
 #jmsTabs button.on{opacity:1;transform:translateY(-4px);box-shadow:inset 0 3px 8px rgba(0,0,0,.35),0 0 0 3px #FFD600}
 #jmsTabs button.on::after{content:"";position:absolute;left:12px;right:12px;bottom:3px;height:5px;border-radius:3px;background:#FFD600}
@@ -126,9 +125,8 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 .jxHi small{color:#bbb}
 #jxCourse{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:3400;background:#000d;color:#fff;font-weight:900;font-size:30px;padding:14px 26px;border-radius:18px;display:none;border:3px solid #FFB300;pointer-events:none}
 .fxRow{display:flex;gap:8px;margin:8px 0}.fxRow .jmsBtn{flex:1;margin:0}
-#jxUR{position:fixed;left:10px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:1400;display:none;gap:8px}
-body[data-tab=reg] #jxUR{display:flex}
-#jxUR button{width:48px;height:48px;border-radius:50%;border:0;background:#1E88E5;color:#fff;font-size:26px;font-weight:900;box-shadow:0 2px 8px #000a}
+#jxUR{position:fixed;right:10px;top:330px;z-index:1400;display:none;gap:8px}
+#jxUR button{width:42px;height:42px;border-radius:50%;border:2px solid #fff;background:#1E88E5cc;color:#fff;font-size:22px;font-weight:900;line-height:1;padding:0;box-shadow:0 2px 8px #000a}
 #jxBar{position:fixed;top:6px;left:0;right:0;z-index:1450;display:none;justify-content:center;gap:6px;pointer-events:none}
 #jxOpen,#jxLot,#jxSave{pointer-events:auto;width:108px;box-sizing:border-box;border:0;border-radius:12px;color:#fff;font-weight:900;font-size:11px;line-height:1.1;padding:8px 4px;box-shadow:0 2px 8px #000a;text-align:center}
 #jxOpen{background:#FFB300;color:#000}
@@ -187,3 +185,17 @@ body[data-tab=reg] #jxUR{display:flex}
 #jmv .vConfY{background:#c0392b}#jmv .vConfN{background:#444}
 #jmv .vB.delall{background:#c0392b;font-size:13px}
 #jmv .vBd.r{background:#c0392b;font-size:11px}
+
+/* ---------- bandeau vert : nom de l'appli + lien Instagram sur toute la largeur ---------- */
+.scroll-content>div:first-child>.font-mono{display:none!important}
+.scroll-content>div:first-child{padding:10px!important}
+.scroll-content>div:first-child>div:first-child{gap:10px!important}
+.scroll-content>div:first-child>div:first-child>div{flex:1 1 55%;font-size:18px!important;line-height:1.15!important;letter-spacing:.02em}
+.scroll-content>div:first-child>div:first-child>button{flex:1 1 45%;font-size:15px!important;padding:13px 8px!important;border-radius:14px!important;box-shadow:0 3px 8px #0007}
+/* ---------- RESET seul dans REGLAGES ---------- */
+.scroll-content>.grid.grid-cols-2.mb-4 button.jxHid{display:none!important}
+.scroll-content>.grid.grid-cols-2.mb-4 button{min-height:54px!important}
+/* ---------- apercu sur PRET A LANCER ---------- */
+.gPv{background:#0f0f0f;border-radius:14px;margin:0 0 8px;min-height:60px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.gPv img{display:none;max-width:100%;max-height:34vh;border-radius:10px}
+#gPvM{color:#999;font-size:13px;padding:18px}

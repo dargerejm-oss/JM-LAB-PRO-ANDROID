@@ -151,7 +151,7 @@ window.__jmsShared = async function(json){
   }
   if(!files.length) return;
   if(files.length === 1){ setFile(mainInput(), files); goTab("fuji"); }
-  else { goTab("exp"); setFile(lotInput(), files); }
+  else { setFile(lotInput(), files); }
 };
 window.__jmsX = window.__jmsX || {}; window.__jmsX.x_ref = function(){ window.__jmsLearn("ref"); };
 if(NAT && NAT.takeShared){ setTimeout(function(){ var j = NAT.takeShared(); if(j) window.__jmsShared(j); }, 900); }
