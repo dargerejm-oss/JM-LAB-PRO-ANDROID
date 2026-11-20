@@ -295,6 +295,18 @@ setTimeout(function(){ rec(); }, 1500);
 var ur = document.createElement("div"); ur.id = "jxUR"; ur.innerHTML = '<button id="jxU">↶</button><button id="jxR2">↷</button>'; document.body.appendChild(ur);
 $("jxU").onclick = function(){ clearTimeout(ht); rec(); jump(hpos-1); }; $("jxR2").onclick = function(){ jump(hpos+1); };
 
+/* ---------- memoriser les derniers reglages (reprise au demarrage) ---------- */
+var KEEPK = "jms_last", kt = 0;
+function keepOn(){ try{ return localStorage.getItem("jms_keep") !== "0"; }catch(e){ return false; } }
+function keepSave(){ if(!keepOn()) return; try{ localStorage.setItem(KEEPK, JSON.stringify({values:curValues(), profile:curProfile()})); }catch(e){} }
+function keepLater(){ clearTimeout(kt); kt = setTimeout(keepSave, 900); }
+document.addEventListener("input", function(e){ if(e.target && e.target.type === "range") keepLater(); }, true);
+document.addEventListener("click", function(e){ if(e.target.closest && e.target.closest(".scroll-content button, #jxUR button")) keepLater(); }, true);
+setTimeout(function(){
+  if(!keepOn()) return; var o = null; try{ o = JSON.parse(localStorage.getItem(KEEPK) || "null"); }catch(e){}
+  if(o && ((o.profile && window.__jmsProfCanon && window.__jmsProfCanon(o.profile) !== "labo pro ev5") || Object.keys(o.values || {}).length)) applyPreset(o);
+}, 1100);
+
 /* ---------- favoris (acces direct dans RÉGLAGES) ---------- */
 function favs(){ try{ return JSON.parse(localStorage.getItem("jms_fav")||"[]"); }catch(e){ return []; } }
 function drawFav(){

@@ -218,11 +218,16 @@ public class MainActivity extends Activity {
             return;
         }
         String act = in.getAction();
-        if (!Intent.ACTION_SEND.equals(act) && !Intent.ACTION_SEND_MULTIPLE.equals(act)) {
+        boolean view = Intent.ACTION_VIEW.equals(act) || Intent.ACTION_EDIT.equals(act);
+        if (!view && !Intent.ACTION_SEND.equals(act) && !Intent.ACTION_SEND_MULTIPLE.equals(act)) {
             return;
         }
         ArrayList<Uri> uris = new ArrayList<>();
-        if (Intent.ACTION_SEND.equals(act)) {
+        if (view) {
+            if (in.getData() != null) {
+                uris.add(in.getData());
+            }
+        } else if (Intent.ACTION_SEND.equals(act)) {
             Uri u = in.getParcelableExtra(Intent.EXTRA_STREAM);
             if (u != null) {
                 uris.add(u);
@@ -264,7 +269,8 @@ public class MainActivity extends Activity {
                 }
                 org.json.JSONObject o = new org.json.JSONObject();
                 o.put("url", "https://appassets.androidplatform.net/shared/" + fn);
-                o.put("name", "Snapseed_" + n + ".jpg");
+                String dn = dispName(getContentResolver(), u, "Photo_" + n + ".jpg");
+                o.put("name", dn.replaceAll("\\.[^.]*$", "") + ".jpg");
                 arr.put(o);
             } catch (Exception e) {
                 // image illisible : on passe a la suivante
@@ -357,6 +363,109 @@ public class MainActivity extends Activity {
         });
     }
 
+    private static final String[] EXIF_TAGS = {
+            android.media.ExifInterface.TAG_DATETIME, android.media.ExifInterface.TAG_DATETIME_ORIGINAL,
+            android.media.ExifInterface.TAG_DATETIME_DIGITIZED, android.media.ExifInterface.TAG_MAKE,
+            android.media.ExifInterface.TAG_MODEL, android.media.ExifInterface.TAG_EXPOSURE_TIME,
+            android.media.ExifInterface.TAG_F_NUMBER, android.media.ExifInterface.TAG_ISO_SPEED_RATINGS,
+            android.media.ExifInterface.TAG_FOCAL_LENGTH, android.media.ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM,
+            android.media.ExifInterface.TAG_LENS_MAKE, android.media.ExifInterface.TAG_LENS_MODEL,
+            android.media.ExifInterface.TAG_EXPOSURE_BIAS_VALUE, android.media.ExifInterface.TAG_WHITE_BALANCE,
+            android.media.ExifInterface.TAG_FLASH, android.media.ExifInterface.TAG_ARTIST,
+            android.media.ExifInterface.TAG_COPYRIGHT, android.media.ExifInterface.TAG_GPS_LATITUDE,
+            android.media.ExifInterface.TAG_GPS_LATITUDE_REF, android.media.ExifInterface.TAG_GPS_LONGITUDE,
+            android.media.ExifInterface.TAG_GPS_LONGITUDE_REF, android.media.ExifInterface.TAG_GPS_ALTITUDE,
+            android.media.ExifInterface.TAG_GPS_ALTITUDE_REF
+    };
+
+    private String convertImageIn(String b64, int maxPixels) throws Exception {
+        byte[] data = Base64.decode(b64, Base64.DEFAULT);
+        android.graphics.BitmapFactory.Options o = new android.graphics.BitmapFactory.Options();
+        o.inJustDecodeBounds = true;
+        android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length, o);
+        int w = o.outWidth, h = o.outHeight;
+        if (w <= 0 || h <= 0) {
+            return "";
+        }
+        if (maxPixels < 1000000) {
+            maxPixels = 1000000;
+        }
+        int sample = 1;
+        while ((long) (w / (sample * 2)) * (h / (sample * 2)) >= maxPixels) {
+            sample *= 2;
+        }
+        o = new android.graphics.BitmapFactory.Options();
+        o.inSampleSize = sample;
+        android.graphics.Bitmap bm = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.length, o);
+        if (bm == null) {
+            return "";
+        }
+        long px = (long) bm.getWidth() * bm.getHeight();
+        if (px > maxPixels) {
+            double k = Math.sqrt((double) maxPixels / px);
+            android.graphics.Bitmap sc = android.graphics.Bitmap.createScaledBitmap(bm,
+                    Math.max(1, (int) (bm.getWidth() * k)), Math.max(1, (int) (bm.getHeight() * k)), true);
+            if (sc != bm) {
+                bm.recycle();
+                bm = sc;
+            }
+        }
+        android.media.ExifInterface src = null;
+        try {
+            src = new android.media.ExifInterface(new java.io.ByteArrayInputStream(data));
+        } catch (Exception ignored) {
+        }
+        int rot = 0;
+        if (src != null) {
+            int or = src.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL);
+            rot = or == android.media.ExifInterface.ORIENTATION_ROTATE_90 ? 90
+                    : or == android.media.ExifInterface.ORIENTATION_ROTATE_180 ? 180
+                    : or == android.media.ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+        }
+        if (rot != 0) {
+            android.graphics.Matrix m = new android.graphics.Matrix();
+            m.postRotate(rot);
+            android.graphics.Bitmap r = android.graphics.Bitmap.createBitmap(bm, 0, 0, bm.getWidth(), bm.getHeight(), m, true);
+            if (r != bm) {
+                bm.recycle();
+                bm = r;
+            }
+        }
+        File tmp = new File(getCacheDir(), "conv_" + System.nanoTime() + ".jpg");
+        try {
+            try (FileOutputStream os = new FileOutputStream(tmp)) {
+                bm.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, os);
+            }
+            bm.recycle();
+            if (src != null) {
+                try {
+                    android.media.ExifInterface dst = new android.media.ExifInterface(tmp.getAbsolutePath());
+                    for (String t : EXIF_TAGS) {
+                        String v = src.getAttribute(t);
+                        if (v != null) {
+                            dst.setAttribute(t, v);
+                        }
+                    }
+                    dst.setAttribute(android.media.ExifInterface.TAG_ORIENTATION,
+                            String.valueOf(android.media.ExifInterface.ORIENTATION_NORMAL));
+                    dst.saveAttributes();
+                } catch (Exception ignored) {
+                }
+            }
+            byte[] out = new byte[(int) tmp.length()];
+            try (InputStream is = new java.io.FileInputStream(tmp)) {
+                int off = 0, r;
+                while (off < out.length && (r = is.read(out, off, out.length - off)) > 0) {
+                    off += r;
+                }
+            }
+            return Base64.encodeToString(out, Base64.NO_WRAP);
+        } finally {
+            tmp.delete();
+        }
+    }
+
     private void toast(String t) {
         runOnUiThread(() -> Toast.makeText(this, t, Toast.LENGTH_LONG).show());
     }
@@ -381,6 +490,16 @@ public class MainActivity extends Activity {
         @JavascriptInterface
         public void setLang(String l) {
             langEn = "en".equals(l);
+        }
+
+        /** HEIC ou photo trop grande -> JPEG lisible par la page (orientation appliquee, EXIF principal recopie). */
+        @JavascriptInterface
+        public String convertImage(String b64, int maxPixels) {
+            try {
+                return convertImageIn(b64, maxPixels);
+            } catch (Throwable e) {
+                return "";
+            }
         }
 
         @JavascriptInterface

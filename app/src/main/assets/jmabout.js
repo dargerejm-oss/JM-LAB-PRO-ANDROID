@@ -17,6 +17,7 @@ css.textContent =
 ".abSec{background:#0f0f0f;border-radius:14px;padding:12px;margin:10px 0;font-size:13px;line-height:1.5;color:#ddd}" +
 ".abSec b{color:#fff}" +
 ".abLang{display:flex;gap:8px;margin-top:8px}.abLang button{flex:1;border:0;border-radius:12px;padding:12px;font-weight:900;font-size:15px;background:#3a3a3a;color:#fff}.abLang button.on{background:#1E88E5;outline:3px solid #FFB300}" +
+".abChk{display:flex;gap:10px;align-items:center;font-weight:700;color:#fff}.abChk input{width:24px;height:24px;flex:none;accent-color:#43A047}" +
 ".abBtn{width:100%;border:0;border-radius:16px;padding:15px;font-weight:900;font-size:16px;color:#fff;margin-top:8px}" +
 ".abI{background:#e91e63}.abG{background:#43A047}.abC{background:#3a3a3a}" +
 ".inStep{text-align:center}.inStep .e{font-size:64px;line-height:1.2}.inStep h3{font-size:22px;margin:8px 0;color:#FFD600}.inStep p{font-size:16px;line-height:1.5;color:#ddd;margin:0 0 6px}" +
@@ -36,6 +37,7 @@ ab.innerHTML = '<div class="abBox">' +
  '<div class="abSec"><b>🔒 ' + T("Confidentialité", "Privacy") + '</b><br>' + T(
    "JM LAB PRO ne collecte aucune donnée personnelle. Vos photos sont traitées uniquement sur votre téléphone et ne sont jamais envoyées sur Internet. Pas de compte, pas de publicité, pas de statistiques. La caméra sert seulement à scanner des QR codes de styles, et l'image n'est pas conservée. Les réglages et styles restent dans l'appli ; les photos sont enregistrées dans le dossier que vous choisissez.",
    "JM LAB PRO collects no personal data. Your photos are processed only on your phone and are never sent over the Internet. No account, no ads, no analytics. The camera is only used to scan style QR codes, and the image is not kept. Settings and styles stay in the app; photos are saved in the folder you choose.") + '</div>' +
+ '<div class="abSec"><label class="abChk"><input type="checkbox" id="abKeep"> ' + T("Reprendre mes derniers réglages à l'ouverture de l'appli", "Restore my last settings when the app opens") + '</label></div>' +
  '<div class="abSec"><b>🌐 ' + T("Langue", "Language") + '</b>' +
  '<div class="abLang"><button data-a="fr" class="' + (EN ? "" : "on") + '">Français</button><button data-a="en" class="' + (EN ? "on" : "") + '">English</button></div></div>' +
  '<div class="abSec" style="font-size:11px;color:#999">' + T(
@@ -52,7 +54,9 @@ ab.addEventListener("click", function(e){
   else if(a === "fr" || a === "en"){ if((a === "en") !== EN && window.__jmsSetLang) window.__jmsSetLang(a); }
   else if(a === "intro"){ ab.classList.remove("show"); intro(); }
 });
-window.__jmsAbout = function(){ ab.classList.add("show"); };
+var kp = ab.querySelector("#abKeep");
+kp.onchange = function(){ try{ localStorage.setItem("jms_keep", kp.checked ? "1" : "0"); if(!kp.checked) localStorage.removeItem("jms_last"); }catch(e){} };
+window.__jmsAbout = function(){ var on = true; try{ on = localStorage.getItem("jms_keep") !== "0"; }catch(e){} kp.checked = on; ab.classList.add("show"); };
 /* le nom de l'appli dans le bandeau vert ouvre A PROPOS */
 document.addEventListener("click", function(e){
   var t = e.target.closest && e.target.closest(".scroll-content>div:first-child>div:first-child>div");
