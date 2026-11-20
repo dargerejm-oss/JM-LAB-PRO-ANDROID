@@ -369,7 +369,7 @@ public class MainActivity extends Activity {
             android.media.ExifInterface.TAG_MODEL, android.media.ExifInterface.TAG_EXPOSURE_TIME,
             android.media.ExifInterface.TAG_F_NUMBER, android.media.ExifInterface.TAG_ISO_SPEED_RATINGS,
             android.media.ExifInterface.TAG_FOCAL_LENGTH, android.media.ExifInterface.TAG_FOCAL_LENGTH_IN_35MM_FILM,
-            android.media.ExifInterface.TAG_LENS_MAKE, android.media.ExifInterface.TAG_LENS_MODEL,
+            "LensMake", "LensModel",
             android.media.ExifInterface.TAG_EXPOSURE_BIAS_VALUE, android.media.ExifInterface.TAG_WHITE_BALANCE,
             android.media.ExifInterface.TAG_FLASH, android.media.ExifInterface.TAG_ARTIST,
             android.media.ExifInterface.TAG_COPYRIGHT, android.media.ExifInterface.TAG_GPS_LATITUDE,
