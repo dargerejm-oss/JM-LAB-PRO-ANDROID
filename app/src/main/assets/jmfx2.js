@@ -119,8 +119,14 @@ function geometry(src, g){
   x.translate(W / 2, H / 2); x.rotate(th); x.scale(k * (g.flip ? -1 : 1), k); x.rotate(q * Math.PI / 2);
   x.drawImage(src, -w / 2, -h / 2);
   if(!g.crop) return c;
-  var cr = g.crop, cw = Math.max(1, Math.round(cr.w * W)), ch = Math.max(1, Math.round(cr.h * H)), o = cvs(cw, ch);
-  o.getContext("2d").drawImage(c, Math.round(cr.x * W), Math.round(cr.y * H), cw, ch, 0, 0, cw, ch);
+  var cr = g.crop, cw = Math.max(1, Math.round(cr.w * W)), ch = Math.max(1, Math.round(cr.h * H)), ox = Math.round(cr.x * W), oy = Math.round(cr.y * H);
+  if(cr.ratio){   /* format impose : proportion exacte sur la vraie photo */
+    var rr = cr.ratio < 0 ? W / H : cr.ratio, mx = ox + cw / 2, my = oy + ch / 2;
+    if(cw / ch > rr) cw = Math.round(ch * rr); else ch = Math.round(cw / rr);
+    ox = Math.round(Math.max(0, Math.min(W - cw, mx - cw / 2))); oy = Math.round(Math.max(0, Math.min(H - ch, my - ch / 2)));
+  }
+  var o = cvs(cw, ch);
+  o.getContext("2d").drawImage(c, ox, oy, cw, ch, 0, 0, cw, ch);
   return o;
 }
 
@@ -216,6 +222,7 @@ css.textContent =
 "#jx2O{z-index:3370}#jx2O .jmsBoxG{max-width:440px}" +
 ".x2C{width:100%;display:block;border-radius:10px;touch-action:none;background:#000}" +
 ".x2Row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.x2Row button{flex:1;min-width:60px;border:0;border-radius:10px;padding:10px 4px;font-weight:900;font-size:12px;background:#3a3a3a;color:#fff}.x2Row button.on{background:#1E88E5;outline:3px solid #FFB300}" +
+"#x2Lp button{min-width:0;font-size:16px;padding:8px 0}" +
 ".x2Lb{display:block;font-size:12px;font-weight:800;color:#bbb;margin:10px 0 2px}.x2Lb b{color:#FFD600}" +
 ".x2Hint{font-size:12px;color:#aaa;text-align:center;margin:6px 0;line-height:1.4}";
 document.head.appendChild(css);
@@ -350,7 +357,7 @@ function crop(){
   HH.r90 = function(){ g.r90 = (g.r90 + 1) % 4; rc = {x:0, y:0, w:1, h:1}; applyRatio(); rebuild(); };
   HH.flip = function(){ g.flip = !g.flip; rebuild(); };
   HH.rz = function(){ g = {r90:0, flip:false, rot:0, crop:null}; rc = {x:0, y:0, w:1, h:1}; $("x2Rot").value = 0; $("x2Rotv").textContent = "0"; rebuild(); };
-  HH.ok = function(){ var whole = rc.x < 0.002 && rc.y < 0.002 && rc.w > 0.996 && rc.h > 0.996; g.crop = whole ? null : rc; geo = g; hide(); if(geoOn()) note(T("✂️ Recadrage appliqué à l'enregistrement de cette photo", "✂️ Crop applied when this photo is saved")); };
+  HH.ok = function(){ var whole = rc.x < 0.002 && rc.y < 0.002 && rc.w > 0.996 && rc.h > 0.996; g.crop = whole ? null : Object.assign({}, rc, {ratio:ratio}); geo = g; hide(); if(geoOn()) note(T("✂️ Recadrage appliqué à l'enregistrement de cette photo", "✂️ Crop applied when this photo is saved")); };
   HH.cancel = hide;
   rebuild();
 }
@@ -415,7 +422,9 @@ function filmScreen(){
   if(pc){ var sz = fitCanvas(pc, ph.width, ph.height, 700); base = cvs(sz[0], sz[1]); base.getContext("2d").drawImage(ph, 0, 0, sz[0], sz[1]); }
   function prev(){
     if(!pc) return; var c = cvs(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0);
+    if(spots.length) heal(c, spots);
     if(curveOn(s)) applyCurves(c.getContext("2d"), c.width, c.height, s);
+    if(geoOn()) c = geometry(c, geo);
     var o = film(c, s, {}); var sz2 = fitCanvas(pc, o.width, o.height, 700); pc.getContext("2d").drawImage(o, 0, 0, sz2[0], sz2[1]);
   }
   function marks(){
