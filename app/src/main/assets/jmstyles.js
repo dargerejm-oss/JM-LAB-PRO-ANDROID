@@ -56,6 +56,7 @@ function note(t){ alert(t); }
 function menu(){
   var n = load().length;
   box.innerHTML = '<h2>🎨 MES STYLES</h2><div class="sub">'+n+' style(s) enregistré(s) • import / export de toutes les façons</div>'+
+  '<button class="hubB b6" data-a="x_manuel"><span class="i">📖</span><span>MODE D\'EMPLOI<small>Le guide illustré de l\'appli, et son PDF</small></span></button>'+
   '<button class="hubB b1" data-a="presets"><span class="i">🎛️</span><span>MES PRESETS & QR<small>Voir, appliquer, scanner ou créer un QR</small></span></button>'+
   '<button class="hubB b2" data-a="exportf"><span class="i">📤</span><span>EXPORTER UN FICHIER<small>Tous mes styles → dossier Téléchargements/JM LAB PRO</small></span></button>'+
   '<button class="hubB b3" data-a="importf"><span class="i">📥</span><span>IMPORTER UN FICHIER<small>Fichier .json / .txt de styles</small></span></button>'+
