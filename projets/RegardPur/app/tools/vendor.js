@@ -8,6 +8,11 @@ for (const f of ['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision
   fs.copyFileSync(path.join(MP, 'wasm', f), path.join(V, 'wasm', f));
 fs.copyFileSync(path.join(R, 'node_modules', 'libheif-js', 'libheif-wasm', 'libheif-bundle.js'), path.join(V, 'libheif-bundle.js'));
 fs.copyFileSync(path.join(R, 'node_modules', 'exifr', 'dist', 'full.umd.js'), path.join(V, 'exifr.js'));
+// reconnaissance des personnes (face-api, modele inclus dans le paquet)
+const FA = path.join(R, 'node_modules', '@vladmandic', 'face-api');
+fs.mkdirSync(path.join(V, 'faceapi'), {recursive: true});
+fs.copyFileSync(path.join(FA, 'dist', 'face-api.js'), path.join(V, 'faceapi', 'face-api.js'));
+for (const f of ['face_recognition_model-weights_manifest.json', 'face_recognition_model.bin']) fs.copyFileSync(path.join(FA, 'model', f), path.join(V, 'faceapi', f));
 const MODEL = path.join(V, 'face_landmarker.task');
 const URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 function get(u, out, n) {

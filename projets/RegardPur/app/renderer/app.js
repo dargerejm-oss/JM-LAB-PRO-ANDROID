@@ -166,6 +166,7 @@ async function load(dir, items, label) {
   if (!items.length) { toast("Aucune photo dans ce dossier."); return; }
   stopAnalysis();
   S.photos.forEach(function (p) { if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl); });
+  persNames = {}; PERS = []; descQueue = [];
   S.dir = dir; S.photos = items; S.byId = {}; S.sel.clear(); S.cur = 0; S.openGroup = -1; S.undo = []; S.filter = "all";
   items.forEach(function (p) { p.status = ""; p.auto = false; p.stars = 0; p.a = null; p.score = 0; p.g = -1; S.byId[p.id] = p; });
   $("folderName").textContent = (dir || label || "") + " — " + items.length + " photos";
@@ -173,12 +174,12 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
   ["bAuto", "bCompare", "bExport"].forEach(function (b) { $(b).disabled = false; });
-  rescore(); buildCards(); refresh(); updLearn();
+  rescore(); buildPersons(); buildCards(); refresh(); updLearn();
   var todo = S.photos.filter(function (p) { return !p.a; });
   if (todo.length) { quickThumbs(todo); analyse(todo); } else toast("Session reprise : " + items.length + " photos déjà analysées.");
 }
@@ -186,7 +187,7 @@ function saveSoon() {
   if (!N || !S.dir) return;
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
-    var o = {v: 1, saved: Date.now(), photos: {}};
+    var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames};
     S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
@@ -261,7 +262,9 @@ function done(p, r) {
     if (N && S.dir) r.thumb.arrayBuffer().then(function (b) { N.writeBin(sessPath(join("vignettes", strHash(p.id) + ".jpg")), new Uint8Array(b)); });
     delete r.thumb;
   }
-  delete r.id; p.a = r; p.score = score(p); p.why = reasons(p);
+  delete r.id;
+  (r.faces || []).forEach(function (f) { if (f.px) { if (f.w > 0.035) descQueue.push({p: p, f: f, px: f.px}); delete f.px; } });
+  p.a = r; p.score = score(p); p.why = reasons(p); runDesc();
   doneN++; prog(); updCard(p);
   if (S.view[S.cur] === p.id) showPanel();
   if (doneN >= totalN) { S.analysing = false; prog(); rescore(); refresh(); saveSoon(); toast("Analyse terminée : " + totalN + " photos. Touchez <b>✨ Tri automatique</b> ou triez vous-même (P / X)."); }
@@ -286,6 +289,80 @@ var io = new IntersectionObserver(function (es) {
   });
 }, {root: $("grid"), rootMargin: "400px"});
 
+/* ---------------- personnes : reconnaissance des visages (face-api, sans internet) ---------------- */
+var descQueue = [], descBusy = false, faNet = null, PERS = [], persNames = {};
+function loadFaceNet() {
+  if (faNet) return faNet;
+  faNet = (async function () {
+    if (!window.faceapi) return null;
+    try {
+      try { await faceapi.tf.setBackend("webgl"); } catch (e) { await faceapi.tf.setBackend("cpu"); }
+      await faceapi.tf.ready();
+      await faceapi.nets.faceRecognitionNet.loadFromUri("vendor/faceapi");
+      return faceapi;
+    } catch (e) { console.log("personnes indisponibles : " + e.message); return null; }
+  })();
+  return faNet;
+}
+async function runDesc() {
+  if (descBusy || !descQueue.length) return;
+  descBusy = true;
+  var fa = await loadFaceNet();
+  var c = document.createElement("canvas"); c.width = c.height = 150; var x = c.getContext("2d");
+  var ic = document.createElement("canvas"); ic.width = ic.height = 56;
+  while (descQueue.length) {
+    var j = descQueue.shift();
+    try {
+      x.putImageData(new ImageData(new Uint8ClampedArray(j.px), 150, 150), 0, 0);
+      ic.getContext("2d").drawImage(c, 20, 14, 110, 110, 0, 0, 56, 56); j.f.ic = ic.toDataURL("image/jpeg", 0.75);
+      if (fa) { var d = await fa.computeFaceDescriptor(c); j.f.d = Array.prototype.map.call(d, function (v) { return Math.round(v * 1000) / 1000; }); }
+    } catch (e) {}
+    if (descQueue.length % 10 === 0) await new Promise(function (r) { setTimeout(r, 0); });
+  }
+  descBusy = false;
+  buildPersons(); drawPersons(); saveSoon();
+}
+function dist(a, b) { var s = 0; for (var i = 0; i < a.length; i++) { var t = a[i] - b[i]; s += t * t; } return Math.sqrt(s); }
+function buildPersons() {
+  var faces = [];
+  S.photos.slice().sort(function (a, b) { return when(a) - when(b); }).forEach(function (p) { bigFaces(p.a).forEach(function (f) { if (f.d) faces.push({p: p, f: f}); }); });
+  var cl = [];
+  faces.forEach(function (o) {
+    var best = null, bd = 0.52;
+    cl.forEach(function (c) { var d = dist(o.f.d, c.cen); if (d < bd) { bd = d; best = c; } });
+    if (best) { best.items.push(o); var n = best.items.length; best.cen = best.cen.map(function (v, i) { return v + (o.f.d[i] - v) / n; }); }
+    else cl.push({cen: o.f.d.slice(), items: [o]});
+  });
+  cl.sort(function (a, b) { return b.items.length - a.items.length; });
+  PERS = cl.map(function (c, i) {
+    var ids = {}; c.items.forEach(function (o) { ids[o.p.id] = 1; o.f.pid = i; });
+    var rep = c.items.slice().sort(function (a, b) { return (b.f.eyeSharp || 0) - (a.f.eyeSharp || 0); })[0];
+    var name = ""; Object.keys(persNames).forEach(function (k) { var o = persNames[k]; if (!name && dist(o.cen, c.cen) < 0.45) name = o.name; });
+    return {i: i, cen: c.cen, ids: ids, n: Object.keys(ids).length, ic: rep.f.ic, name: name || "Personne " + (i + 1)};
+  });
+}
+function drawPersons() {
+  var box = $("persons");
+  if (!PERS.length) { box.innerHTML = '<div class="note">' + (S.photos.some(function (p) { return bigFaces(p.a).length; }) ? "Reconnaissance des personnes…" : "Aucun visage reconnu pour l'instant.") + "</div>"; return; }
+  var show = PERS.filter(function (o) { return o.n >= 2 || PERS.length <= 8; }).slice(0, 30);
+  box.innerHTML = show.map(function (o) { return '<div class="prs' + (S.filter === "person:" + o.i ? " on" : "") + '" data-p="' + o.i + '" title="Double-clic pour donner un nom">' + (o.ic ? '<img src="' + o.ic + '">' : "<i>👤</i>") + "<b>" + esc(o.name) + "</b><span>" + o.n + "</span></div>"; }).join("") +
+    (PERS.length > show.length ? '<div class="note">+ ' + (PERS.length - show.length) + " personne(s) vue(s) une seule fois</div>" : "");
+  $("persHint").textContent = "(" + PERS.length + ")";
+}
+$("persons").addEventListener("click", function (e) { var r = e.target.closest(".prs"); if (!r) return; var k = "person:" + r.dataset.p; S.filter = S.filter === k ? "all" : k; S.openGroup = -1; refresh(true); });
+$("persons").addEventListener("dblclick", function (e) {
+  var r = e.target.closest(".prs"); if (!r) return; var o = PERS[+r.dataset.p];
+  dialog("<h3>Nom de la personne</h3><input type='text' id='pName' style='width:100%' value='" + esc(/^Personne \d+$/.test(o.name) ? "" : o.name) + "' placeholder='ex. Julie'><div class='row'><button data-c='cancel'>Annuler</button><button class='pri' data-c='ok2'>OK</button></div>", function (c) {
+    if (c !== "ok2") return; var v = ($("pName") ? $("pName").value : "").trim(); if (!v) return;
+    persNames[strHash(o.cen.join(","))] = {name: v, cen: o.cen}; o.name = v; drawPersons(); saveSoon();
+  });
+  setTimeout(function () { var i = $("pName"); if (i) i.focus(); }, 50);
+});
+
+/* ---------------- photos semblables ---------------- */
+function simDist(a, b) { if (!a.a || !b.a || a.a.err || b.a.err) return 999; return ham(a.a.hash, b.a.hash) + colDist(a.a.col, b.a.col) / 4; }
+$("bSim").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p) return; S.filter = S.filter === "similar:" + p.id ? "all" : "similar:" + p.id; S.openGroup = -1; refresh(true); };
+
 /* ---------------- filtres ---------------- */
 var FILTERS = [
   ["all", "Toutes", function () { return true; }],
@@ -303,7 +380,10 @@ var ISSUES = [
   ["groups", "Rafales et doublons", function (p) { return p.g >= 0; }]
 ];
 function has(p, re) { var w = p.why; if (!w) return false; return w.rej.concat(w.warn).some(function (t) { return re.test(t); }); }
-function fnOf(k) { var f = FILTERS.concat(ISSUES).filter(function (x) { return x[0] === k; })[0]; return f ? f[2] : FILTERS[0][2]; }
+function fnOf(k) {
+  if (/^person:/.test(k)) { var o = PERS[+k.slice(7)]; return function (p) { return !!(o && o.ids[p.id]); }; }
+  if (/^similar:/.test(k)) { var ref = S.byId[k.slice(8)]; return function (p) { return !!ref && simDist(ref, p) <= 26; }; }
+  var f = FILTERS.concat(ISSUES).filter(function (x) { return x[0] === k; })[0]; return f ? f[2] : FILTERS[0][2]; }
 function drawFilters() {
   function row(f) { var n = S.photos.filter(f[2]).length; return '<div class="flt' + (S.filter === f[0] ? " on" : "") + '" data-f="' + f[0] + '"><span>' + f[1] + "</span><span>" + n + "</span></div>"; }
   $("filters").innerHTML = FILTERS.map(row).join("");
@@ -345,7 +425,8 @@ function computeView() {
   if (sort === "score") list.sort(function (a, b) { return b.score - a.score || when(a) - when(b); });
   else if (sort === "name") list.sort(function (a, b) { return a.rel < b.rel ? -1 : 1; });
   else list.sort(function (a, b) { return when(a) - when(b) || (a.name < b.name ? -1 : 1); });
-  if ($("cGroup").checked && S.filter !== "groups") {
+  if (/^similar:/.test(S.filter)) { var ref = S.byId[S.filter.slice(8)]; list.sort(function (a, b) { return simDist(ref, a) - simDist(ref, b); }); return list.map(function (p) { return p.id; }); }
+  if ($("cGroup").checked && S.filter !== "groups" && !/^person:/.test(S.filter)) {
     // une seule photo par serie (la meilleure), sauf la serie ouverte
     var out = [], seen = {};
     list.forEach(function (p) {
@@ -366,7 +447,8 @@ function refresh(keepCur) {
   S.view.forEach(function (id) { frag.appendChild(cards[id]); });
   g.innerHTML = ""; g.appendChild(frag);
   var i = S.view.indexOf(curId); S.cur = i >= 0 ? i : (S.view.length ? clamp(S.cur, 0, S.view.length - 1) : -1);
-  S.photos.forEach(updCard); drawFilters(); showPanel();
+  S.photos.forEach(updCard); drawFilters(); drawPersons(); showPanel();
+  $("bSim").textContent = /^similar:/.test(S.filter) ? "✖ Fermer les photos semblables (" + S.view.length + ")" : "🔍 Montrer les photos semblables";
   if (keepCur !== false) scrollToCur();
 }
 function scrollToCur() { var c = cards[S.view[S.cur]]; if (c && c.scrollIntoView) c.scrollIntoView({block: "nearest"}); }

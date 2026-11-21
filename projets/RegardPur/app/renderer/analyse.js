@@ -210,7 +210,13 @@ async function analyse(msg) {
           var ew = Math.max(48, eyeW * 1.6), eh = Math.max(36, eyeW * 0.7);
           var es = sharpOfCrop(bmp, ecx - ew / 2, ecy - eh / 2, ew, eh);
           var fs2 = sharpOfCrop(bmp, minx * W, miny * H, bw * W, bh * H);
-          out.faces.push({x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
+          // visage redresse (yeux a l'horizontale) 150 x 150 : sert a reconnaitre la personne
+          var le = {x: (pts[33].x + pts[133].x) / 2 * W, y: (pts[33].y + pts[133].y) / 2 * H}, re = {x: (pts[263].x + pts[362].x) / 2 * W, y: (pts[263].y + pts[362].y) / 2 * H};
+          var ang = Math.atan2(re.y - le.y, re.x - le.x), fcx = (minx + bw / 2) * W, fcy = (miny + bh / 2) * H, side = Math.max(bw * W, bh * H) * 1.1;
+          var ac2 = canvas(150, 150), ax2 = ac2.getContext("2d", {willReadFrequently: true});
+          ax2.imageSmoothingQuality = "high"; ax2.translate(75, 75); ax2.rotate(-ang); ax2.scale(150 / side, 150 / side); ax2.drawImage(bmp, -fcx, -fcy);
+          var px = ax2.getImageData(0, 0, 150, 150).data;
+          out.faces.push({px: px, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
             closed: blinkMin > 0.5, half: !(blinkMin > 0.5) && blink > 0.45, smile: Math.round(smile * 100) / 100,
             eyeSharp: es ? toScore(es.v) : null, faceSharp: fs2 ? toScore(fs2.v) : null});
         });

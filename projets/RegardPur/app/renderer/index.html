@@ -28,6 +28,8 @@
     <div id="filters"></div>
     <h4>Problèmes repérés</h4>
     <div id="issues"></div>
+    <h4>Personnes <small id="persHint"></small></h4>
+    <div id="persons"><div class="note">Les personnes apparaissent ici après l'analyse.</div></div>
     <h4>Options</h4>
     <label class="ck"><input type="checkbox" id="cGroup" checked> Regrouper les rafales et doublons</label>
     <label class="ck"><input type="checkbox" id="cAdvance" checked> Passer à la suivante après P / X</label>
@@ -62,6 +64,7 @@
       <button data-st="" class="neu">↺ <kbd>U</kbd></button>
     </div>
     <div id="pvStars"></div>
+    <button id="bSim" style="width:100%;margin-bottom:6px">🔍 Montrer les photos semblables</button>
     <div id="pvScore"></div>
     <div id="pvBars"></div>
     <div id="pvWhy"></div>
@@ -98,6 +101,7 @@
 <input type="file" id="fallbackPick" webkitdirectory multiple hidden>
 <div id="toast"></div>
 <script src="vendor/exifr.js"></script>
+<script src="vendor/faceapi/face-api.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
