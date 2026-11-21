@@ -534,7 +534,7 @@ function paramTool(key){
   HH.sty = function(b){ st.st = +b.dataset.i; labels(); later(); };
   HH.pip = function(){ pipMode(!pip); };
   HH.zero = function(){ P.forEach(function(p){ st[p[0]] = 0; }); labels(); later(); };
-  HH.help = function(){ var h = $("x2KH"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser : choisir le réglage • ↔ glisser : moins / plus • 👁 maintenu : sans l'outil • ✓ garder, ✕ annuler.", "↕ swipe: pick a setting • ↔ swipe: less / more • hold 👁: without the tool • ✓ keep, ✕ cancel."); };
+  HH.help = function(){ var h = $("x2KH"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser : choisir le réglage • ↔ glisser : moins / plus • 👁 maintenu : sans l'outil • ⛶ : voir en grand et zoomer • ✓ garder, ✕ annuler.", "↕ swipe: pick a setting • ↔ swipe: less / more • hold 👁: without the tool • ⛶: view large and zoom • ✓ keep, ✕ cancel."); };
   HH.full = function(){ var s2 = get(); s2[key] = st; put(s2); if(window.__jmsFull) window.__jmsFull(); };
   HH.cancel = function(){ var s2 = get(); if(saved) s2[key] = saved; else delete s2[key]; put(s2); hide(); };
   HH.ok = function(){ var s2 = get(); s2[key] = st; put(s2); hide(); };
@@ -1040,7 +1040,7 @@ function tune(){
   HH.undo = function(){ var b = $("jxU"); if(b) b.click(); setTimeout(labels, 700); };
   HH.redo = function(){ var b = $("jxR2"); if(b) b.click(); setTimeout(labels, 700); };
   HH.auto = function(){ if(window.__jmsX && window.__jmsX.x_auto){ var A = window.alert; window.alert = function(){}; try{ window.__jmsX.x_auto(); }finally{ window.alert = A; } setTimeout(labels, 300); } };
-  HH.help = function(){ var h = $("x2THelp"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser vers le haut / bas : liste des réglages • ↔ glisser à gauche / droite : moins / plus • 👁 maintenu : photo d'origine • ✓ garder, ✕ annuler.", "↕ swipe up / down: settings list • ↔ swipe left / right: less / more • hold 👁: original photo • ✓ keep, ✕ cancel."); };
+  HH.help = function(){ var h = $("x2THelp"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser vers le haut / bas : liste des réglages • ↔ glisser à gauche / droite : moins / plus • 👁 maintenu : photo d'origine • ⛶ : voir en grand et zoomer • ✓ garder, ✕ annuler.", "↕ swipe up / down: settings list • ↔ swipe left / right: less / more • hold 👁: original photo • ⛶: view large and zoom • ✓ keep, ✕ cancel."); };
   HH.cancel = function(){ var s2 = tuneSliders(); start.forEach(function(v, i){ if(s2[i] && s2[i].value !== v) tuneSet(s2[i], v); }); clearInterval(loop); hide(); };
   HH.ok = function(){ clearInterval(loop); hide(); };
   labels(); draw();

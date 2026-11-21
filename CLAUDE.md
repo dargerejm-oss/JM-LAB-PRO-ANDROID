@@ -32,3 +32,14 @@ Ne PAS ajouter : Perspective, Noir et blanc complet.
 ## Mode d'emploi et PDF
 - Pour TOUTES les captures du mode d'emploi et des PDF (français et anglais), utiliser **l'image du singe**
   fournie par l'utilisateur (à demander si elle n'est pas dans la conversation), pas les photos personnelles.
+
+## Projet à faire ensuite : « Regard Pur » (tri de photos, mieux qu'AfterShoot)
+Base : `projets/RegardPur/RegardPur_V1.4.py` (Python / Tkinter, fourni par l'utilisateur).
+Objectif : une appli **PC d'abord** (Windows, fichier .exe), puis **Android**, au moins aussi bonne qu'AfterShoot,
+avec le même genre d'interface (sans reprendre son nom ni son logo). À prévoir :
+- ouvrir un dossier, vignettes rapides, vue en grand, comparaison côte à côte ;
+- tri automatique : netteté et flou de bougé (vraie mesure, la V1.4 tire encore la netteté au hasard), yeux fermés,
+  visages, exposition, photos en double ou en rafale regroupées avec la meilleure mise en avant ;
+- étoiles, garder (P) / rejeter (X), raccourcis clavier, score qui apprend des choix (déjà amorcé dans la V1.4) ;
+- export : copier / déplacer les retenues, fichiers XMP pour Lightroom, lien avec JM LAB PRO pour la retouche.
+Ne pas commencer avant que l'utilisateur le demande.

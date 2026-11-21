@@ -121,8 +121,8 @@ function savePdf(){
 
 /* ---------- ACCUEIL (premier lancement) ---------- */
 var STEPS = [
-  ["📂", T("Ouvrez une photo", "Open a photo"), T("Touchez <b>OUVRIR IMAGE</b> en haut de l'écran. La photo s'affiche avec un curseur avant / après.", "Tap <b>OPEN IMAGE</b> at the top of the screen. The photo appears with a before / after slider.")],
-  ["🎞️", T("Choisissez un rendu", "Choose a look"), T("Dans <b>PROFILS FILM</b>, touchez un profil. Affinez ensuite dans <b>RÉGLAGES</b> avec les curseurs. ↶ ↷ pour annuler / rétablir.", "In <b>FILM PROFILES</b>, tap a profile. Then fine-tune in <b>SETTINGS</b> with the sliders. ↶ ↷ to undo / redo.")],
+  ["📂", T("Ouvrez une photo", "Open a photo"), T("Touchez <b>OUVRIR IMAGE</b> en haut de l'écran. La correction automatique <b>ProLab</b> s'applique tout de suite (case et intensité dans RÉGLAGES).", "Tap <b>OPEN IMAGE</b> at the top of the screen. The <b>ProLab</b> auto correction is applied at once (checkbox and strength in SETTINGS).")],
+  ["🧰", T("Retouchez", "Edit"), T("Choisissez un rendu dans <b>PROFILS FILM</b>, puis touchez <b>🧰 OUTILS</b> : Retouches, Courbes, Sélection, Pinceau, HDR… <b>Doigt appuyé</b> sur la photo : voir l'avant. <b>⛶</b> ou deux tapotements : voir en grand.", "Pick a look in <b>FILM PROFILES</b>, then tap <b>🧰 TOOLS</b>: Tune, Curves, Selective, Brush, HDR… <b>Hold</b> the photo: see before. <b>⛶</b> or double-tap: view large.")],
   ["💾", T("Enregistrez", "Save"), T("<b>ENREGISTRER</b> pour une photo. Pour plusieurs photos d'un coup : <b>OUVRIR UN LOT</b>, puis <b>LANCER LA CORRECTION</b>.", "<b>SAVE</b> for one photo. For many photos at once: <b>OPEN A BATCH</b>, then <b>START EDITING</b>.") + "<br><br>" + T("📖 Le <b>mode d'emploi</b> complet est dans À propos (touchez le nom de l'appli dans le bandeau vert).", "📖 The full <b>user guide</b> is in About (tap the app name in the green banner).")]
 ];
 var inv = document.createElement("div"); inv.id = "jmIn"; document.body.appendChild(inv);
