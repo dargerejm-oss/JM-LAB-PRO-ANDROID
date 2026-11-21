@@ -193,7 +193,7 @@ async function load(dir, items, label) {
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
-  ["bAuto", "bCompare", "bExport"].forEach(function (b) { $(b).disabled = false; });
+  ["bAuto", "bCompare", "bExport", "bStats"].forEach(function (b) { $(b).disabled = false; });
   rescore(); buildPersons(); buildCards(); refresh(); updLearn();
   var todo = S.photos.filter(function (p) { return !p.a; });
   // session reprise : note artistique des photos qui n'en ont pas encore (vignettes chargees petit a petit)
@@ -1035,6 +1035,38 @@ async function doImport(src, list) {
   await load(root, out.map(function (o) { var rel = o.path.slice(root.length).replace(/^[\\\/]/, ""); return {id: rel, name: o.name, path: o.path, rel: rel, size: o.size, mtime: o.mtime, raw: o.raw, heic: o.heic}; }), "");
 }
 
+/* ---------------- bilan de la seance ---------------- */
+function stats() {
+  var A = S.photos.filter(function (p) { return p.a && !p.a.err; }), n = S.photos.length;
+  var c = function (f) { return S.photos.filter(f).length; };
+  var why = {}; A.forEach(function (p) { (p.why ? p.why.rej : []).forEach(function (t) { t = t.replace(/ \(.*\)$/, ""); why[t] = (why[t] || 0) + 1; }); });
+  var nP = c(function (p) { return p.status === "P"; }), nX = c(function (p) { return p.status === "X"; }), nA = c(function (p) { return p.status === "P" && p.auto || p.status === "X" && p.auto; });
+  var sc = A.map(function (p) { return p.score; }), moy = sc.length ? Math.round(avg(sc)) : 0, best = A.slice().sort(function (a, b) { return b.score - a.score; }).slice(0, 5);
+  var ae = A.filter(function (p) { return p.a.aes != null; }).map(function (p) { return p.a.aes; });
+  var bar2 = function (lbl, v, tot, col) { return "<div class='bar'><div class='l'><span>" + lbl + "</span><span>" + v + " (" + Math.round(v / Math.max(1, tot) * 100) + " %)</span></div><div class='t'><i style='width:" + (v / Math.max(1, tot) * 100) + "%;background:" + col + "'></i></div></div>"; };
+  dialog("<h3>📊 Bilan de la séance</h3>" +
+    "<p><b>" + n + "</b> photos · score moyen <b>" + moy + "</b>/100" + (ae.length ? " · œil artistique moyen <b>" + avg(ae).toFixed(1).replace(".", ",") + "</b>/10" : "") + " · <b>" + S.groups.length + "</b> série" + (S.groups.length > 1 ? "s" : "") + " · <b>" + PERS.length + "</b> personne" + (PERS.length > 1 ? "s" : "") + "</p>" +
+    bar2("✔ Gardées", nP, n, "var(--keep)") + bar2("✖ Rejetées", nX, n, "var(--rej)") + bar2("À voir", n - nP - nX, n, "var(--mut)") +
+    (nA ? "<p class='small'>" + nA + " choix faits par le tri automatique, " + (nP + nX - nA) + " faits à la main. Temps gagné estimé : environ " + Math.max(1, Math.round(nA * 4 / 60)) + " min.</p>" : "") +
+    (Object.keys(why).length ? "<h4 style='margin:12px 0 4px'>Pourquoi des photos sont écartées</h4><table>" + Object.keys(why).sort(function (a, b) { return why[b] - why[a]; }).map(function (k) { return "<tr><td>" + why[k] + "</td><td>" + esc(k) + "</td></tr>"; }).join("") + "</table>" : "") +
+    (best.length ? "<h4 style='margin:12px 0 4px'>Les 5 meilleures</h4><div style='display:flex;gap:6px'>" + best.map(function (p) { return "<div style='flex:1;text-align:center'>" + (p.thumbUrl ? "<img src='" + p.thumbUrl + "' style='width:100%;height:80px;object-fit:cover;border-radius:6px'>" : "") + "<div class='small'>" + p.score + "</div></div>"; }).join("") + "</div>" : "") +
+    "<div class='row'><button class='pri' data-c='ok'>OK</button></div>");
+}
+
+/* ---------------- guide du premier lancement ---------------- */
+var GUIDE = [
+  ["👁️ Bienvenue dans Regard Pur", "Regard Pur trie vos photos pour vous : il repère les <b>floues</b>, les <b>bougées</b>, les <b>yeux fermés</b>, les <b>expositions ratées</b> et regroupe les <b>rafales</b>. Tout se passe sur votre PC, sans internet."],
+  ["📂 1. Ouvrir ou importer", "<b>Ouvrir un dossier</b> pour des photos déjà sur le PC, ou <b>📥 Importer une carte</b> pour copier une carte SD (renommage et copie de sécurité possibles). L'analyse démarre toute seule."],
+  ["✨ 2. Trier", "<b>Tri automatique</b> garde les meilleures et écarte les ratées, avec la raison écrite. Corrigez avec <b>P</b> (garder), <b>X</b> (rejeter), <b>1 à 5</b> (étoiles) : Regard Pur <b>apprend vos goûts</b>."],
+  ["🔍 3. Vérifier", "<b>Entrée</b> : photo en grand, <b>Z</b> : zoom 100 % sur les yeux, <b>C</b> : comparer une série côte à côte. Colonne de gauche : filtres, problèmes repérés et <b>personnes</b>."],
+  ["📤 4. Exporter", "<b>Exporter</b> copie les retenues, écrit les fichiers pour Lightroom et peut <b>retoucher avec le rendu JM LAB PRO</b>. Le bouton <b>❔</b> rappelle tous les raccourcis."]
+];
+function guide(i) {
+  i = i || 0; var g = GUIDE[i];
+  dialog("<h3>" + g[0] + "</h3><p style='line-height:1.6'>" + g[1] + "</p><p class='small'>" + (i + 1) + " / " + GUIDE.length + "</p><div class='row'>" + (i ? "<button data-c='prev'>← Précédent</button>" : "<button data-c='skip'>Passer</button>") + "<button class='pri' data-c='" + (i < GUIDE.length - 1 ? "next" : "end") + "'>" + (i < GUIDE.length - 1 ? "Suivant →" : "C'est parti !") + "</button></div>",
+    function (c) { if (c === "next") guide(i + 1); else if (c === "prev") guide(i - 1); try { localStorage.setItem("rp_intro", "1"); } catch (e) {} });
+}
+
 /* ---------------- fenetres de dialogue ---------------- */
 var dlgCb = null;
 function dialog(html, cb) { $("dlgBox").innerHTML = html; $("dlg").classList.add("show"); dlgCb = cb || null; }
@@ -1050,7 +1082,7 @@ function help() {
      ["Entrée", "Vue en grand"], ["Échap", "Revenir à la grille"], ["Z", "Zoom 100 % sur les yeux ou la zone nette"], ["F", "Montrer / cacher visages et zone nette"],
      ["C", "Comparer (sélection ou série)"], ["Espace", "Ouvrir / fermer la série"], ["G", "Regrouper les séries oui / non"], ["Ctrl + clic", "Sélectionner plusieurs photos"], ["Maj + clic", "Sélectionner une suite"],
      ["Ctrl + A", "Tout sélectionner"], ["Ctrl + Z", "Annuler la dernière action"]].map(function (r) { return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("") +
-    "</table><p class='small'>Score : netteté mesurée à 100 % (sur les yeux s'il y a un visage), flou de bougé, yeux fermés, exposition. Il apprend de vos choix P / X.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>");
+    "</table><p class='small'>Score : netteté mesurée à 100 % (sur les yeux s'il y a un visage), flou de bougé, yeux fermés, exposition. Il apprend de vos choix P / X.</p><div class='row'><button data-c='guide'>Revoir le guide</button><button class='pri' data-c='ok'>OK</button></div>", function (c) { if (c === "guide") guide(0); });
 }
 
 /* ---------------- clavier ---------------- */
@@ -1099,7 +1131,8 @@ document.addEventListener("keydown", function (e) {
 /* ---------------- boutons ---------------- */
 $("bOpen").onclick = openFolder; $("bOpen2").onclick = openFolder;
 $("bAuto").onclick = function () { if (S.analysing) { toast("Attendez la fin de l'analyse…"); return; } autoCull(); };
-$("bImport").onclick = openImport; $("bCompare").onclick = openCompare; $("bExport").onclick = openExport; $("bHelp").onclick = help;
+$("bImport").onclick = openImport; $("bCompare").onclick = openCompare; $("bExport").onclick = openExport; $("bHelp").onclick = help; $("bStats").onclick = stats;
+try { if (!localStorage.getItem("rp_intro")) setTimeout(function () { guide(0); }, 400); } catch (e) {}
 updLearn();
 window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load};
 })();
