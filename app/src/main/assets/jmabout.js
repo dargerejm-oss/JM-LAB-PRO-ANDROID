@@ -33,7 +33,7 @@ ab.innerHTML = '<div class="abBox">' +
  '<div class="abSec">' + T(
    "Retouche photo hors ligne : profils film, réglages, effets, cadre et signature, traitement par lot.",
    "Offline photo editing: film profiles, adjustments, effects, frame and signature, batch processing.") + '</div>' +
- '<button class="abBtn" style="background:#C9A24A;color:#111" data-a="manuel">📖 ' + T("MODE D'EMPLOI", "USER GUIDE (FRENCH)") + '</button>' +
+ '<button class="abBtn" style="background:#C9A24A;color:#111" data-a="manuel">📖 ' + T("MODE D'EMPLOI", "USER GUIDE") + '</button>' +
  '<button class="abBtn abI" data-a="insta">📷 ' + T("MON INSTAGRAM", "MY INSTAGRAM") + '</button>' +
  '<div class="abSec"><b>🔒 ' + T("Confidentialité", "Privacy") + '</b><br>' + T(
    "JM LAB PRO ne collecte aucune donnée personnelle. Vos photos sont traitées uniquement sur votre téléphone et ne sont jamais envoyées sur Internet. Pas de compte, pas de publicité, pas de statistiques. La caméra sert seulement à scanner des QR codes de styles, et l'image n'est pas conservée. Les réglages et styles restent dans l'appli ; les photos sont enregistrées dans le dossier que vous choisissez.",
@@ -66,7 +66,8 @@ document.addEventListener("click", function(e){
 }, true);
 
 /* ---------- MODE D'EMPLOI : pages du PDF affichees dans l'appli + enregistrement du PDF ---------- */
-var PAGES = 12, PDF = "manuel/JM_LAB_PRO_mode_emploi.pdf";
+/* francais ou anglais selon la langue de l'appli */
+var MDIR = EN ? "manuel/en/" : "manuel/", PAGES = 12, PDF = MDIR + (EN ? "JM_LAB_PRO_user_guide.pdf" : "JM_LAB_PRO_mode_emploi.pdf");
 var mc = document.createElement("style");
 mc.textContent = "#jmMan{position:fixed;inset:0;z-index:3650;background:#2b2b2b;display:none;flex-direction:column;font-family:system-ui,sans-serif}#jmMan.show{display:flex}" +
  "#jmMan .mTop{flex:none;display:flex;align-items:center;gap:6px;padding:max(8px,env(safe-area-inset-top)) 8px 8px;background:#141414;color:#fff}" +
@@ -90,7 +91,7 @@ function setZoom(z, cx, cy){
   mPg.scrollLeft = fx * zoomM - ox; mPg.scrollTop = fy * zoomM - oy;
 }
 function openManual(){
-  if(!built){ built = true; var h = ""; for(var i = 1; i <= PAGES; i++) h += '<img loading="lazy" alt="page ' + i + '" src="manuel/p' + (i < 10 ? "0" : "") + i + '.jpg">'; mIn.innerHTML = h; }
+  if(!built){ built = true; var h = ""; for(var i = 1; i <= PAGES; i++) h += '<img loading="lazy" alt="page ' + i + '" src="' + MDIR + 'p' + (i < 10 ? "0" : "") + i + '.jpg">'; mIn.innerHTML = h; }
   man.classList.add("show");
 }
 window.__jmsManual = openManual;
@@ -108,7 +109,7 @@ man.addEventListener("click", function(e){
   else if(m === "pdf") savePdf();
 });
 function savePdf(){
-  var name = "JM_LAB_PRO_mode_emploi.pdf";
+  var name = EN ? "JM_LAB_PRO_user_guide.pdf" : "JM_LAB_PRO_mode_emploi.pdf";
   fetch(PDF).then(function(r){ if(!r.ok) throw 0; return r.blob(); }).then(function(b){
     b = new Blob([b], {type:"application/pdf"});
     if(window.JMNative && window.__jmsSave){

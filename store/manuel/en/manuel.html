@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>JM LAB PRO – User guide</title>
+<style>
+@page { size: 148mm 210mm; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { font-family: "Inter", "DejaVu Sans", system-ui, sans-serif; color: #1d1d1f; font-size: 10.2pt; line-height: 1.42; }
+.page { width: 148mm; height: 210mm; padding: 11mm 11mm 12mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; background: #fff; }
+.page:last-child { page-break-after: auto; }
+.foot { position: absolute; left: 11mm; right: 11mm; bottom: 6mm; font-size: 7.5pt; color: #8a8a8a; display: flex; justify-content: space-between; border-top: 0.3mm solid #e3e3e3; padding-top: 1.6mm; }
+h1 { font-size: 19pt; margin: 0 0 1mm; letter-spacing: .01em; }
+h2 { font-size: 15pt; margin: 0 0 3mm; display: flex; align-items: center; gap: 2.5mm; }
+h2 .n { display: inline-flex; width: 8mm; height: 8mm; border-radius: 50%; background: #C9A24A; color: #fff; font-size: 11pt; align-items: center; justify-content: center; flex: none; }
+h3 { font-size: 11pt; margin: 3.5mm 0 1.2mm; color: #7a5a14; }
+p { margin: 0 0 2mm; }
+ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+li { margin: 0 0 1.1mm; }
+b { color: #000; }
+.row { display: flex; gap: 6mm; align-items: flex-start; }
+.row .txt { flex: 1; min-width: 0; }
+.shot { flex: none; width: 50mm; border-radius: 4mm; border: 0.6mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; }
+.shot.sm { width: 44mm; }
+.tip { background: #FFF7E0; border-left: 1.2mm solid #C9A24A; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
+.warn { background: #FDECEA; border-left: 1.2mm solid #D84315; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
+.k { display: inline-block; background: #1d1d1f; color: #fff; border-radius: 1.4mm; padding: 0 1.6mm; font-weight: 800; font-size: 8.6pt; white-space: nowrap; }
+.k.y { background: #FFB300; color: #000; } .k.b { background: #1E88E5; } .k.g { background: #43A047; }
+table { width: 100%; border-collapse: collapse; font-size: 9.2pt; margin-top: 2mm; }
+th, td { text-align: left; padding: 1.8mm 2mm; border-bottom: 0.3mm solid #e3e3e3; vertical-align: top; }
+th { background: #f4f1ea; font-size: 8.8pt; }
+.cover { background: #141416; color: #fff; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.cover img.logo { width: 46mm; border-radius: 10mm; box-shadow: 0 2mm 8mm rgba(0,0,0,.6); }
+.cover h1 { font-size: 28pt; color: #D2AD59; margin: 9mm 0 1mm; letter-spacing: .06em; }
+.cover .sub { font-size: 14pt; color: #eee; margin-bottom: 14mm; }
+.cover .who { font-size: 10pt; color: #aaa; }
+.cover .ver { position: absolute; bottom: 10mm; font-size: 9pt; color: #777; }
+.toc { list-style: none; padding: 0; margin: 4mm 0 0; }
+.toc li { display: flex; gap: 3mm; padding: 1.8mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 10.5pt; }
+.toc li span:first-child { width: 7mm; color: #C9A24A; font-weight: 800; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 5mm; }
+</style>
+</head>
+<body>
+<section class="page cover">
+  <img class="logo" src="logo.jpg" alt="">
+  <h1>JM LAB PRO</h1>
+  <div class="sub">User guide</div>
+  <div class="who">Offline photo editing<br>by JM.Dargère</div>
+  <div class="ver">Version 4.6 • November 2026</div>
+</section>
+
+<section class="page">
+  <h1>Contents</h1>
+  <ul class="toc">
+    <li><span>1</span><span>The main screen</span></li>
+    <li><span>2</span><span>Film profiles and settings</span></li>
+    <li><span>3</span><span>Tune image (like Snapseed)</span></li>
+    <li><span>4</span><span>Crop and straighten</span></li>
+    <li><span>5</span><span>Curves</span></li>
+    <li><span>6</span><span>Healing</span></li>
+    <li><span>7</span><span>Saving – where are my photos?</span></li>
+    <li><span>8</span><span>Editing a batch of photos</span></li>
+    <li><span>9</span><span>Styles, QR codes and tools</span></li>
+    <li><span>10</span><span>About, language, privacy</span></li>
+    <li><span>11</span><span>Tips and FAQ</span></li>
+  </ul>
+  <h3>In three steps</h3>
+  <ol>
+    <li><b>Open a photo</b> with <span class="k y">📂 OPEN IMAGE</span> at the top.</li>
+    <li><b>Pick a look</b> in <b>FILM PROFILES</b>, then fine-tune in <b>SETTINGS</b>.</li>
+    <li><b>Save</b> with <span class="k g">💾 SAVE</span>.</li>
+  </ol>
+  <div class="tip">JM LAB PRO works <b>without Internet</b>, without an account and without ads. Your photos never leave your phone.</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>2</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">1</span>The main screen</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>At the top</h3>
+      <ul>
+        <li><span class="k y">📂 OPEN IMAGE</span>: choose a photo.</li>
+        <li><span class="k b">🗂 OPEN A BATCH</span>: choose several photos to edit at once (chapter 8).</li>
+        <li><span class="k g">💾 SAVE</span>: save the edited photo (appears as soon as a photo is open).</li>
+      </ul>
+      <h3>The preview</h3>
+      <ul>
+        <li>Drag the <b>↔ slider</b>: on the left the <b>edited</b> photo, on the right the <b>original</b>.</li>
+        <li><b>Histogram</b> at the bottom left: how the tones are spread. A blue dot = crushed shadows, red = blown highlights. Tap it to shrink it.</li>
+        <li><b>↶ ↷</b> at the bottom right: undo / redo a setting.</li>
+      </ul>
+      <h3>The tabs at the bottom</h3>
+      <p><b>SETTINGS</b> • <b>FILM PROFILES</b> • <b>STYLES / QR</b> • <b>VIEWER</b></p>
+    </div>
+    <img class="shot" src="02_reglages.jpg" alt="">
+  </div>
+  <div class="tip">The green banner: tap <b>JM.DARGERE LAB PRO</b> to open <b>About</b>, and <b>📷 INSTAGRAM</b> for the Instagram page.</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>3</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">2</span>Film profiles and settings</h2>
+  <div class="row">
+    <img class="shot" src="03_profils.jpg" alt="">
+    <div class="txt">
+      <h3>Film profiles</h3>
+      <p>Tap a profile: the photo takes its look at once. The chosen profile is outlined in yellow.</p>
+      <div class="grid2" style="font-size:9pt">
+        <span><b>LABO PRO EV5</b> auto exposure</span><span><b>Vivid Boost</b> vivid</span>
+        <span><b>Natural</b> balanced</span><span><b>Soft Portrait</b> skin</span>
+        <span><b>Soft Chrome</b> warm matte</span><span><b>Cinema</b> cine</span>
+        <span><b>Black &amp; White</b></span><span><b>Color Film</b></span>
+      </div>
+      <h3>SETTINGS tab</h3>
+      <p>At the top, the <b>toolbar</b>:</p>
+      <p><span class="k b">🎛️ TUNE</span> <span class="k">✂️ CROP</span> <span class="k g">📈 CURVES</span> <span class="k" style="background:#C62828">🩹 HEALING</span></p>
+      <p>An active tool is outlined in yellow.</p>
+      <p>Below, the <b>sliders</b>: Strength (of the profile), Exposure, Contrast, Temperature, Tint, Highlights, Shadows, Vibrance, Saturation, Clarity, Blacks, Whites, Dehaze, Vignette. <b>RESET</b> sets everything back to zero.</p>
+    </div>
+  </div>
+  <div class="tip"><b>⭐ Favourites</b>: your favourite styles appear as buttons above the sliders (see chapter 9).</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>4</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">3</span>Tune image</h2>
+  <p>Works like Snapseed's <b>Tune Image</b> tool: everything is done <b>by sliding your finger on the photo</b>.</p>
+  <div class="row">
+    <div class="txt">
+      <h3>Pick the setting</h3>
+      <p>Swipe <b>up or down</b>: the list appears. Lift your finger on the setting you want: Brightness, Contrast, Saturation, Ambiance, Highlights, Shadows, Warmth, Tint, Structure, Blacks, Whites, Dehaze, Vignette, Profile strength.</p>
+      <p>Or tap <b>☰</b> at the bottom.</p>
+      <h3>Change the value</h3>
+      <p>Swipe <b>right</b> (more) or <b>left</b> (less). The value shows at the top, and on the <b>yellow ruler</b> at the bottom. You can also tap the ruler directly.</p>
+      <h3>The buttons</h3>
+      <ul>
+        <li><b>👁</b> held: see the original photo.</li>
+        <li><b>↶ ↷</b>: undo / redo.</li>
+        <li><b>✨ Auto</b>: automatic light correction.</li>
+        <li><b>✕</b>: leave without keeping • <b>✓</b>: keep.</li>
+      </ul>
+    </div>
+    <img class="shot sm" src="04_retouches.jpg" alt="">
+  </div>
+  <div class="tip">Tune image drives the same sliders as the SETTINGS tab: it also applies to <b>batches</b> and <b>presets</b>.</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>5</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">4</span>Crop and straighten</h2>
+  <div class="row">
+    <img class="shot sm" src="06_recadrer.jpg" alt="">
+    <div class="txt">
+      <ul>
+        <li>Drag the <b>yellow corners</b> or the <b>frame</b>.</li>
+        <li>Formats: <b>Free</b>, 1:1, 4:5 (Instagram), 3:2, 16:9, <b>Original</b>.</li>
+        <li><b>Straighten</b>: the slider fixes a tilted horizon (from −20° to +20°) with no empty corners.</li>
+        <li><b>↻ 90°</b> rotates, <b>⇋ Mirror</b> flips.</li>
+        <li><b>✔ APPLY THE CROP</b>: applied when the photo is saved.</li>
+      </ul>
+      <div class="tip" style="margin-top:2mm">The crop only applies to the <b>open photo</b>. It is reset when you open another photo.</div>
+    </div>
+  </div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>6</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">5</span>Curves</h2>
+  <div class="row">
+    <div class="txt">
+      <ul>
+        <li>The curve acts on tones: on the left the <b>shadows</b>, on the right the <b>highlights</b>.</li>
+        <li><b>Tap the curve</b> to add a point, drag it. Drag a point <b>out of the square</b> to remove it.</li>
+        <li>Raising the <b>foot of the curve</b> (bottom-left point) gives a <b>matte / film</b> look.</li>
+        <li><b>RGB</b>: the whole image • <b>R</b>, <b>G</b>, <b>B</b>: a single colour.</li>
+        <li>Quick settings: Soft S, Strong S, Matte (film), Shadows +, Dense, Neutral, Reset all.</li>
+        <li><b>✔ OK</b> at the top right.</li>
+      </ul>
+    </div>
+    <img class="shot sm" src="07_courbes.jpg" alt="">
+  </div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>7</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">6</span>Healing</h2>
+  <p>Like Snapseed's <b>Healing</b> tool: it removes dust, a blemish, a wire, a small spot.</p>
+  <div class="row">
+    <div class="txt">
+      <ol>
+        <li><b>Zoom in</b> with two fingers on the area to fix (and move around with two fingers).</li>
+        <li><b>Paint</b> over the spot with your finger: it turns <b>red</b>.</li>
+        <li><b>Lift your finger</b>: the spot is replaced by the surrounding texture.</li>
+      </ol>
+      <ul>
+        <li><b>Brush size</b>: at the bottom. The finer the brush, the cleaner the result.</li>
+        <li><b>👁</b> held: see the original • <b>↶ ↷</b>: undo / redo.</li>
+        <li><b>✓</b> keeps the fixes (applied when saving) • <b>✕</b> leaves without keeping.</li>
+      </ul>
+      <div class="warn">Near a very contrasted edge (lamp, white sky), use a <b>fine brush</b> and <b>zoom in</b>: a large brush may copy a piece of nearby scenery.</div>
+    </div>
+    <img class="shot" src="08_correcteur.jpg" alt="">
+  </div>
+  <div class="tip">Healing only applies to the <b>open photo</b> (each photo has its own spots).</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>8</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">7</span>Saving – where are my photos?</h2>
+  <p>Tap <span class="k g">💾 SAVE</span>. A banner shows the processing time, then <b>✔ SAVED</b> with the file name. The original photo is never changed: the copy ends with <b>_JMD_LAB_PRO.jpg</b>.</p>
+  <table>
+    <tr><th>What you do</th><th>Where it goes</th></tr>
+    <tr><td>💾 SAVE (one photo)</td><td><b>Pictures › JM LAB PRO</b></td></tr>
+    <tr><td>Batch with “🖼️ Gallery”</td><td><b>Pictures › JM LAB PRO › batch name</b></td></tr>
+    <tr><td>Batch with “📂 Chosen folder”</td><td>The chosen folder (SD card, USB key…) › batch name</td></tr>
+    <tr><td>Batch ZIP</td><td><b>Downloads › JM LAB PRO</b></td></tr>
+    <tr><td>Viewer</td><td>The save folder chosen in the viewer</td></tr>
+    <tr><td>Deleted photos (viewer)</td><td><b>_SUPPRIMES</b> folder (recoverable)</td></tr>
+    <tr><td>Backups of your styles</td><td>Pictures › JM LAB PRO › Sauvegardes</td></tr>
+    <tr><td>Exported styles, this guide</td><td><b>Downloads › JM LAB PRO</b></td></tr>
+  </table>
+  <h3>Finding them</h3>
+  <p>In the <b>Gallery</b> or <b>Google Photos</b>: <b>JM LAB PRO</b> album. Or in the <b>Files</b> app: Pictures › JM LAB PRO.</p>
+  <h3>What is applied when saving</h3>
+  <p>Profile + sliders + Tune image + Curves + Crop + Healing + Effects (sky, face, grain…) + Frame and signature if turned on.</p>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>9</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">8</span>Editing a batch of photos</h2>
+  <div class="row">
+    <div class="txt">
+      <ol>
+        <li>First set the style on one photo (profile, sliders, curves).</li>
+        <li>Tap <span class="k b">🗂 OPEN A BATCH</span> and choose your photos.</li>
+        <li>The <b>🚀 READY TO START</b> screen shows a <b>preview of the 1st photo</b> with the style.</li>
+        <li>Choose: <b>Frame + signature</b>, <b>quality / size</b>, <b>effects</b>, <b>folder name</b>, <b>Gallery</b> or <b>Chosen folder</b>, and the <b>ZIP</b> if needed.</li>
+        <li>Tap <b>▶ START EDITING</b>. The hourglass and timer show the progress, then the <b>DONE</b> banner.</li>
+      </ol>
+      <ul>
+        <li><b>⛔ STOP</b> stops the running batch.</li>
+        <li><b>HEIC</b> photos are converted automatically; <b>very large</b> photos are reduced to avoid a crash.</li>
+      </ul>
+      <div class="warn"><b>Crop</b> and <b>healing</b> do not apply to batches (they belong to one photo). <b>Curves</b> and <b>Tune image</b> do.</div>
+    </div>
+    <img class="shot" src="10_lot.jpg" alt="">
+  </div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>10</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">9</span>Styles, QR codes and tools</h2>
+  <div class="row">
+    <img class="shot sm" src="09_styles.jpg" alt="">
+    <div class="txt" style="font-size:9.4pt">
+      <p><b>STYLES / QR</b> tab:</p>
+      <ul>
+        <li><b>User guide</b>: this document.</li>
+        <li><b>My presets &amp; QR</b>: save your settings, apply them again, share them as a QR code.</li>
+        <li><b>Export / import a file</b>, <b>text code</b> (WhatsApp…).</li>
+        <li><b>QR as image</b>: one style → a QR saved in the gallery.</li>
+        <li><b>Viewer</b>: browse a folder and save with one tap.</li>
+        <li><b>Frame + signature</b>: frame, initials or signature, colours.</li>
+        <li><b>Compare profiles</b>: your photo with each profile side by side.</li>
+        <li><b>Learn a retouch style</b>: before photo + edited photo → settings.</li>
+        <li><b>Style from a reference</b>, <b>intensity &amp; blend</b>, <b>style → several folders</b>.</li>
+        <li><b>Effects</b>: sky, face, gradient, grain, B&amp;W, sharpness, noise, ready-to-post crop, watermark, brush.</li>
+        <li><b>Lesson mode</b>, <b>lesson sheet</b>, <b>daily challenge</b>, <b>large text</b>, <b>.cube LUT</b>, <b>batch history</b>, <b>favourites</b>.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>11</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">10</span>About, language, privacy</h2>
+  <div class="row">
+    <div class="txt">
+      <p>Tap <b>JM.DARGERE LAB PRO</b> in the green banner.</p>
+      <ul>
+        <li><b>📖 User guide</b>: this document, and saving the PDF.</li>
+        <li><b>Restore my last settings</b> when the app opens (checkbox).</li>
+        <li><b>Language</b>: Français or English (otherwise, the phone's language).</li>
+        <li><b>Privacy</b>: no data collected, everything stays on the phone.</li>
+        <li><b>Show the quick guide again</b>.</li>
+      </ul>
+    </div>
+    <img class="shot sm" src="11_apropos.jpg" alt="">
+  </div>
+  <h2 style="margin-top:4mm"><span class="n">11</span>Tips and FAQ</h2>
+  <ul style="font-size:9.3pt">
+    <li><b>Open a photo from the gallery</b>: “Share” or “Open with / Edit with” → <b>JM LAB PRO</b>.</li>
+    <li><b>Android back button</b>: closes the open window first, then leaves the app.</li>
+    <li><b>Updating the app</b>: install the new APK file over the old one; your settings and presets are kept.</li>
+    <li><b>The saved photo looks different from the preview</b>: the preview is reduced; crop, healing and effects are computed at full size when saving.</li>
+  </ul>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>12</span></div>
+</section>
+
+</body>
+</html>

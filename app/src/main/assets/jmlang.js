@@ -425,6 +425,7 @@ var D = EN ? {
 "normalement sans connexion.":"normally offline.",
 "PROFILS FILM":"FILM PROFILES","GAMME ETENDUE":"EXTENDED RANGE","SANS GRIS":"NO GREY",
 "Touchez OUVRIR IMAGE en haut":"Tap OPEN IMAGE at the top",
+"MODE D'EMPLOI":"USER GUIDE","Le guide illustré de l'appli, et son PDF":"The illustrated app guide, and its PDF",
 "PARTAGE":"SHARE"
 } : {};
 

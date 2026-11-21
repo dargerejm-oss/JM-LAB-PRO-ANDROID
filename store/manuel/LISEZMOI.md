@@ -10,3 +10,7 @@ node build.js <dossier de manuel.html> <dossier de sortie>
 
 Copier ensuite `JM_LAB_PRO_mode_emploi.pdf` et `p01.jpg`, `p02.jpg`… dans `app/src/main/assets/manuel/`
 (et ajuster `PAGES` dans `app/src/main/assets/jmabout.js` si le nombre de pages change).
+
+## Version anglaise
+Sources dans `en/` (même script `build.js`). Copier les pages dans `app/src/main/assets/manuel/en/`
+et le PDF sous le nom `JM_LAB_PRO_user_guide.pdf`. L'appli choisit la langue toute seule.
