@@ -251,3 +251,9 @@ body.simple .expert{display:none!important}
 #lpHeal.on{background:var(--gold);color:#111;border-color:var(--gold);font-weight:700}
 
 body.tab-exporter #side,body.tab-exporter #panel{display:none}
+
+/* « Pas d'accord » */
+.disagree{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:2px 0 8px;padding:6px 8px;border:1px dashed var(--line);border-radius:8px}
+.disagree span{color:var(--mut);font-size:12px;width:100%}
+.disagree button{padding:3px 8px;font-size:11px}
+.disagree button.on{background:var(--gold);color:#111;border-color:var(--gold)}

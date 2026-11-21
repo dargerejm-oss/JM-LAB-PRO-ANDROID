@@ -49,7 +49,51 @@ var TH = { // seuils selon l'exigence : souple / normale / stricte
   sharp: [18, 28, 40], eye: [12, 20, 28], motion: [85, 70, 55], hi: [22, 12, 7], lo: [50, 32, 20], dark: [26, 36, 48], keep: [48, 58, 68], burst: [28, 16, 8]
 };
 function strict() { return +$("sStrict").value; }
-function bigFaces(a) { return (a && a.faces || []).filter(function (f) { return f.w > 0.035; }); }
+function bigFaces(a) {
+  return (a && a.faces || []).filter(function (f) { return f.w > 0.035; }).map(function (x) {
+    // yeux fermes / mi-clos selon votre seuil appris (« Pas d'accord »)
+    if (x.blinkMin != null) { x.closed = x.blinkMin > CALT.blink; x.half = !x.closed && x.blink > CALT.blink - 0.05; }
+    return x;
+  });
+}
+/* ---------------- « Pas d'accord » : vos corrections reglent les seuils de Regard Pur ----------------
+   chaque correction garde la mesure de la photo et votre verdict ; on cherche le seuil qui colle le mieux
+   a vos verdicts, sans trop s'eloigner du seuil d'origine. */
+var CAL = (function () { try { return JSON.parse(localStorage.getItem("rp_cal")) || {ex: []}; } catch (e) { return {ex: []}; } })();
+var CALT = {eyeD: 0, sceneD: 0, blink: 0.5};
+function calFit(kind, def, lo, hi, step, bad) { // bad(v, t) : vrai si la mesure v serait jugee « mauvaise » avec le seuil t
+  var ex = CAL.ex.filter(function (o) { return o.k === kind; }); if (!ex.length) return def;
+  var best = def, bc = Infinity;
+  for (var t = lo; t <= hi + 1e-9; t += step) {
+    var c = Math.abs(t - def) / (hi - lo) * 1.5;
+    ex.forEach(function (o) { if (bad(o.v, t) !== !!o.y) c += 1; });
+    if (c < bc) { bc = c; best = t; }
+  }
+  return best;
+}
+function calUpdate() {
+  CALT.eyeD = calFit("eye", 20, 0, 70, 1, function (v, t) { return v < t; }) - 20;
+  CALT.sceneD = calFit("scene", 28, 0, 80, 1, function (v, t) { return v < t; }) - 28;
+  CALT.blink = calFit("blink", 0.5, 0.15, 0.9, 0.01, function (v, t) { return v > t; });
+}
+calUpdate();
+function calAdd(p, what) {
+  var a = p.a; if (!a || a.err) return;
+  var er = eyeRaw(a), f = bigFaces(a);
+  p.ov = p.ov || {};
+  if (what === "floue" || what === "nette") {
+    if (er != null) CAL.ex.push({k: "eye", v: er, y: what === "floue" ? 1 : 0}); else CAL.ex.push({k: "scene", v: a.sharp, y: what === "floue" ? 1 : 0});
+    p.ov.sharp = what;
+  } else if (what === "fermes" || what === "ouverts") {
+    f.forEach(function (x) { if (x.blinkMin != null) CAL.ex.push({k: "blink", v: what === "fermes" ? x.blink : x.blinkMin, y: what === "fermes" ? 1 : 0}); });
+    p.ov.eyes = what;
+  }
+  if (CAL.ex.length > 600) CAL.ex.splice(0, CAL.ex.length - 600);
+  try { localStorage.setItem("rp_cal", JSON.stringify(CAL)); } catch (e) {}
+  calUpdate(); rescore(); refresh(false); saveSoon(); updLearn();
+  toast("Merci, c'est noté. Regard Pur a revu tout le dossier avec votre correction.");
+}
+function calReset() { CAL = {ex: []}; try { localStorage.removeItem("rp_cal"); } catch (e) {} S.photos.forEach(function (p) { p.ov = null; }); calUpdate(); rescore(); refresh(false); saveSoon(); updLearn(); toast("Réglages appris remis à zéro."); }
 function expoScore(a) {
   var e = a.expo, s = 100, fl = bigFaces(a).filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; });
   if (fl.length && avg(fl) >= 55 && avg(fl) <= 225) return clamp(Math.round(100 - Math.max(0, e.hi - 8) * 1.5 - Math.max(0, e.lo - 15)), 60, 100); s -= Math.max(0, e.hi - 1.5) * 5; s -= Math.max(0, e.lo - 4) * 3;
@@ -138,13 +182,17 @@ function reasons(p) {
   var a = p.a, k = strict(), rej = [], warn = [], good = [];
   if (!a) return {rej: rej, warn: ["Analyse en cours…"], good: good};
   if (a.err) return {rej: ["Image illisible"], warn: [], good: []};
-  var se = sharpEff(a), f = bigFaces(a), er = eyeRaw(a);
-  if (er != null ? er < TH.eye[k] : se < TH.sharp[k]) rej.push(f.length ? "Visage / yeux flous" : "Floue");
-  else if (er != null ? er < TH.eye[k] + 8 : se < TH.sharp[k] + 12) warn.push("Netteté moyenne");
+  var se = sharpEff(a), f = bigFaces(a), er = eyeRaw(a), ov = p.ov || {}, tE = TH.eye[k] + CALT.eyeD, tS = TH.sharp[k] + CALT.sceneD;
+  if (ov.sharp === "floue") rej.push(f.length ? "Visage / yeux flous (votre avis)" : "Floue (votre avis)");
+  else if (ov.sharp === "nette") good.push(f.length ? "Yeux nets (votre avis)" : "Nette (votre avis)");
+  else if (er != null ? er < tE : se < tS) rej.push(f.length ? "Visage / yeux flous" : "Floue");
+  else if (er != null ? er < tE + 8 : se < tS + 12) warn.push("Netteté moyenne");
   else good.push(f.length ? "Yeux nets" : "Nette");
   if (a.motion >= TH.motion[k] && a.sharp < 70) rej.push("Flou de bougé");
   else if (a.motion >= TH.motion[k] - 20 && a.sharp < 70) warn.push("Léger bougé");
-  if (f.length) {
+  if (f.length && ov.eyes === "fermes") rej.push("Yeux fermés (votre avis)");
+  else if (f.length && ov.eyes === "ouverts") good.push("Yeux ouverts (votre avis)");
+  else if (f.length) {
     var cl = f.filter(function (x) { return x.closed; }).length, hf = f.filter(function (x) { return x.half; }).length;
     if (cl === f.length) rej.push(f.length > 1 ? "Yeux fermés (tout le monde)" : "Yeux fermés");
     else if (cl) (k >= 1 ? rej : warn).push("Yeux fermés (" + cl + " sur " + f.length + ")");
@@ -224,7 +272,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -240,7 +288,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -618,9 +666,14 @@ function undo() {
   drawFilters(); showPanel(); saveSoon(); toast("Annulé.");
 }
 function updLearn() {
-  var n = L.ex.length, k = L.ex.filter(function (o) { return o.y; }).length;
+  var n = L.ex.length, k = L.ex.filter(function (o) { return o.y; }).length, nc = CAL.ex.length;
   $("learn").innerHTML = "🧠 <b>Apprentissage</b> : " + n + " choix retenus (" + k + " gardées, " + (n - k) + " rejetées)." +
-    (n >= 15 && k >= 3 && n - k >= 3 ? " Le score suit maintenant vos goûts." : " Le score s'adaptera à vos goûts après une quinzaine de choix P / X.");
+    (n >= 15 && k >= 3 && n - k >= 3 ? " Le score suit maintenant vos goûts." : " Le score s'adaptera à vos goûts après une quinzaine de choix P / X.") +
+    (nc ? "<br>🎯 <b>Détection réglée sur votre œil</b> : " + nc + " correction" + (nc > 1 ? "s" : "") + " « Pas d'accord »" +
+      (CALT.eyeD ? " · netteté des yeux " + (CALT.eyeD > 0 ? "plus" : "moins") + " stricte" : "") + (CALT.sceneD ? " · netteté générale " + (CALT.sceneD > 0 ? "plus" : "moins") + " stricte" : "") +
+      (CALT.blink !== 0.5 ? " · yeux fermés " + (CALT.blink < 0.5 ? "plus" : "moins") + " vite détectés" : "") +
+      ". <a href='#' id='calReset' style='color:var(--mut)'>Remettre à zéro</a>" : "");
+  var cr = $("calReset"); if (cr) cr.onclick = function (e) { e.preventDefault(); if (confirm("Oublier toutes vos corrections « Pas d'accord » ?")) calReset(); };
 }
 
 /* ---------------- tri automatique ---------------- */
@@ -678,6 +731,7 @@ function showPanel() {
   $("pvName").textContent = p.rel + (S.sel.size > 1 ? "  (+" + (S.sel.size - 1) + " sélectionnées)" : "");
   $("pvStars").innerHTML = starsHtml(p.stars);
   var a = p.a;
+  $("pvCal").innerHTML = "";
   if (!a) { $("pvScore").innerHTML = "<small>Analyse en cours…</small>"; $("pvBars").innerHTML = ""; $("pvWhy").innerHTML = ""; $("pvExif").innerHTML = ""; return; }
   if (a.err) { $("pvScore").innerHTML = "<small>" + esc(a.err) + "</small>"; $("pvBars").innerHTML = ""; $("pvWhy").innerHTML = ""; return; }
   $("pvScore").innerHTML = '<b style="color:' + colOf(p.score) + '">' + p.score + "</b><small>/ 100 — " + (p.status === "P" ? "✔ gardée" : p.status === "X" ? "✖ rejetée" : "à voir") + (p.auto && p.status ? " (auto)" : "") + "</small>";
@@ -692,10 +746,15 @@ function showPanel() {
   var ab = adjBias(p);
   $("pvWhy").innerHTML = "<div style='color:var(--mut)'>📁 Catégorie : " + CATS[catOf(p)].nom + ($("sCat").value === "auto" ? " (devinée)" : "") + "</div>" +
     (p.adj ? "<div style='color:var(--gold)'>🎚 Votre retouche : " + (p.adj.ev > 0 ? "+" : "") + p.adj.ev.toFixed(1) + " EV, chaleur " + (p.adj.wb > 0 ? "+" : "") + p.adj.wb + "</div>" : ab ? "<div style='color:var(--gold)'>🧠 Retouche apprise (" + ab.n + " photos) : " + (ab.ev > 0 ? "+" : "") + ab.ev.toFixed(1).replace(".", ",") + " EV, chaleur " + (ab.wb > 0 ? "+" : "") + ab.wb + "</div>" : "") + w.rej.map(function (t) { return '<div style="color:var(--rej)">✖ ' + esc(t) + "</div>"; }).join("") + w.warn.map(function (t) { return '<div style="color:var(--doubt)">⚠ ' + esc(t) + "</div>"; }).join("") + w.good.map(function (t) { return '<div style="color:var(--keep)">✔ ' + esc(t) + "</div>"; }).join("");
+  var fz = bigFaces(a).length, ov2 = p.ov || {};
+  $("pvCal").innerHTML = "<div class='disagree'><span>Pas d'accord avec Regard Pur ? Corrigez-le, il apprend :</span>" +
+    "<button data-cal='floue'" + (ov2.sharp === "floue" ? " class='on'" : "") + ">Elle est floue</button><button data-cal='nette'" + (ov2.sharp === "nette" ? " class='on'" : "") + ">Elle est nette</button>" +
+    (fz ? "<button data-cal='fermes'" + (ov2.eyes === "fermes" ? " class='on'" : "") + ">Yeux fermés</button><button data-cal='ouverts'" + (ov2.eyes === "ouverts" ? " class='on'" : "") + ">Yeux ouverts</button>" : "") + "</div>";
   var cv = $("pvHist"), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
   if (a.hist) { var mx = Math.max.apply(null, a.hist.slice(1, 63)) || 1; x.fillStyle = "#9aa3b2"; a.hist.forEach(function (v, i) { var hh = Math.min(1, v / mx) * (cv.height - 4); x.fillRect(i * cv.width / 64, cv.height - hh, cv.width / 64 + 0.5, hh); }); }
   $("pvExif").innerHTML = exifTxt(a) + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px" + (p.raw ? " (aperçu du RAW)" : "") : "");
 }
+$("pvCal").addEventListener("click", function (e) { var b = e.target.closest("button[data-cal]"); if (!b) return; var p = S.byId[S.view[S.cur]]; if (p) calAdd(p, b.dataset.cal); });
 $("pvBtns").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setStatus(b.dataset.st); });
 $("pvStars").addEventListener("click", function (e) { var s = e.target.closest(".star"); if (s) setStars(+s.dataset.s); });
 
