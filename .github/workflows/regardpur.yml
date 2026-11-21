@@ -9,6 +9,11 @@ on:
 permissions:
   contents: write
 
+# une seule fabrication a la fois : la derniere version envoyee est toujours celle publiee
+concurrency:
+  group: regardpur-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-latest
