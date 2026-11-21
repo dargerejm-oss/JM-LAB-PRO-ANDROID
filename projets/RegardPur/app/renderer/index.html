@@ -7,58 +7,100 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-card" viewBox="0 0 24 24"><path d="M7 3h8l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M9 7v3M12 7v3M15 7v3"/></symbol>
+    <symbol id="i-magic" viewBox="0 0 24 24"><path d="M4 20 16 8l2 2L6 22z"/><path d="M15 4v3M13.5 5.5h3M20 9v3M18.5 10.5h3M9 3v2M8 4h2"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5 9.5 18 20 6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M4 9h11a5 5 0 0 1 0 10H8"/><path d="M8 5 4 9l4 4"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+    <symbol id="i-brush" viewBox="0 0 24 24"><path d="M14 4l6 6-9 9H5v-6z"/><path d="M12 6l6 6"/></symbol>
+    <symbol id="i-face" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5s1.3 1.8 3.5 1.8 3.5-1.8 3.5-1.8M9 9.5h.01M15 9.5h.01"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-temp" viewBox="0 0 24 24"><path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/></symbol>
+    <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M11 8v6M8 11h6"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+    <symbol id="i-best" viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+  </defs>
+</svg>
 <header id="top">
   <div class="brand"><img src="icon.png" alt=""><div><b>Regard Pur</b><small id="folderName">Trie. Épure. Garde le regard.</small></div></div>
-  <button id="bOpen" class="pri">📂 Ouvrir un dossier</button>
-  <button id="bImport" title="Copier les photos d'une carte SD vers le PC, les renommer, puis les trier">📥 Importer une carte</button>
-  <button id="bAuto" disabled>✨ Tri automatique</button>
-  <label class="sel">Exigence
-    <select id="sStrict"><option value="0">Souple</option><option value="1" selected>Normale</option><option value="2">Stricte</option></select>
-  </label>
-  <button id="bCompare" disabled>⇆ Comparer</button>
-  <button id="bExport" disabled>📤 Exporter</button>
-  <button id="bStats" disabled title="Bilan de la séance">📊 Bilan</button>
+  <nav id="tabs">
+    <button data-t="trier" class="on"><i>1</i><svg class="ic"><use href="#i-grid"/></svg>Trier</button>
+    <button data-t="retoucher"><i>2</i><svg class="ic"><use href="#i-brush"/></svg>Retoucher</button>
+    <button data-t="exporter"><i>3</i><svg class="ic"><use href="#i-export"/></svg>Exporter</button>
+  </nav>
   <div class="grow"></div>
   <div id="prog"><div id="progBar"></div><span id="progTxt"></span></div>
-  <button id="bHelp" title="Raccourcis clavier">❔</button>
+  <label id="modeSw" data-tip="Simple : l'essentiel, pour bien démarrer. Expert : tous les réglages fins."><span>Simple</span><input type="checkbox" id="cExpert"><i></i><span>Expert</span></label>
+  <button id="bStats" class="ico" disabled data-tip="Bilan de la séance"><svg class="ic"><use href="#i-chart"/></svg></button>
+  <button id="bHelp" class="ico" data-tip="Aide et raccourcis clavier"><svg class="ic"><use href="#i-help"/></svg></button>
 </header>
+<div id="sub">
+  <div class="subT" data-for="trier">
+    <button id="bOpen" class="pri"><svg class="ic"><use href="#i-folder"/></svg>Ouvrir un dossier</button>
+    <button id="bImport" data-tip="Copier les photos d'une carte SD vers le PC, les renommer, puis les trier"><svg class="ic"><use href="#i-card"/></svg>Importer une carte</button>
+    <span class="sep"></span>
+    <button id="bAuto" disabled data-tip="Garde les meilleures, écarte les ratées. Vos choix faits à la main ne sont jamais changés."><svg class="ic"><use href="#i-magic"/></svg>Tri automatique</button>
+    <label class="sel expert">Exigence <i class="tip" data-tip="Souple : rejette seulement les photos vraiment ratées. Stricte : ne garde que les très bonnes.">?</i>
+      <select id="sStrict"><option value="0">Souple</option><option value="1" selected>Normale</option><option value="2">Stricte</option></select>
+    </label>
+    <button id="bCompare" disabled data-tip="Comparer côte à côte la sélection (Ctrl + clic) ou la série de la photo choisie"><svg class="ic"><use href="#i-compare"/></svg>Comparer</button>
+    <div class="grow"></div>
+    <label class="sel">Taille <input type="range" id="rSize" min="120" max="360" value="200"></label>
+  </div>
+  <div class="subT" data-for="retoucher">
+    <span class="hint">Choisissez une photo dans la bande du bas, puis utilisez <b>Retouche rapide</b>, <b>Portrait</b> ou <b>Correcteur</b>. Tout est fait à l'export, vos originaux ne sont jamais modifiés.</span>
+  </div>
+  <div class="subT" data-for="exporter">
+    <span class="hint">Dernière étape : choisissez <b>quelles photos</b>, <b>où</b>, et si elles doivent être <b>retouchées</b>.</span>
+  </div>
+</div>
 
 <div id="main">
   <aside id="side">
-    <h4>Afficher</h4>
-    <div id="filters"></div>
-    <h4>Problèmes repérés</h4>
-    <div id="issues"></div>
-    <h4>Personnes <small id="persHint"></small></h4>
-    <div id="persons"><div class="note">Les personnes apparaissent ici après l'analyse.</div></div>
-    <h4>Options</h4>
-    <label class="ck"><input type="checkbox" id="cGroup" checked> Regrouper les rafales et doublons</label>
-    <label class="ck"><input type="checkbox" id="cAdvance" checked> Passer à la suivante après P / X</label>
-    <label class="sel full">Catégorie de la séance
-      <select id="sCat"><option value="auto">Auto (devinée photo par photo)</option><option value="mariage">💍 Mariage</option><option value="portrait">🙂 Portrait</option><option value="famille">👨‍👩‍👧 Famille / groupe</option><option value="contre-jour">🌅 Contre-jour</option><option value="plage">🏖️ Plage</option><option value="paysage">🏞️ Paysage</option><option value="nuit">🌙 Nuit</option></select>
-    </label>
-    <label class="sel full">Client / séance (facultatif)
-      <input type="text" id="tClient" placeholder="ex. Léa &amp; Hugo">
-    </label>
-    <label class="sel full">Trier par
-      <select id="sSort"><option value="date">Date de prise de vue</option><option value="score">Score (meilleures d'abord)</option><option value="name">Nom du fichier</option></select>
-    </label>
-    <label class="sel full">Taille des vignettes
-      <input type="range" id="rSize" min="120" max="360" value="200">
-    </label>
+    <details open><summary>Afficher</summary><div id="filters"></div></details>
+    <details open><summary>Problèmes repérés <i class="tip" data-tip="Photos où Regard Pur a trouvé un défaut. Cliquez pour les voir.">?</i></summary><div id="issues"></div></details>
+    <details open><summary>Personnes <small id="persHint"></small> <i class="tip" data-tip="Les mêmes visages sont regroupés. Clic : ses photos. Double-clic : lui donner un nom.">?</i></summary>
+      <div id="persons"><div class="note">Les personnes apparaissent ici après l'analyse.</div></div></details>
+    <details open><summary>Séance</summary>
+      <label class="sel full">Catégorie <i class="tip" data-tip="Change ce qui est normal (une photo de nuit est sombre, un contre-jour a un ciel blanc) et la retouche à l'export. Auto : devinée photo par photo.">?</i>
+        <select id="sCat"><option value="auto">Auto (devinée photo par photo)</option><option value="mariage">Mariage</option><option value="portrait">Portrait</option><option value="famille">Famille / groupe</option><option value="contre-jour">Contre-jour</option><option value="plage">Plage</option><option value="paysage">Paysage</option><option value="nuit">Nuit</option></select>
+      </label>
+      <label class="sel full">Client / séance (facultatif) <i class="tip" data-tip="Regard Pur retient vos réglages pour chaque client et les reproposera la prochaine fois.">?</i>
+        <input type="text" id="tClient" placeholder="ex. Léa &amp; Hugo">
+      </label>
+    </details>
+    <details class="expert"><summary>Options</summary>
+      <label class="ck"><input type="checkbox" id="cGroup" checked> Regrouper les rafales et doublons</label>
+      <label class="ck"><input type="checkbox" id="cAdvance" checked> Passer à la suivante après Garder / Rejeter</label>
+      <label class="sel full">Trier par
+        <select id="sSort"><option value="date">Date de prise de vue</option><option value="score">Score (meilleures d'abord)</option><option value="name">Nom du fichier</option></select>
+      </label>
+    </details>
     <div id="learn" class="note"></div>
   </aside>
 
-  <section id="center">
+<section id="center">
     <div id="empty">
-      <div class="big">👁️</div>
+      <img src="icon.png" class="logo" alt="">
       <h2>Ouvrez un dossier de photos</h2>
       <p>Regard Pur analyse chaque photo : <b>netteté réelle</b>, <b>flou de bougé</b>, <b>yeux fermés</b>, <b>exposition</b>, <b>rafales et doublons</b>.<br>
-      Ensuite : <b>P</b> pour garder, <b>X</b> pour rejeter, <b>1 à 5</b> pour les étoiles, ou <b>✨ Tri automatique</b>.</p>
-      <button class="pri" id="bOpen2">📂 Ouvrir un dossier</button>
+      Ensuite : <b>Tri automatique</b>, ou triez vous-même avec <b>P</b> (garder), <b>X</b> (rejeter) et <b>1 à 5</b> (étoiles).</p>
+      <button class="pri big" id="bOpen2"><svg class="ic"><use href="#i-folder"/></svg>Ouvrir un dossier</button> <button class="big" id="bImport2"><svg class="ic"><use href="#i-card"/></svg>Importer une carte SD</button>
       <p class="small">JPEG, HEIC (iPhone), PNG, TIFF et RAW (CR2, CR3, NEF, ARW, RAF, ORF, RW2, DNG…). Rien n'est modifié dans vos photos.</p>
     </div>
     <div id="grid" tabindex="0"></div>
+    <div id="exportPage"></div>
   </section>
 
   <aside id="panel">
@@ -66,40 +108,47 @@
     <div id="pvFaces"></div>
     <div id="pvName"></div>
     <div id="pvBtns">
-      <button data-st="P" class="keep">✔ Garder <kbd>P</kbd></button>
-      <button data-st="X" class="rej">✖ Rejeter <kbd>X</kbd></button>
-      <button data-st="" class="neu">↺ <kbd>U</kbd></button>
+      <button data-st="P" class="keep"><svg class="ic"><use href="#i-check"/></svg>Garder <kbd>P</kbd></button>
+      <button data-st="X" class="rej"><svg class="ic"><use href="#i-x"/></svg>Rejeter <kbd>X</kbd></button>
+      <button data-st="" class="neu" data-tip="Remettre « à voir » (U)"><svg class="ic"><use href="#i-undo"/></svg></button>
     </div>
     <div id="pvStars"></div>
-    <button id="bSim" style="width:100%;margin-bottom:6px">🔍 Montrer les photos semblables</button>
+    <button id="bSim" style="width:100%;margin-bottom:6px"><svg class="ic"><use href="#i-search"/></svg>Montrer les photos semblables</button>
     <div id="pvScore"></div>
     <div id="pvBars"></div>
     <div id="pvWhy"></div>
-    <canvas id="pvHist" width="280" height="70"></canvas>
-    <div id="pvExif"></div>
+    <canvas id="pvHist" class="expert" width="280" height="70"></canvas>
+    <div id="pvExif" class="expert"></div>
   </aside>
 </div>
 
 <div id="loupe" class="ovl">
   <div id="lpBar">
-    <button id="lpBack">← Grille <kbd>Échap</kbd></button>
+    <button id="lpBack"><svg class="ic"><use href="#i-back"/></svg>Grille <kbd>Échap</kbd></button>
     <span id="lpName"></span>
     <div class="grow"></div>
-    <label class="ck"><input type="checkbox" id="lpMarks" checked> Visages et zone nette <kbd>F</kbd></label>
-    <button id="lpHeal" title="Correcteur : peignez sur une tache ou un objet à enlever">🩹 Correcteur</button>
-    <button id="lpRet" title="Retouche portrait : peau, rides, yeux, dents, arrière-plan">💄 Retouche portrait</button>
-    <button id="lpZoom">🔍 100 % <kbd>Z</kbd></button>
-    <button data-st="P" class="keep">✔ Garder</button>
-    <button data-st="X" class="rej">✖ Rejeter</button>
+    <button data-st="P" class="keep"><svg class="ic"><use href="#i-check"/></svg>Garder <kbd>P</kbd></button>
+    <button data-st="X" class="rej"><svg class="ic"><use href="#i-x"/></svg>Rejeter <kbd>X</kbd></button>
     <span id="lpStars"></span>
-    <span class="adj" title="Votre retouche : Regard Pur l'apprend par catégorie et par client">☀<input type="range" id="lpEv" min="-10" max="10" value="0"><b id="lpEvV">0</b> 🌡<input type="range" id="lpWb" min="-30" max="30" value="0"><b id="lpWbV">0</b><button id="lpAdj0" title="Remettre à zéro">↺</button></span>
+    <span class="sep"></span>
+    <label class="ck expert" data-tip="Montrer les cadres des visages et la zone la plus nette (F)"><input type="checkbox" id="lpMarks" checked> Repères <kbd>F</kbd></label>
+    <button id="lpZoom" data-tip="Zoom 100 % sur les yeux ou la zone nette (Z)"><svg class="ic"><use href="#i-zoom"/></svg>100 % <kbd>Z</kbd></button>
+    <button id="lpRet" style="display:none"></button>
   </div>
   <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas>
     <div id="healBar"><b>🩹 Correcteur</b><span>Peignez sur ce qu'il faut enlever (tache, fil, panneau…). Z : zoom, clic droit glissé : se déplacer.</span>
       <label>Taille <input type="range" id="healSize" min="4" max="80" value="18"></label><button id="healUndo">↶ Annuler</button><button id="healClear">Tout effacer</button><i id="healMsg"></i></div></div>
   <div id="lpInfo"></div>
   <div id="lpFaces"></div>
-  <div id="rpPanel"></div>
+  <aside id="rpSide">
+    <div id="rtTop">
+      <h3><svg class="ic"><use href="#i-sliders"/></svg>Retouche rapide <i class="tip" data-tip="Regard Pur apprend ces corrections par catégorie et par client, et les applique aux autres photos à l'export.">?</i></h3>
+      <div class="rl"><span><svg class="ic"><use href="#i-sun"/></svg>Exposition</span><input type="range" id="lpEv" min="-10" max="10" value="0"><b id="lpEvV">0</b></div>
+      <div class="rl"><span><svg class="ic"><use href="#i-temp"/></svg>Chaleur</span><input type="range" id="lpWb" min="-30" max="30" value="0"><b id="lpWbV">0</b></div>
+      <div class="row2"><button id="lpAdj0"><svg class="ic"><use href="#i-undo"/></svg>Remettre à zéro</button><button id="lpHeal" data-tip="Peignez sur une tache ou un objet : la zone est reconstruite avec la matière voisine"><svg class="ic"><use href="#i-brush"/></svg>Correcteur</button></div>
+    </div>
+    <div id="rpPanel"></div>
+  </aside>
   <div id="lpStrip"></div>
 </div>
 

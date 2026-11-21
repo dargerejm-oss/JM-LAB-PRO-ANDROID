@@ -181,3 +181,73 @@ input[type=range]{accent-color:var(--gold);width:100%}
 #healBar label{display:flex;align-items:center;gap:6px}
 #healBar input{width:90px}
 #healBar i{color:var(--gold);font-style:normal}
+
+/* ================= nouvelle organisation : Trier · Retoucher · Exporter ================= */
+.ic{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px;margin-right:6px;flex:none}
+button.ico .ic{margin:0}
+button{display:inline-flex;align-items:center;justify-content:center}
+button.big{padding:11px 18px;font-size:15px}
+#tabs{display:flex;gap:4px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:4px;margin-left:8px}
+#tabs button{border:0;background:transparent;color:var(--mut);padding:8px 16px;border-radius:9px;font-weight:600;letter-spacing:.3px}
+#tabs button i{font-style:normal;width:20px;height:20px;border-radius:50%;background:var(--bg3);color:var(--mut);font-size:11px;display:inline-flex;align-items:center;justify-content:center;margin-right:8px}
+#tabs button.on{background:var(--bg3);color:var(--gold)}
+#tabs button.on i{background:var(--gold);color:#111}
+#tabs button:hover:not(.on){color:var(--txt)}
+#sub{height:46px;display:flex;align-items:center;padding:0 12px;background:var(--bg2);border-bottom:1px solid var(--line)}
+.subT{display:none;align-items:center;gap:8px;width:100%}
+.subT.on{display:flex}
+.subT .hint{color:var(--mut);font-size:13px}
+.sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+#main{height:calc(100% - 104px)}
+.ovl{top:104px}
+#dlg{top:0}
+#modeSw{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--mut);cursor:pointer;margin:0 6px}
+#modeSw input{display:none}
+#modeSw i{width:34px;height:18px;border-radius:9px;background:var(--bg3);border:1px solid var(--line);position:relative}
+#modeSw i::after{content:"";position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:var(--mut);transition:left .15s}
+#modeSw input:checked+i{background:#3a3115}
+#modeSw input:checked+i::after{left:18px;background:var(--gold)}
+/* mode Simple : on cache les reglages fins */
+body.simple .expert{display:none!important}
+/* colonne de gauche repliable */
+#side details{border-bottom:1px solid var(--line);padding:6px 0 8px}
+#side summary{cursor:pointer;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);padding:6px 2px;list-style:none;display:flex;align-items:center;gap:6px}
+#side summary::-webkit-details-marker{display:none}
+#side summary::before{content:"▸";transition:transform .15s;color:var(--mut)}
+#side details[open] summary::before{transform:rotate(90deg)}
+/* bulles d'aide */
+.tip{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid var(--mut);color:var(--mut);font-size:10px;cursor:help;text-transform:none;letter-spacing:0}
+[data-tip]{position:relative}
+[data-tip]:hover::after{content:attr(data-tip);position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);background:#000;color:#eee;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:12px;font-weight:400;line-height:1.45;width:max-content;max-width:280px;white-space:normal;z-index:99;text-transform:none;letter-spacing:0;box-shadow:0 6px 20px #0008;pointer-events:none}
+#side [data-tip]:hover::after{left:0;transform:none}
+/* ecran d'accueil */
+#empty .logo{width:96px;height:96px;border-radius:22px;margin-bottom:8px}
+#empty .big{display:inline-flex}
+/* grille allegee : les vignettes hors de l'ecran ne sont pas dessinees */
+.card{content-visibility:auto;contain-intrinsic-size:auto calc(var(--sz,200px) * 1.02)}
+/* page Exporter */
+#exportPage{position:absolute;inset:0;overflow:auto;display:none;padding:24px}
+#exportPage .exp{max-width:760px;margin:0 auto}
+#exportPage h2{margin:0 0 4px;color:var(--gold)}
+#exportPage .card2{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:14px 0}
+#exportPage .card2 h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px}
+#exportPage .card2 h3 i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--gold);color:#111;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+#exportPage label.opt{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:9px;margin:6px 0;cursor:pointer}
+#exportPage label.opt input{accent-color:var(--gold);margin-top:3px}
+#exportPage details.adv{margin-top:10px}
+#exportPage details.adv summary{cursor:pointer;color:var(--mut);font-size:13px}
+#exportPage .go{display:flex;justify-content:flex-end;gap:10px;margin:18px 0 40px}
+/* vue en grand : panneau Retoucher */
+#rpSide{position:absolute;right:0;top:52px;bottom:96px;width:330px;background:var(--bg2);border-left:1px solid var(--line);overflow:auto;display:none;z-index:3}
+#loupe.rmode #rpSide{display:block}
+#loupe.rmode #lpFaces{right:342px}
+#loupe.rmode #lpInfo{display:none}
+#rtTop{padding:12px 14px;border-bottom:1px solid var(--line)}
+#rtTop h3,#rpPanel h3{margin:0 0 8px;color:var(--gold);font-size:15px;display:flex;align-items:center;gap:6px}
+#rtTop .rl{display:grid;grid-template-columns:110px 1fr 34px;align-items:center;gap:6px;font-size:13px;margin:4px 0}
+#rtTop .rl b{font-weight:400;color:var(--mut);text-align:right;font-size:12px}
+#rtTop .row2{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+#rpPanel{position:static;display:block;width:auto;border:0;top:auto;bottom:auto}
+#lpHeal.on{background:var(--gold);color:#111;border-color:var(--gold);font-weight:700}
+
+body.tab-exporter #side,body.tab-exporter #panel{display:none}

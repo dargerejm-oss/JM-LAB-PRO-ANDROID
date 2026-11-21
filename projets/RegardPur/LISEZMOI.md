@@ -1,6 +1,14 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.12 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.0 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+
+## Interface (3.0)
+- **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
+- Vraies icônes (SVG), bulles d'aide « ? » au survol, colonne de gauche en sections repliables.
+- **Mode Simple / Expert** (en haut à droite) : le mode Simple cache les réglages fins.
+- Retoucher : photo en grand + panneau unique (retouche rapide, correcteur, portrait).
+- Exporter : page en 3 cartes (quelles photos, où, retouche) + réglages avancés repliés.
+- Grille allégée pour les gros dossiers (vignettes hors écran non dessinées) et temps restant pendant l'analyse.
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
