@@ -188,10 +188,10 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 
 /* ---------- bandeau vert : nom de l'appli + lien Instagram sur toute la largeur ---------- */
 .scroll-content>div:first-child>.font-mono{display:none!important}
-.scroll-content>div:first-child{padding:10px!important}
-.scroll-content>div:first-child>div:first-child{gap:10px!important}
-.scroll-content>div:first-child>div:first-child>div{flex:1 1 55%;font-size:18px!important;line-height:1.15!important;letter-spacing:.02em}
-.scroll-content>div:first-child>div:first-child>button{flex:1 1 45%;font-size:15px!important;padding:13px 8px!important;border-radius:14px!important;box-shadow:0 3px 8px #0007}
+.scroll-content>div:first-child{padding:6px 10px!important;min-height:0!important;margin-bottom:8px!important}
+.scroll-content>div:first-child>div:first-child{gap:8px!important}
+.scroll-content>div:first-child>div:first-child>div{flex:1 1 55%;font-size:14px!important;line-height:1.15!important;letter-spacing:.02em}
+.scroll-content>div:first-child>div:first-child>button{flex:1 1 45%;font-size:12px!important;padding:7px 8px!important;border-radius:12px!important;box-shadow:0 2px 6px #0007}
 /* ---------- RESET seul dans REGLAGES ---------- */
 .scroll-content>.grid.grid-cols-2.mb-4 button.jxHid{display:none!important}
 .scroll-content>.grid.grid-cols-2.mb-4 button{min-height:54px!important}
@@ -202,3 +202,6 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 /* ---------- petits ecrans / paysage : apercu proportionnel a la hauteur ---------- */
 @media (max-height:760px){.fixed-top{height:47vh!important}.scroll-content{margin-top:47vh!important}}
 @media (max-height:480px){.fixed-top{height:62vh!important}.scroll-content{margin-top:62vh!important}}
+/* appui long sur la photo : pas de menu ni de selection */
+.fixed-top,.fixed-top *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#jxEye{font-size:22px!important}

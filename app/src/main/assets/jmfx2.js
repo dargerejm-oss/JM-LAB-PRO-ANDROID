@@ -656,6 +656,46 @@ function proLab(bar){
   ck.checked = !window.__jmsProLabOff; c.classList.toggle("off", !!window.__jmsProLabOff);
 }
 
+/* ---------- AVANT / APRES : doigt maintenu sur la photo, ou bouton 👁 maintenu ---------- */
+var befC = document.createElement("canvas"); befC.id = "jxBefore2";
+befC.style.cssText = "position:fixed;z-index:1200;display:none;pointer-events:none;background:#222";
+var befL = document.createElement("div");
+befL.style.cssText = "position:fixed;z-index:1201;display:none;pointer-events:none;background:#000c;color:#fff;font-weight:900;font-size:14px;padding:6px 14px;border-radius:16px;letter-spacing:.08em";
+befL.textContent = T("AVANT", "BEFORE");
+document.body.appendChild(befC); document.body.appendChild(befL);
+function showBefore(on){
+  var f = document.querySelector(".fixed-top"), c = document.getElementById("filteredCanvas");
+  if(!on || !natImg || !f || !c || c.style.display === "none"){ befC.style.display = befL.style.display = "none"; return; }
+  var r = f.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  befC.style.left = r.left + "px"; befC.style.top = r.top + "px"; befC.style.width = r.width + "px"; befC.style.height = r.height + "px";
+  befC.width = Math.round(r.width * dpr); befC.height = Math.round(r.height * dpr);
+  var x = befC.getContext("2d"), k = Math.min(befC.width / natImg.naturalWidth, befC.height / natImg.naturalHeight), w = natImg.naturalWidth * k, h = natImg.naturalHeight * k;
+  x.fillStyle = "#222"; x.fillRect(0, 0, befC.width, befC.height); x.imageSmoothingQuality = "high";
+  x.drawImage(natImg, (befC.width - w) / 2, (befC.height - h) / 2, w, h);
+  befL.style.left = (r.left + r.width / 2) + "px"; befL.style.top = (r.top + 46) + "px"; befL.style.transform = "translateX(-50%)";
+  befC.style.display = befL.style.display = "block";
+}
+/* doigt maintenu sur la photo (pas sur le curseur avant / apres) */
+var hold = null;
+document.addEventListener("pointerdown", function(e){
+  var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target) || (e.target.closest && e.target.closest("#divider"))) return;
+  var c = document.getElementById("filteredCanvas"); if(!c || c.style.display === "none") return;
+  hold = {x:e.clientX, y:e.clientY, on:false, t:setTimeout(function(){ if(hold){ hold.on = true; showBefore(true); } }, 220)};
+}, true);
+document.addEventListener("pointermove", function(e){ if(hold && !hold.on && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 12){ clearTimeout(hold.t); hold = null; } }, true);
+function endHold(){ if(hold){ clearTimeout(hold.t); hold = null; } showBefore(false); }
+document.addEventListener("pointerup", endHold, true); document.addEventListener("pointercancel", endHold, true);
+/* bouton 👁 a cote de ↶ ↷ */
+function eyeBtn(){
+  var ur = document.getElementById("jxUR"); if(!ur || document.getElementById("jxEye")) return;
+  var b = document.createElement("button"); b.id = "jxEye"; b.textContent = "👁"; b.title = T("Maintenir pour voir avant la correction", "Hold to see before the correction");
+  b.onpointerdown = function(e){ e.preventDefault(); showBefore(true); };
+  b.onpointerup = b.onpointerleave = b.onpointercancel = function(){ showBefore(false); };
+  b.oncontextmenu = function(e){ e.preventDefault(); };
+  ur.insertBefore(b, ur.firstChild);
+}
+setInterval(eyeBtn, 1000); setTimeout(eyeBtn, 400);
+
 /* ---------- barre d'outils dans RÉGLAGES ---------- */
 function bar(){
   var c = document.querySelector(".space-y-3.mb-4"); if(!c) return;
