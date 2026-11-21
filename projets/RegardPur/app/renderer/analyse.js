@@ -599,6 +599,17 @@ self.onmessage = function (e) {
     }).then(function (f) { self.postMessage({id: m.id, faces5: f}); }, function (err) { self.postMessage({id: m.id, faces5: [], err: String(err && err.message || err)}); });
     return;
   }
+  if (m.pmask) { // silhouette des personnes (pour ne deflouter que le sujet et garder le fond flou voulu)
+    queue = queue.then(async function () {
+      needPortrait(); var sg = await initSeg(); if (!sg) return null;
+      var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+      var s = Math.min(1, 768 / Math.max(bm.width, bm.height)), w = Math.round(bm.width * s), h = Math.round(bm.height * s), c = canvas(w, h); c.getContext("2d").drawImage(bm, 0, 0, w, h); bm.close();
+      var r = sg.segment(c), d = r.categoryMask.getAsUint8Array().slice(); r.categoryMask.close();
+      var n = 0; for (var i = 0; i < d.length; i++) { d[i] = d[i] ? 255 : 0; if (d[i]) n++; }
+      var f = n / d.length; return f > 0.03 && f < 0.93 ? {w: w, h: h, d: d} : null;
+    }).then(function (r) { self.postMessage({id: m.id, pmask: r}); }, function () { self.postMessage({id: m.id, pmask: null}); });
+    return;
+  }
   if (m.measure) { // nouvelle mesure d'une photo corrigee (verification avant / apres)
     queue = queue.then(function () { return analyse(m); }).then(function (r) { delete r.thumb; self.postMessage({id: m.id, meas: r}); }, function (err) { self.postMessage({id: m.id, meas: null}); });
     return;

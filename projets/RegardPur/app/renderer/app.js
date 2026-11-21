@@ -468,6 +468,7 @@ function pump() {
 }
 function onResult(w, e) {
   var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (r.pmask !== undefined) { var cbk = prevWait[r.id]; delete prevWait[r.id]; if (cbk) cbk(r); return; }
   if (r.meas !== undefined) { var cbm = prevWait[r.id]; delete prevWait[r.id]; if (cbm) cbm(r); return; }
   if (r.faces5 !== undefined) { var cbf = prevWait[r.id]; delete prevWait[r.id]; if (cbf) cbf(r); return; }
   if (r.joined !== undefined) { var cbj = prevWait[r.id]; delete prevWait[r.id]; if (cbj) cbj(r); return; }
@@ -1294,6 +1295,21 @@ async function aiOne(p, kind, nb, of, chain) {
     for (i = 0; i < fd.length; i += 4) { fd[i] += up[i] - 128; fd[i + 1] += up[i + 1] - 128; fd[i + 2] += up[i + 2] - 128; }
     xo.putImageData(fimg, 0, 0);
   } else xo.putImageData(new ImageData(new Uint8ClampedArray(out.buffer, out.byteOffset, out.length), tw, th), 0, 0);
+  // defloutage du sujet seulement : le resultat n'est garde que sur les personnes, en fondu ; le fond flou (bokeh) reste
+  if (kind === "naf" && $("aiKeepBg").checked && p.a && bigFaces(p.a).length) {
+    $("aiState").textContent = "⏳ Repérage des personnes…";
+    var pm = await new Promise(function (res) { ensurePool(); var w = pool[0], key = "pm:" + Date.now(), c = orig.slice(); prevWait[key] = function (r) { res(r.pmask); }; w.postMessage({id: key, buf: c.buffer, heic: heicOf(p) && !(chain && p.ai), pmask: true}, [c.buffer]); });
+    if (pm) {
+      var mc = new OffscreenCanvas(pm.w, pm.h), mx = mc.getContext("2d"), mi = mx.createImageData(pm.w, pm.h);
+      for (var q = 0; q < pm.d.length; q++) { mi.data[q * 4 + 3] = pm.d[q]; }
+      mx.putImageData(mi, 0, 0);
+      var mb = new OffscreenCanvas(W, H), xb = mb.getContext("2d"); xb.filter = "blur(" + Math.max(2, Math.round(W / 250)) + "px)"; xb.drawImage(mc, 0, 0, W, H);
+      var al = xb.getImageData(0, 0, W, H).data, oc = new OffscreenCanvas(W, H), xoc = oc.getContext("2d"); xoc.drawImage(bm, 0, 0);
+      var od = xoc.getImageData(0, 0, W, H), o2 = od.data, nimg = xo.getImageData(0, 0, W, H), nd = nimg.data;
+      for (q = 0; q < nd.length; q += 4) { var a = al[q + 3] / 255; nd[q] = o2[q] + (nd[q] - o2[q]) * a; nd[q + 1] = o2[q + 1] + (nd[q + 1] - o2[q + 1]) * a; nd[q + 2] = o2[q + 2] + (nd[q + 2] - o2[q + 2]) * a; }
+      xo.putImageData(nimg, 0, 0);
+    }
+  }
   bm.close();
   await aiSave(p, kind, co, p.heic || p.raw ? null : first, chain);
 }

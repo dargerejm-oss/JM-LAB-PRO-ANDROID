@@ -170,6 +170,7 @@
         <div class="aiBtns"><button id="aiNaf" data-tip="Corrige le bougé et le flou de mise au point">Déflouter (IA)</button><button id="aiEsr" data-tip="Photo pixelisée, très compressée ou abîmée : même taille, détails reconstruits">Restaurer (IA)</button><button id="aiX2" data-tip="Double la taille de la photo en reconstruisant les détails">Agrandir ×2 (IA)</button><button id="aiScu" data-tip="Enlève le bruit (grain numérique) en gardant les détails : photos de nuit, en intérieur, ISO élevés">Débruiter (IA)</button><button id="aiGfp" data-tip="Répare les visages flous ou abîmés (yeux, peau, bouche). L'IA redessine le visage : comparez avec l'original (bouton Revenir).">Visages (IA)</button></div>
         <div class="rl expert"><span>Visages</span><select id="aiFace" style="grid-column:span 2"><option value="0.6">Naturel</option><option value="0.85">Marqué</option><option value="1">Complet</option></select></div>
         <div class="rl expert"><span>Rendu</span><select id="aiSoft" style="grid-column:span 2"><option value="esr">Net</option><option value="esrd">Doux (moins de bruit)</option></select></div>
+        <label class="ck"><input type="checkbox" id="aiKeepBg" checked> Déflouter seulement les personnes (garder le fond flou voulu)</label>
         <div id="aiState" class="dbInfo"></div>
         <button id="aiOff" style="display:none;width:100%">Revenir à l'original (sans IA)</button>
       </div>
