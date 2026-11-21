@@ -2,7 +2,8 @@
 const {app, BrowserWindow, ipcMain, dialog, shell, Menu, protocol} = require('electron');
 const fs = require('fs'), fsp = fs.promises, path = require('path');
 
-const IMG = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tif', '.tiff']);
+const HEIC = new Set(['.heic', '.heif', '.hif']);
+const IMG = new Set(['.heic', '.heif', '.hif', '.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tif', '.tiff']);
 const RAW = new Set(['.cr2', '.cr3', '.nef', '.nrw', '.arw', '.srf', '.sr2', '.raf', '.orf', '.rw2', '.pef', '.dng', '.srw', '.x3f', '.3fr', '.iiq', '.rwl', '.mrw', '.kdc', '.erf']);
 let win;
 // les pages de l'appli sont servies par une adresse interne (app://rp/...) : le module visages peut ainsi charger ses fichiers
@@ -41,7 +42,7 @@ async function walk(dir, out, depth) {
     const ext = path.extname(e.name).toLowerCase();
     if (!IMG.has(ext) && !RAW.has(ext)) continue;
     let st; try { st = await fsp.stat(p); } catch (x) { continue; }
-    out.push({path: p, name: e.name, rel: path.relative(out.root, p), size: st.size, mtime: st.mtimeMs, raw: RAW.has(ext)});
+    out.push({path: p, name: e.name, rel: path.relative(out.root, p), size: st.size, mtime: st.mtimeMs, raw: RAW.has(ext), heic: HEIC.has(ext)});
   }
 }
 // plus grande image JPEG cachee dans un fichier RAW (apercu de l'appareil)
@@ -75,6 +76,9 @@ ipcMain.handle('read', async (e, p, raw) => {
   const b = await fsp.readFile(p);
   if (raw) { const j = rawPreview(b); if (j) return new Uint8Array(j); return null; }
   return new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
+});
+ipcMain.handle('readHead', async (e, p, n) => {
+  const fh = await fsp.open(p, 'r'); try { const b = Buffer.alloc(n); const r = await fh.read(b, 0, n, 0); return new Uint8Array(b.buffer, 0, r.bytesRead); } finally { await fh.close(); }
 });
 ipcMain.handle('readText', async (e, p) => { try { return await fsp.readFile(p, 'utf8'); } catch (x) { return null; } });
 ipcMain.handle('writeText', async (e, p, s) => { await fsp.mkdir(path.dirname(p), {recursive: true}); await fsp.writeFile(p, s, 'utf8'); return true; });

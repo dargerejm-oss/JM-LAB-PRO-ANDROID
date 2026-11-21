@@ -1,9 +1,11 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.0 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
-- Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, PNG, TIFF et RAW (aperçu intégré au RAW).
+- Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
+- Vignettes immédiates (petite image intégrée à la photo), avant même l'analyse.
+- **Gros plans des visages** (pleine résolution) à côté de la photo et dans la vue en grand ; un clic zoome sur le visage.
 - Analyse chaque photo, sans internet :
   - **netteté réelle**, mesurée à 100 % sur les zones les plus détaillées, et sur les yeux s'il y a un visage ;
   - **flou de bougé** : la netteté diffère selon la direction ;
@@ -28,4 +30,5 @@ Version 2.0 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 ## À faire ensuite
 - Android (réutiliser `renderer/`, accès aux photos par la partie Android comme JM LAB PRO).
 - Lien « Retoucher dans JM LAB PRO ».
-- Photos HEIC (iPhone).
+- Régler la netteté sur de vraies photos d'appareil ; vérifier HEIC et yeux fermés sur de vraies photos.
+- Copie depuis la carte SD avec renommage ; classement par personne ; recherche de photos semblables ; mode d'emploi.

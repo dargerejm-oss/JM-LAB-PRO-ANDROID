@@ -11,6 +11,26 @@ var module = {exports: {}}, exports = module.exports;
 var MP = null, faceLM = null, faceReady = null;
 var MPERR = ""; try { importScripts("vendor/vision_bundle.js"); MP = module.exports; } catch (e) { MP = null; MPERR = String(e && e.message || e); }
 
+/* photos HEIC (iPhone) : decodees par libheif, charge seulement si besoin */
+var HEIF = null;
+async function heifLib() {
+  if (HEIF) return HEIF;
+  module = {exports: {}}; exports = module.exports;
+  importScripts("vendor/libheif-bundle.js");
+  var f = typeof module.exports === "function" ? module.exports : self.libheif, r = f();
+  HEIF = r && typeof r.then === "function" ? await r : r;
+  return HEIF;
+}
+async function heicCanvas(buf) {
+  var lib = await heifLib(), dec = new lib.HeifDecoder(), imgs = dec.decode(buf);
+  if (!imgs || !imgs.length) throw new Error("HEIC illisible");
+  var im = imgs[0], w = im.get_width(), h = im.get_height(), c = canvas(w, h), x = c.getContext("2d"), id = x.createImageData(w, h);
+  await new Promise(function (res, rej) { im.display(id, function (d) { if (d) res(); else rej(new Error("HEIC illisible")); }); });
+  x.putImageData(id, 0, 0);
+  imgs.forEach(function (o) { try { o.free(); } catch (e) {} });
+  return c;
+}
+
 function initFaces() {
   if (faceReady) return faceReady;
   faceReady = (async function () {
@@ -67,12 +87,24 @@ function edgeSharp(g, w, h) {
   }
   return res;
 }
+/* grandes photos (plus de 2500 px) : on mesure a 100 % et a 50 %, et on garde le meilleur des deux
+   (une photo bien mise au point d'un capteur de 24 Mpx n'est jamais "piquee au pixel" a 100 %) */
 function sharpOfCrop(bmp, sx, sy, sw, sh) {
+  var r1 = sharpAt(bmp, sx, sy, sw, sh, 1);
+  if (Math.max(bmp.width, bmp.height) <= 2500) return r1;
+  var cx = sx + sw / 2, cy = sy + sh / 2, r2 = sharpAt(bmp, cx - sw, cy - sh, sw * 2, sh * 2, 0.5);
+  if (!r2) return r1; if (!r1) return r2;
+  var v2 = r2.v - 0.06;
+  return v2 > r1.v ? {v: v2, max: r2.max - 0.06, min: r2.min - 0.06, n: r2.n} : r1;
+}
+function sharpAt(bmp, sx, sy, sw, sh, k) {
   sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy));
   sw = Math.round(Math.min(sw, bmp.width - sx)); sh = Math.round(Math.min(sh, bmp.height - sy));
-  if (sw < 24 || sh < 24) return null;
-  var c = canvas(sw, sh), x = c.getContext("2d", {willReadFrequently: true});
-  x.drawImage(bmp, sx, sy, sw, sh, 0, 0, sw, sh);
+  var dw = Math.round(sw * k), dh = Math.round(sh * k);
+  if (dw < 24 || dh < 24) return null;
+  var c = canvas(dw, dh), x = c.getContext("2d", {willReadFrequently: true});
+  x.imageSmoothingQuality = "high";
+  x.drawImage(bmp, sx, sy, sw, sh, 0, 0, dw, dh); sw = dw; sh = dh;
   var g = grayOf(x.getImageData(0, 0, sw, sh), sw, sh), r = edgeSharp(g, sw, sh), ok = r.filter(Boolean);
   if (!ok.length) return null;
   // une direction sans presque aucun bord franc alors que les autres en ont : elle est floue (bouge)
@@ -118,7 +150,7 @@ async function analyse(msg) {
     }
   } catch (e) {}
   var bmp;
-  try { bmp = await createImageBitmap(blob, {imageOrientation: "from-image"}); }
+  try { bmp = msg.heic ? await createImageBitmap(await heicCanvas(msg.buf)) : await createImageBitmap(blob, {imageOrientation: "from-image"}); }
   catch (e) { out.err = "Image illisible"; return out; }
   var W = bmp.width, H = bmp.height; out.w = W; out.h = H;
   // vignette
@@ -192,6 +224,11 @@ async function analyse(msg) {
 var queue = Promise.resolve();
 self.onmessage = function (e) {
   var m = e.data;
+  if (m.full) { // image en grand pour une photo HEIC
+    queue = queue.then(function () { return heicCanvas(m.buf).then(function (c) { return c.convertToBlob({type: "image/jpeg", quality: 0.92}); }); })
+      .then(function (b) { self.postMessage({id: m.id, full: b}); }, function (err) { self.postMessage({id: m.id, full: null, err: String(err && err.message || err)}); });
+    return;
+  }
   if (m.init) { initFaces().then(function (l) { self.postMessage({ready: true, faces: !!l}); }); return; }
   queue = queue.then(function () { return analyse(m); }).then(function (r) { self.postMessage(r); }, function (err) { self.postMessage({id: m.id, err: String(err && err.message || err)}); });
 };

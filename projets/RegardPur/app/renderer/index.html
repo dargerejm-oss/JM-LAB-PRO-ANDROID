@@ -46,13 +46,14 @@
       <p>Regard Pur analyse chaque photo : <b>netteté réelle</b>, <b>flou de bougé</b>, <b>yeux fermés</b>, <b>exposition</b>, <b>rafales et doublons</b>.<br>
       Ensuite : <b>P</b> pour garder, <b>X</b> pour rejeter, <b>1 à 5</b> pour les étoiles, ou <b>✨ Tri automatique</b>.</p>
       <button class="pri" id="bOpen2">📂 Ouvrir un dossier</button>
-      <p class="small">JPEG, PNG, TIFF et RAW (CR2, CR3, NEF, ARW, RAF, ORF, RW2, DNG…). Rien n'est modifié dans vos photos.</p>
+      <p class="small">JPEG, HEIC (iPhone), PNG, TIFF et RAW (CR2, CR3, NEF, ARW, RAF, ORF, RW2, DNG…). Rien n'est modifié dans vos photos.</p>
     </div>
     <div id="grid" tabindex="0"></div>
   </section>
 
   <aside id="panel">
     <div id="pvWrap"><img id="pvImg" alt=""><div id="pvOver"></div></div>
+    <div id="pvFaces"></div>
     <div id="pvName"></div>
     <div id="pvBtns">
       <button data-st="P" class="keep">✔ Garder <kbd>P</kbd></button>
@@ -81,6 +82,7 @@
   </div>
   <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="lpOver"></div></div>
   <div id="lpInfo"></div>
+  <div id="lpFaces"></div>
   <div id="lpStrip"></div>
 </div>
 
@@ -94,6 +96,7 @@
 <div id="dlg" class="ovl"><div class="box" id="dlgBox"></div></div>
 <input type="file" id="fallbackPick" webkitdirectory multiple hidden>
 <div id="toast"></div>
+<script src="vendor/exifr.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

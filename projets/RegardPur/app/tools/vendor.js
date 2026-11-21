@@ -6,6 +6,7 @@ fs.mkdirSync(path.join(V, 'wasm'), {recursive: true});
 fs.copyFileSync(path.join(MP, 'vision_bundle.cjs'), path.join(V, 'vision_bundle.js'));
 for (const f of ['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision_wasm_module_internal.js', 'vision_wasm_module_internal.wasm', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm'])
   fs.copyFileSync(path.join(MP, 'wasm', f), path.join(V, 'wasm', f));
+fs.copyFileSync(path.join(R, 'node_modules', 'libheif-js', 'libheif-wasm', 'libheif-bundle.js'), path.join(V, 'libheif-bundle.js'));
 fs.copyFileSync(path.join(R, 'node_modules', 'exifr', 'dist', 'full.umd.js'), path.join(V, 'exifr.js'));
 const MODEL = path.join(V, 'face_landmarker.task');
 const URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';

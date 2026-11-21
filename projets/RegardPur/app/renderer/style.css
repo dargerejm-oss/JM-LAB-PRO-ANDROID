@@ -128,3 +128,14 @@ input[type=range]{accent-color:var(--gold);width:100%}
 .box td{padding:4px 6px;border-bottom:1px solid var(--line)}
 .box td:first-child{white-space:nowrap;color:var(--gold);font-family:monospace}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000e;border:1px solid var(--line);border-radius:10px;padding:9px 16px;z-index:50;display:none;max-width:80vw}
+
+/* gros plans des visages */
+#pvFaces{display:flex;gap:6px;overflow-x:auto;margin-top:8px}
+#pvFaces:empty{display:none}
+.fc{flex:none;position:relative;border:2px solid var(--keep);border-radius:8px;overflow:hidden;background:#000;cursor:zoom-in}
+.fc.closed{border-color:var(--rej)}.fc.half{border-color:var(--doubt)}
+.fc img{display:block;height:92px}
+.fc span{position:absolute;left:0;right:0;bottom:0;font-size:10px;background:#000b;text-align:center;padding:1px 0}
+#lpFaces{position:absolute;right:12px;top:64px;bottom:108px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;pointer-events:auto}
+#lpFaces:empty{display:none}
+#lpFaces .fc img{height:auto;width:180px}
