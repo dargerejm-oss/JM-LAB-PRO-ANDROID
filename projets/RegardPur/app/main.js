@@ -118,6 +118,21 @@ ipcMain.handle('join', (e, ...a) => path.join(...a));
 ipcMain.handle('openPath', (e, p) => shell.openPath(p));
 ipcMain.handle('showItem', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('aiOk', () => AI.available());
+// style appris : reglages Lightroom (.xmp a cote des photos, ou XMP dans les JPEG exportes) et DxO (.dop)
+ipcMain.handle('styleFiles', async (e, dir) => {
+  const out = [];
+  async function w(d, depth) {
+    let ents; try { ents = await fsp.readdir(d, {withFileTypes: true}); } catch (x) { return; }
+    for (const en of ents) {
+      if (out.length >= 3000) return; if (en.name.startsWith('.')) continue; const p = path.join(d, en.name);
+      if (en.isDirectory()) { if (depth < 6) await w(p, depth + 1); continue; }
+      const ext = path.extname(en.name).toLowerCase();
+      if (ext === '.xmp' || ext === '.dop') out.push({path: p, kind: ext.slice(1)});
+      else if (ext === '.jpg' || ext === '.jpeg') out.push({path: p, kind: 'jpg'});
+    }
+  }
+  await w(dir, 0); return out;
+});
 // carte SD / telephone : premier lecteur qui contient un dossier DCIM (repris d'ARCHIVAGE_TRI_PRO)
 ipcMain.handle('sdCard', () => { if (process.platform !== 'win32') return null; for (const l of 'DEFGHIJKLMNOPQRSTUVWXYZ') { const r = l + ':\\'; try { if (fs.existsSync(r + 'DCIM')) return r; } catch (e) {} } return null; });
 // lieux : GPS -> « Ville-Pays » avec OpenStreetMap (Nominatim), seulement si l'utilisateur l'active ; 1 demande par seconde, reponses memorisees

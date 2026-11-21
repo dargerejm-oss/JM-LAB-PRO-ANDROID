@@ -1054,6 +1054,7 @@ function devStyle(p) {
   return o;
 }
 /* outils adaptes au type de photo : un clic applique la recette (reglages de depart, a affiner) ou lance l'outil */
+var TYPE_CUR = [];
 var TYPE_TOOLS = {
   portrait: [["Peau naturelle", "rp:naturel"], ["Éclat du visage", {lk: {glow: {g: 22, sat: 5, w: 0}}}], ["Regard (yeux, iris)", "rp:eclat"], ["Visages (IA)", "ai:face"]],
   mariage: [["Retouche mariage", "rp:mariage"], ["Lumière douce", {v: {Contraste: -12, Ombres: 15}, lk: {glow: {g: 30, sat: 0, w: 10}}}], ["Blancs propres", {v: {Blanc: 15}, lk: {wb: {t: -8, ti: 0}}}], ["Visages (IA)", "ai:face"]],
@@ -1065,14 +1066,14 @@ var TYPE_TOOLS = {
 };
 function typeShow(p) {
   if (!p || !p.a) { $("typeBox").style.display = "none"; return; }
-  var c = catOf(p), T = TYPE_TOOLS[c] || []; $("typeBox").style.display = T.length ? "" : "none";
+  var c = catOf(p), T = (MYSTYLE ? [["Mon style", {v: MYSTYLE.v, my: 1}]] : []).concat(TYPE_TOOLS[c] || []); TYPE_CUR = T; $("typeBox").style.display = T.length ? "" : "none";
   $("typeTitle").textContent = "Pour ce type de photo : " + (CATS[c] ? CATS[c].nom : c);
   var used = (p.dev && p.dev.tt) || [];
   $("typeTools").innerHTML = T.filter(function (t) { return !/^ai:/.test(t[1]) || AI.has[t[1] === "ai:face" ? "gfp" : t[1].slice(3)]; }).map(function (t) { return "<button data-tt='" + T.indexOf(t) + "'" + (used.indexOf(t[0]) >= 0 ? " class='done'" : "") + ">" + t[0] + "</button>"; }).join("");
 }
 $("typeTools").addEventListener("click", function (e) {
   var b = e.target.closest("button[data-tt]"), p = S.byId[S.view[S.cur]]; if (!b || !p) return;
-  var t = TYPE_TOOLS[catOf(p)][+b.dataset.tt], a = t[1];
+  var t = TYPE_CUR[+b.dataset.tt], a = t[1];
   if (typeof a === "string" && a.indexOf("ai:") === 0) { aiRun(a.slice(3)); return; }
   if (typeof a === "string" && a.indexOf("rp:") === 0) { var k = a.slice(3); p.ret = {preset: k, str: 100, v: JSON.parse(JSON.stringify(RP_PRESETS[k].v))}; rp.cur = p.ret; }
   else if (a === "crop") { var cc = autoCrop(p, "orig"); if (!cc) { toast("Le cadrage est déjà bon."); return; } devGet(p).crop = cc; }
@@ -2072,6 +2073,42 @@ function printCheck(p) {
   });
   return "<div class='expert' style='margin-top:4px'>🖨️ Tirage (cm) : " + out.join(" · ") + "<br><small>✓ bon (≥ 250 dpi) · ≈ juste · ✗ trop petite · ✂ visage coupé par le recadrage</small></div>";
 }
+/* style appris de Lightroom (reglages « crs: » des .xmp / JPEG exportes) et de DxO (.dop) : moyenne robuste (mediane)
+   de vos reglages, convertie en reglages Regard Pur ; propose dans « Pour ce type de photo » sous le nom « Mon style » */
+var MYSTYLE = null; try { MYSTYLE = JSON.parse(localStorage.getItem("rp_mystyle") || "null"); } catch (e) {}
+var LRMAP = [["Exposure2012", "Exposition", 1], ["Contrast2012", "Contraste", 0.7], ["Highlights2012", "Hautes SANS GRIS", 0.7], ["Shadows2012", "Ombres", 0.7],
+  ["Whites2012", "Blanc", 0.6], ["Blacks2012", "Noir", 0.6], ["Clarity2012", "Clarte", 0.6], ["Dehaze", "Dehaze", 0.6], ["Vibrance", "Vibrance", 0.7], ["Saturation", "Saturation", 0.7],
+  ["IncrementalTemperature", "Temperature", 0.6], ["IncrementalTint", "Teinte", 0.6], ["PostCropVignetteAmount", "Vignette", 0.6]];
+function lrParse(txt) {
+  if (!txt || txt.indexOf("crs:") < 0) return null; var o = {}, n = 0;
+  LRMAP.forEach(function (m) { var re = new RegExp("crs:" + m[0] + "\\s*=\\s*\"([+\\-0-9.]+)\"|<crs:" + m[0] + ">([+\\-0-9.]+)<"), r = re.exec(txt); if (r) { o[m[0]] = parseFloat(r[1] || r[2]); n++; } });
+  return n ? o : null;
+}
+function dopParse(txt) { // DxO PhotoLab : format a confirmer avec des fichiers d'exemple
+  if (!txt) return null; var o = {}, n = 0, g = function (k) { var r = new RegExp(k + "\\s*=\\s*([+\\-0-9.]+)").exec(txt); return r ? parseFloat(r[1]) : null; };
+  var map = {ExposureCompensation: "Exposure2012", Contrast: "Contrast2012", MicroContrast: "Clarity2012", Vibrancy: "Vibrance", Saturation: "Saturation", ClearViewIntensity: "Dehaze"};
+  Object.keys(map).forEach(function (k) { var v = g(k); if (v != null) { o[map[k]] = v; n++; } });
+  return n ? o : null;
+}
+async function learnStyle() {
+  if (!N || !N.styleFiles) return; var dir = await N.pickDir("Dossier de photos retouchées (Lightroom ou DxO)", S.dir); if (!dir) return;
+  $("styleInfo").textContent = "⏳ Lecture…"; var L = await N.styleFiles(dir), vals = {}, nf = 0, src = {lr: 0, dxo: 0};
+  for (var i = 0; i < L.length; i++) {
+    var f = L[i], o = null;
+    try { if (f.kind === "dop") { o = dopParse(await N.readText(f.path)); if (o) src.dxo++; }
+      else { var t = f.kind === "xmp" ? await N.readText(f.path) : new TextDecoder("latin1").decode(await N.readHead(f.path, 262144)); o = lrParse(t); if (o) src.lr++; } } catch (e) {}
+    if (o) { nf++; Object.keys(o).forEach(function (k) { (vals[k] = vals[k] || []).push(o[k]); }); }
+    if (i % 25 === 0) $("styleInfo").textContent = "⏳ " + (i + 1) + " / " + L.length;
+  }
+  if (nf < 3) { $("styleInfo").textContent = "Pas assez de photos retouchées trouvées (" + nf + ")."; return; }
+  var med = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }, v = {};
+  LRMAP.forEach(function (m) { var a = vals[m[0]]; if (!a || a.length < nf * 0.3) return; var x = med(a); if (m[0] === "Exposure2012") x = x / 0.65; else x = x * m[2]; x = Math.round(x * 10) / 10; if (Math.abs(x) >= (m[0] === "Exposure2012" ? 0.1 : 2)) v[m[1]] = Math.max(-100, Math.min(100, x)); });
+  MYSTYLE = {v: v, n: nf, lr: src.lr, dxo: src.dxo, date: Date.now()}; try { localStorage.setItem("rp_mystyle", JSON.stringify(MYSTYLE)); } catch (e) {}
+  $("styleInfo").textContent = "Style appris sur " + nf + " photo(s) (" + (src.lr ? "Lightroom " + src.lr : "") + (src.lr && src.dxo ? ", " : "") + (src.dxo ? "DxO " + src.dxo : "") + ")";
+  var p = S.byId[S.view[S.cur]]; if (p) typeShow(p);
+}
+$("bStyle").onclick = learnStyle;
+if (MYSTYLE) setTimeout(function () { $("styleInfo").textContent = "Style appris (" + MYSTYLE.n + " photos)"; }, 0);
 function dialog(html, cb) { $("dlgBox").innerHTML = html; $("dlg").classList.add("show"); dlgCb = cb || null; }
 function closeDialog() { $("dlg").classList.remove("show"); }
 $("dlg").addEventListener("click", function (e) {
