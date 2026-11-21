@@ -45,18 +45,21 @@ async function readBytes(p) {
 
 /* ---------------- score ---------------- */
 var TH = { // seuils selon l'exigence : souple / normale / stricte
-  sharp: [22, 34, 46], motion: [85, 70, 55], hi: [22, 12, 7], lo: [50, 32, 20], dark: [26, 36, 48], keep: [48, 58, 68], burst: [28, 16, 8]
+  sharp: [18, 28, 40], eye: [12, 20, 28], motion: [85, 70, 55], hi: [22, 12, 7], lo: [50, 32, 20], dark: [26, 36, 48], keep: [48, 58, 68], burst: [28, 16, 8]
 };
 function strict() { return +$("sStrict").value; }
 function bigFaces(a) { return (a && a.faces || []).filter(function (f) { return f.w > 0.035; }); }
 function expoScore(a) {
-  var e = a.expo, s = 100; s -= Math.max(0, e.hi - 1.5) * 5; s -= Math.max(0, e.lo - 4) * 3;
+  var e = a.expo, s = 100, fl = bigFaces(a).filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; });
+  if (fl.length && avg(fl) >= 55 && avg(fl) <= 225) return clamp(Math.round(100 - Math.max(0, e.hi - 8) * 1.5 - Math.max(0, e.lo - 15)), 60, 100); s -= Math.max(0, e.hi - 1.5) * 5; s -= Math.max(0, e.lo - 4) * 3;
   var d = Math.abs(e.mean - 118); if (d > 55) s -= (d - 55) * 2; return clamp(Math.round(s), 0, 100);
 }
+/* nettete des yeux mesuree (le visage le plus net) ; reglee sur de vraies photos :
+   portraits nets 30 a 70, flou d'1 pixel 15 a 27, flou de 2 pixels 2 a 10 */
+function eyeRaw(a) { var f = bigFaces(a); if (!f.length) return null; return Math.max.apply(null, f.map(function (x) { return x.eyeSharp != null ? x.eyeSharp : (x.faceSharp != null ? x.faceSharp : 0); })); }
 function sharpEff(a) {
-  var f = bigFaces(a), s = a.sharp;
-  if (f.length) { var es = Math.max.apply(null, f.map(function (x) { return x.eyeSharp != null ? x.eyeSharp : (x.faceSharp != null ? x.faceSharp : 0); })); s = Math.max(es, a.sharp * 0.6); }
-  return Math.round(s);
+  var e = eyeRaw(a);
+  return Math.round(e == null ? a.sharp : Math.min(100, Math.max(e * 1.45, a.sharp * 0.6)));
 }
 function eyesScore(a) { var f = bigFaces(a); return f.length ? avg(f.map(function (x) { return x.closed ? 0 : x.half ? 50 : 100; })) : null; }
 function feat(a) { var e = eyesScore(a), f = bigFaces(a); return [1, sharpEff(a) / 100, expoScore(a) / 100, e == null ? 0.7 : e / 100, f.length ? avg(f.map(function (x) { return x.smile; })) : 0, (a.motion || 0) / 100, f.length ? 1 : 0]; }
@@ -97,9 +100,9 @@ function reasons(p) {
   var a = p.a, k = strict(), rej = [], warn = [], good = [];
   if (!a) return {rej: rej, warn: ["Analyse en cours…"], good: good};
   if (a.err) return {rej: ["Image illisible"], warn: [], good: []};
-  var se = sharpEff(a), f = bigFaces(a);
-  if (se < TH.sharp[k]) rej.push(f.length ? "Visage / yeux flous" : "Floue");
-  else if (se < TH.sharp[k] + 15) warn.push("Netteté moyenne");
+  var se = sharpEff(a), f = bigFaces(a), er = eyeRaw(a);
+  if (er != null ? er < TH.eye[k] : se < TH.sharp[k]) rej.push(f.length ? "Visage / yeux flous" : "Floue");
+  else if (er != null ? er < TH.eye[k] + 8 : se < TH.sharp[k] + 12) warn.push("Netteté moyenne");
   else good.push(f.length ? "Yeux nets" : "Nette");
   if (a.motion >= TH.motion[k] && a.sharp < 70) rej.push("Flou de bougé");
   else if (a.motion >= TH.motion[k] - 20 && a.sharp < 70) warn.push("Léger bougé");
@@ -111,8 +114,10 @@ function reasons(p) {
     else good.push(f.length > 1 ? f.length + " visages, yeux ouverts" : "Yeux ouverts");
     if (avg(f.map(function (x) { return x.smile; })) > 0.55) good.push("Sourire");
   }
-  if (a.expo.hi > TH.hi[k]) rej.push("Très surexposée"); else if (a.expo.hi > 4) warn.push("Blancs brûlés (" + a.expo.hi + " %)");
-  if (a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) rej.push("Très sombre"); else if (a.expo.mean < 62) warn.push("Sombre");
+  // portrait : si le visage est bien expose, un fond tres clair ou tres sombre est un choix, pas une erreur
+  var fl = f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }), faceOk = fl.length && avg(fl) >= 55 && avg(fl) <= 225;
+  if (a.expo.hi > TH.hi[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très clair" : "Très surexposée"); else if (a.expo.hi > 4) warn.push("Blancs brûlés (" + a.expo.hi + " %)");
+  if (a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très sombre" : "Très sombre"); else if (a.expo.mean < 62 && !faceOk) warn.push("Sombre");
   var g = p.g >= 0 ? S.groups[p.g] : null;
   if (g) {
     if (p.best) good.push("Meilleure de la série (" + g.length + " photos)");
@@ -516,7 +521,7 @@ function autoCull() {
     if (p.status && !p.auto) { manual++; return; }
     var w = p.why;
     if (w.rej.length) { p.status = "X"; nX++; }
-    else if (p.score >= TH.keep[k] && (p.g < 0 || p.best)) { p.status = "P"; nP++; }
+    else if (p.score >= TH.keep[k] && (p.g < 0 || p.best) && !w.warn.some(function (t) { return /Netteté|bougé|Yeux/.test(t); })) { p.status = "P"; nP++; }
     else { p.status = ""; nT++; }
     p.auto = !!p.status;
   });

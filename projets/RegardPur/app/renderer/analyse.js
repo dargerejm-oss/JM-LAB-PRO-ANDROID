@@ -31,6 +31,35 @@ async function heicCanvas(buf) {
   return c;
 }
 
+/* visages : d'abord sur toute l'image ; si rien n'est trouve, dans 5 morceaux agrandis
+   (le detecteur rate les visages petits dans le cadre : portrait en pied, groupe…) */
+function detectFaces(lm, bmp, W, H) {
+  function run(sx, sy, sw, sh) {
+    var k = Math.min(1, 1280 / Math.max(sw, sh)), c = canvas(sw * k, sh * k); c.getContext("2d").drawImage(bmp, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    var r = lm.detect(c), L = [], B = [];
+    (r.faceLandmarks || []).forEach(function (pts, i) {
+      L.push(pts.map(function (q) { return {x: (sx + q.x * sw) / W, y: (sy + q.y * sh) / H, z: q.z}; }));
+      B.push((r.faceBlendshapes || [])[i] || {categories: []});
+    });
+    return {faceLandmarks: L, faceBlendshapes: B};
+  }
+  var res = run(0, 0, W, H);
+  if (res.faceLandmarks.length) return res;
+  var cw = W * 0.6, ch = H * 0.6, boxes = [];
+  [[0, 0], [W - cw, 0], [0, H - ch], [W - cw, H - ch], [(W - cw) / 2, (H - ch) / 2]].forEach(function (o) {
+    var r = run(o[0], o[1], cw, ch);
+    r.faceLandmarks.forEach(function (pts, i) {
+      var xs = pts.map(function (q) { return q.x; }), ys = pts.map(function (q) { return q.y; });
+      var b = {x0: Math.min.apply(null, xs), x1: Math.max.apply(null, xs), y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys)};
+      // le meme visage vu dans deux morceaux : on ne le garde qu'une fois
+      var dup = boxes.some(function (o2) { var ix = Math.max(0, Math.min(b.x1, o2.x1) - Math.max(b.x0, o2.x0)), iy = Math.max(0, Math.min(b.y1, o2.y1) - Math.max(b.y0, o2.y0)); return ix * iy > 0.3 * (b.x1 - b.x0) * (b.y1 - b.y0); });
+      if (dup) return; boxes.push(b);
+      res.faceLandmarks.push(pts); res.faceBlendshapes.push(r.faceBlendshapes[i]);
+    });
+  });
+  return res;
+}
+
 function initFaces() {
   if (faceReady) return faceReady;
   faceReady = (async function () {
@@ -163,9 +192,18 @@ async function analyse(msg) {
   ax.drawImage(bmp, 0, 0, aw, ah);
   var aimg = ax.getImageData(0, 0, aw, ah), g = grayOf(aimg, aw, ah);
   // exposition
-  var hist = new Uint32Array(64), hi = 0, lo = 0, sum = 0;
-  for (var i = 0; i < g.length; i++) { var v = g[i]; sum += v; hist[Math.min(63, v >> 2)]++; if (v >= 250) hi++; if (v <= 5) lo++; }
-  var n = g.length; out.expo = {mean: Math.round(sum / n), hi: Math.round(hi / n * 1000) / 10, lo: Math.round(lo / n * 1000) / 10};
+  // un cadre uni (blanc ou noir) autour de la photo n'est pas compte
+  function flatRow(y) { var s = 0, s2 = 0; for (var x = 0; x < aw; x += 2) { var v = g[y * aw + x]; s += v; s2 += v * v; } var m = s / (aw / 2); return Math.sqrt(Math.max(0, s2 / (aw / 2) - m * m)) < 6 && (m > 235 || m < 20); }
+  function flatCol(x) { var s = 0, s2 = 0; for (var y = 0; y < ah; y += 2) { var v = g[y * aw + x]; s += v; s2 += v * v; } var m = s / (ah / 2); return Math.sqrt(Math.max(0, s2 / (ah / 2) - m * m)) < 6 && (m > 235 || m < 20); }
+  var bt = 0, bb = ah - 1, bl = 0, br = aw - 1, lim = 0.15;
+  while (bt < ah * lim && flatRow(bt)) bt++; while (bb > ah * (1 - lim) && flatRow(bb)) bb--;
+  while (bl < aw * lim && flatCol(bl)) bl++; while (br > aw * (1 - lim) && flatCol(br)) br--;
+  // un fin liseré dans le cadre : on le saute aussi
+  if (bt || bl) { bt = Math.min(Math.round(ah * lim), bt + 6); bl = Math.min(Math.round(aw * lim), bl + 6); bb = Math.max(Math.round(ah * (1 - lim)), bb - 6); br = Math.max(Math.round(aw * (1 - lim)), br - 6); }
+  out.frame = !!(bt || bl);
+  var hist = new Uint32Array(64), hi = 0, lo = 0, sum = 0, n = 0;
+  for (var yy = bt; yy <= bb; yy++) for (var xx = bl; xx <= br; xx++) { var v = g[yy * aw + xx]; sum += v; n++; hist[Math.min(63, v >> 2)]++; if (v >= 250) hi++; if (v <= 5) lo++; }
+  n = Math.max(1, n); out.expo = {mean: Math.round(sum / n), hi: Math.round(hi / n * 1000) / 10, lo: Math.round(lo / n * 1000) / 10};
   out.hist = Array.prototype.slice.call(hist);
   out.hash = dhash(g, aw, ah); out.col = colorSig(aimg);
   // zones les plus detaillees (grille 6 x 4) -> nettete mesuree a 100 % sur les 3 meilleures
@@ -196,13 +234,12 @@ async function analyse(msg) {
     var lm = await initFaces();
     if (lm) {
       try {
-        var fsz = Math.min(1, 1280 / Math.max(W, H)), fc = canvas(W * fsz, H * fsz); fc.getContext("2d").drawImage(bmp, 0, 0, fc.width, fc.height);
-        var res = lm.detect(fc);
+        var res = detectFaces(lm, bmp, W, H);
         (res.faceLandmarks || []).forEach(function (pts, k) {
           var minx = 1, miny = 1, maxx = 0, maxy = 0;
           pts.forEach(function (q) { if (q.x < minx) minx = q.x; if (q.y < miny) miny = q.y; if (q.x > maxx) maxx = q.x; if (q.y > maxy) maxy = q.y; });
           var bw = maxx - minx, bh = maxy - miny; if (bw * W < 40) return; // visage trop petit pour juger
-          var bs = {}; ((res.faceBlendshapes || [])[k] || {categories: []}).categories.forEach(function (c) { bs[c.categoryName] = c.score; });
+          var bs = {}; (res.faceBlendshapes[k] || {categories: []}).categories.forEach(function (c) { bs[c.categoryName] = c.score; });
           var blink = Math.max(bs.eyeBlinkLeft || 0, bs.eyeBlinkRight || 0), blinkMin = Math.min(bs.eyeBlinkLeft || 0, bs.eyeBlinkRight || 0);
           var smile = ((bs.mouthSmileLeft || 0) + (bs.mouthSmileRight || 0)) / 2;
           // nettete sur la zone des yeux (points 33 et 263 = coins exterieurs des yeux)
@@ -216,7 +253,8 @@ async function analyse(msg) {
           var ac2 = canvas(150, 150), ax2 = ac2.getContext("2d", {willReadFrequently: true});
           ax2.imageSmoothingQuality = "high"; ax2.translate(75, 75); ax2.rotate(-ang); ax2.scale(150 / side, 150 / side); ax2.drawImage(bmp, -fcx, -fcy);
           var px = ax2.getImageData(0, 0, 150, 150).data;
-          out.faces.push({px: px, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
+          var fl = 0, fn = 0; for (var fy = Math.floor((miny + bh * 0.25) * ah); fy < (miny + bh * 0.8) * ah; fy += 2) for (var fx = Math.floor((minx + bw * 0.2) * aw); fx < (minx + bw * 0.8) * aw; fx += 2) { if (fy >= 0 && fy < ah && fx >= 0 && fx < aw) { fl += g[fy * aw + fx]; fn++; } }
+          out.faces.push({px: px, lum: fn ? Math.round(fl / fn) : null, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
             closed: blinkMin > 0.5, half: !(blinkMin > 0.5) && blink > 0.45, smile: Math.round(smile * 100) / 100,
             eyeSharp: es ? toScore(es.v) : null, faceSharp: fs2 ? toScore(fs2.v) : null});
         });

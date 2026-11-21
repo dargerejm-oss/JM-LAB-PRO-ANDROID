@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.3 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.4 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
@@ -33,5 +33,5 @@ Version 2.3 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 ## À faire ensuite
 - Android (réutiliser `renderer/`, accès aux photos par la partie Android comme JM LAB PRO).
 - Lien « Retoucher dans JM LAB PRO ».
-- Régler la netteté sur de vraies photos d'appareil ; vérifier HEIC et yeux fermés sur de vraies photos.
+- Netteté des yeux réglée sur de vraies photos (2.4). Reste à vérifier : HEIC, yeux fermés, photos 24 Mpx d'appareil.
 - Mode d'emploi.
