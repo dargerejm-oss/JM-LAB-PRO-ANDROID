@@ -416,14 +416,13 @@ function exifOf(buf) {
   }
   return null;
 }
-async function develop(m) {
+/* rendu « JM LAB PRO » d'une image (en place) : correction de categorie, profil + ProLab + curseurs, peau protegee, courbe.
+   Utilise a l'export (pleine resolution) ET pour l'apercu de l'etape Retoucher : meme resultat. */
+function renderStyle(c, S) {
   if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; }
-  var S = m.style, bmp = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
-  var W = bmp.width, H = bmp.height, c = canvas(W, H), x = c.getContext("2d", {willReadFrequently: true}); x.drawImage(bmp, 0, 0);
-  // correcteur / suppression d'objets : avant tout le reste (meme methode que JM LAB PRO)
-  if (S.heals && S.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(c, S.heals); }
+  var W = c.width, H = c.height, x = c.getContext("2d", {willReadFrequently: true});
   // exposition automatique ProLab : meme mesure que l'appli (image reduite a 256 px, un point sur 16)
-  var aw = Math.min(256, W), ah = Math.min(256, H), ac = canvas(aw, ah), ax = ac.getContext("2d", {willReadFrequently: true}); ax.drawImage(bmp, 0, 0, aw, ah);
+  var aw = Math.min(256, W), ah = Math.min(256, H), ac = canvas(aw, ah), ax = ac.getContext("2d", {willReadFrequently: true}); ax.drawImage(c, 0, 0, aw, ah);
   var d = ax.getImageData(0, 0, aw, ah).data, K = 0, he = 0;
   for (var i = 0; i < d.length; i += 64) { K += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; he++; }
   var ze = he ? K / he : 128, dn = S.off || S.auto ? 0 : Math.max(-5, Math.min(5, (128 - ze) / 38)), v = S.v || {};
@@ -470,7 +469,38 @@ async function develop(m) {
     }
     x.putImageData(id, 0, y);
   }
+  // courbe (monotone, sans rebond) appliquee a la fin, sur les trois couleurs
+  if (S.curve && S.curve.length >= 2) {
+    var CL = curveLut(S.curve);
+    for (y = 0; y < H; y += band) {
+      var bh2 = Math.min(band, H - y), id2 = x.getImageData(0, y, W, bh2), q = id2.data;
+      for (i = 0; i < q.length; i += 4) { q[i] = CL[q[i]]; q[i + 1] = CL[q[i + 1]]; q[i + 2] = CL[q[i + 2]]; }
+      x.putImageData(id2, 0, y);
+    }
+  }
+}
+function curveLut(pts) { // courbe passant par les points, monotone (Fritsch-Carlson)
+  pts = pts.slice().sort(function (a, b) { return a[0] - b[0]; });
+  var n = pts.length, xs = pts.map(function (p) { return p[0]; }), ys = pts.map(function (p) { return p[1]; }), dl = [], m = [], L = new Uint8ClampedArray(256);
+  for (var i = 0; i < n - 1; i++) dl.push((ys[i + 1] - ys[i]) / Math.max(1e-6, xs[i + 1] - xs[i]));
+  m[0] = dl[0]; m[n - 1] = dl[n - 2]; for (i = 1; i < n - 1; i++) m[i] = dl[i - 1] * dl[i] <= 0 ? 0 : (dl[i - 1] + dl[i]) / 2;
+  for (i = 0; i < n - 1; i++) { if (dl[i] === 0) { m[i] = m[i + 1] = 0; continue; } var a2 = m[i] / dl[i], b2 = m[i + 1] / dl[i], h = a2 * a2 + b2 * b2; if (h > 9) { var t3 = 3 / Math.sqrt(h); m[i] = t3 * a2 * dl[i]; m[i + 1] = t3 * b2 * dl[i]; } }
+  for (var v = 0; v < 256; v++) {
+    if (v <= xs[0]) { L[v] = ys[0]; continue; } if (v >= xs[n - 1]) { L[v] = ys[n - 1]; continue; }
+    var k = 0; while (v > xs[k + 1]) k++;
+    var hh = xs[k + 1] - xs[k], t = (v - xs[k]) / hh, t2 = t * t, t4 = t2 * t;
+    L[v] = (2 * t4 - 3 * t2 + 1) * ys[k] + (t4 - 2 * t2 + t) * hh * m[k] + (-2 * t4 + 3 * t2) * ys[k + 1] + (t4 - t2) * hh * m[k + 1];
+  }
+  return L;
+}
+async function develop(m) {
+  if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; }
+  var S = m.style, bmp = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+  var W = bmp.width, H = bmp.height, c = canvas(W, H), x = c.getContext("2d", {willReadFrequently: true}); x.drawImage(bmp, 0, 0);
   bmp.close();
+  // correcteur / suppression d'objets : avant tout le reste (meme methode que JM LAB PRO)
+  if (S.heals && S.heals.length) JMHEAL(c, S.heals);
+  renderStyle(c, S);
   if (S.ret) { needPortrait(); try { await portraitRetouch(c, S.ret); } catch (e) { self.postMessage({log: "retouche portrait : " + e.message}); } }
   // horizon penche : on tourne et on recadre juste ce qu'il faut pour ne pas voir de coins vides
   if (S.tilt) {
@@ -497,6 +527,7 @@ self.onmessage = function (e) {
       var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
       var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)), cv = canvas(bm.width * k2, bm.height * k2); cv.getContext("2d").drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
       if (m.heals && m.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(cv, m.heals); }
+      if (m.style) renderStyle(cv, m.style);
       var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;
       return {b: await cv.convertToBlob({type: "image/jpeg", quality: 0.9}), n: n};
     }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
