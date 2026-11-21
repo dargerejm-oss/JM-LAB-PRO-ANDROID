@@ -1006,7 +1006,7 @@ function devShow(p) {
   curveDraw(CRV.ch === "m" ? d.curve : (d.curves || {})[CRV.ch]);
   var db = d.deblur || {}; $("dbAmt").value = db.amt || 0; $("dbAmt").nextElementSibling.textContent = db.amt || 0; $("dbKind").value = db.kind || "auto"; if (!(db.amt > 0)) $("dbInfo").textContent = "";
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-lv]"), function (r) { var v = +((d.levels || {})[r.dataset.lv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 && r.dataset.lv === "g" ? "+" + v : v; });
-  aiShow(p);
+  aiShow(p); typeShow(p);
   $("dvFixed").textContent = d.fix && d.fix.length ? "🩺 Corrigé : " + d.fix.join(", ") : "";
   var lk = d.looks || {};
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop [data-lk]"), function (r) { var k = r.dataset.lk.split("."), v = +((lk[k[0]] || {})[k[1]] || 0); r.value = v; if (r.tagName === "INPUT") r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
@@ -1023,6 +1023,33 @@ function devStyle(p) {
   if (p.rot) o.rot = p.rot;
   return o;
 }
+/* outils adaptes au type de photo : un clic applique la recette (reglages de depart, a affiner) ou lance l'outil */
+var TYPE_TOOLS = {
+  portrait: [["Peau naturelle", "rp:naturel"], ["Éclat du visage", {lk: {glow: {g: 22, sat: 5, w: 0}}}], ["Regard (yeux, iris)", "rp:eclat"], ["Visages (IA)", "ai:face"]],
+  mariage: [["Retouche mariage", "rp:mariage"], ["Lumière douce", {v: {Contraste: -12, Ombres: 15}, lk: {glow: {g: 30, sat: 0, w: 10}}}], ["Blancs propres", {v: {Blanc: 15}, lk: {wb: {t: -8, ti: 0}}}], ["Visages (IA)", "ai:face"]],
+  famille: [["Visages éclaircis", {v: {Ombres: 30}}], ["Peau naturelle", "rp:naturel"], ["Netteté de groupe", {lk: {details: {s: 10, n: 30}}}]],
+  "contre-jour": [["Déboucher le sujet", {v: {Ombres: 55, "Hautes SANS GRIS": -40}}], ["HDR personnes", {lk: {hdr: {st: 1, f: 35, b: 0, sat: 0}}}], ["Ciel récupéré", {lk: {tone: {hi: -35, mid: 0, lo: 10}}}]],
+  plage: [["Mer et ciel", {v: {Vibrance: 20, Dehaze: 10}, lk: {tone: {hi: -20, mid: 0, lo: 0}}}], ["Horizon droit", "tilt"], ["Peau protégée", {v: {Vibrance: 8}}]],
+  paysage: [["Détails", {lk: {details: {s: 30, n: 25}}}], ["Ciel et relief", {v: {Dehaze: 15}, lk: {tone: {hi: -25, mid: 5, lo: 20}}}], ["HDR nature", {lk: {hdr: {st: 0, f: 40, b: 0, sat: 10}}}], ["Horizon droit", "tilt"]],
+  nuit: [["Débruiter (IA)", "ai:scu"], ["Ombres", {v: {Ombres: 30, Noir: -10}}], ["Lumières maîtrisées", {v: {"Hautes SANS GRIS": -35}}], ["Lissage du grain", {lk: {details: {s: -30, n: 0}}}]]
+};
+function typeShow(p) {
+  if (!p || !p.a) { $("typeBox").style.display = "none"; return; }
+  var c = catOf(p), T = TYPE_TOOLS[c] || []; $("typeBox").style.display = T.length ? "" : "none";
+  $("typeTitle").textContent = "Pour ce type de photo : " + (CATS[c] ? CATS[c].nom : c);
+  var used = (p.dev && p.dev.tt) || [];
+  $("typeTools").innerHTML = T.filter(function (t) { return !/^ai:/.test(t[1]) || AI.has[t[1] === "ai:face" ? "gfp" : t[1].slice(3)]; }).map(function (t) { return "<button data-tt='" + T.indexOf(t) + "'" + (used.indexOf(t[0]) >= 0 ? " class='done'" : "") + ">" + t[0] + "</button>"; }).join("");
+}
+$("typeTools").addEventListener("click", function (e) {
+  var b = e.target.closest("button[data-tt]"), p = S.byId[S.view[S.cur]]; if (!b || !p) return;
+  var t = TYPE_TOOLS[catOf(p)][+b.dataset.tt], a = t[1];
+  if (typeof a === "string" && a.indexOf("ai:") === 0) { aiRun(a.slice(3)); return; }
+  if (typeof a === "string" && a.indexOf("rp:") === 0) { var k = a.slice(3); p.ret = {preset: k, str: 100, v: JSON.parse(JSON.stringify(RP_PRESETS[k].v))}; rp.cur = p.ret; }
+  else if (a === "tilt") { if (!p.a.tilt) { toast("L'horizon de cette photo est déjà droit."); return; } devGet(p).tilt = true; }
+  else { var d = devGet(p); if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
+  var d2 = devGet(p); d2.tt = (d2.tt || []).filter(function (x) { return x !== t[0]; }).concat([t[0]]);
+  devShow(p); devChanged(p); toast("« " + t[0] + " » appliqué — affinez avec les curseurs si besoin.");
+});
 function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
 $("rtTop").addEventListener("input", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
