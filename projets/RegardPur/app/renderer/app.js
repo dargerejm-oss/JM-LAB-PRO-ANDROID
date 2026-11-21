@@ -6,7 +6,7 @@ var N = window.RPNative || null;               // partie PC (absente dans un sim
 var RAWX = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|x3f|3fr|iiq|rwl|mrw|kdc|erf)$/i;
 var IMGX = /\.(jpe?g|png|webp|bmp|gif|tiff?|heic|heif|hif)$/i, HEICX = /\.(heic|heif|hif)$/i;
 
-var AVER = 2; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
+var AVER = 3; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
 var S = {
   photos: [], byId: {}, view: [], cur: -1, sel: new Set(), filter: "all", dir: null, groups: [], openGroup: -1,
   undo: [], analysing: false, saveT: 0
@@ -116,6 +116,9 @@ function baseScore(a) {
   if (e == null) s = 0.72 * se + 0.28 * ex;
   else s = 0.45 * se + 0.2 * ex + 0.35 * e + 5 * avg(f.map(function (x) { return x.smile; }));
   if (a.motion > 40) s -= (a.motion - 40) * 0.35;
+  if (a.pix) s -= 30; else if (a.up != null && a.up > 0.07) s -= 10;
+  if (a.jq != null && a.jq < 50) s -= (50 - a.jq) * 0.3;
+  if (a.noiseView != null && a.noiseView > 5 && (a.mp || 0) >= 0.8) s -= (a.noiseView - 5) * 2.5;
   // une photo floue ou mal exposee ne peut pas avoir une bonne note, meme si le reste va bien
   s = Math.min(s, se + 25, ex + 25);
   // oeil artistique : lumiere, couleurs, composition (modele NIMA, sur le PC)
@@ -210,6 +213,15 @@ function reasons(p) {
   if (f.some(function (x) { return x.x < 0.004 || x.y < 0.004 || x.x + x.w > 0.996 || x.y + x.h > 0.996; }) && f.length) warn.push("Visage coupé par le bord");
   if (f.length >= 2) { var turned = f.filter(function (x) { return x.yaw != null && Math.abs(x.yaw) > 0.42; }).length; if (turned) warn.push(turned + " personne" + (turned > 1 ? "s tournent" : " tourne") + " la tête"); }
   if (a.tilt) warn.push("Horizon penché (" + Math.abs(a.tilt).toFixed(1).replace(".", ",") + "°)");
+  // qualite d'image : pixelisation, photo agrandie, compression, bruit, definition, informations de prise de vue
+  if (a.pix) (k >= 1 ? rej : warn).push("Pixelisée (agrandie sans lissage)");
+  else if (a.up != null && a.up > 0.07) warn.push("Photo agrandie (vraie définition plus faible)");
+  if (a.jq != null && a.jq < 50) (a.jq < 30 && k === 2 ? rej : warn).push("Compression JPEG forte (qualité " + a.jq + ")");
+  if (a.noiseView != null && (a.mp || 0) >= 0.8) { if (a.noiseView > 8.5) (k === 2 ? rej : warn).push("Très bruitée"); else if (a.noiseView > 5) warn.push("Grain / bruit visible"); }
+  if (a.mp != null) { var cmW = Math.round(Math.max(a.w, a.h) / 200 * 2.54), cmH = Math.round(Math.min(a.w, a.h) / 200 * 2.54);
+    if (a.mp < 0.8) warn.push("Très petite définition (" + String(a.mp).replace(".", ",") + " Mpx) : écran seulement");
+    else if (a.mp < 2.5) warn.push("Petite définition (" + String(a.mp).replace(".", ",") + " Mpx) : tirage jusqu'à ~" + cmW + "×" + cmH + " cm"); }
+  if (!a.exif || (!a.exif.date && !a.exif.model && !a.exif.make)) warn.push("Sans EXIF (copie, capture ou photo envoyée par message ?)");
   var ae = aesScore(a); if (ae != null && ae >= 72 && !rej.length && !warn.some(function (t) { return /Netteté|bougé/.test(t); })) good.push("Belle image (œil artistique)");
   var g = p.g >= 0 ? S.groups[p.g] : null;
   if (g) {
@@ -538,6 +550,8 @@ var ISSUES = [
   ["eyes", "Yeux fermés / mi-clos", function (p) { return has(p, /Yeux fermés|mi-clos/); }],
   ["expo", "Exposition ratée", function (p) { return has(p, /exposée|sombre|brûlés/i); }],
   ["compo", "Composition (bord, tête, horizon)", function (p) { return has(p, /coupé|tête|Horizon/); }],
+  ["qual", "Qualité d'image (bruit, pixels, compression, définition)", function (p) { return has(p, /Pixelisée|agrandie|Compression|bruit|Bruit|bruitée|définition/); }],
+  ["noexif", "Sans EXIF", function (p) { return has(p, /Sans EXIF/); }],
   ["faces", "Avec visages", function (p) { return bigFaces(p.a).length > 0; }],
   ["groups", "Rafales et doublons", function (p) { return p.g >= 0; }]
 ];
@@ -740,6 +754,7 @@ function showPanel() {
   if (f.length) { var es = sharpEff(a); h += bar("Netteté des yeux / visage", es, colOf(es)); var ey = eyesScore(a); h += bar("Yeux ouverts", ey, colOf(ey), f.length + " visage" + (f.length > 1 ? "s" : "")); }
   h += bar("Flou de bougé", a.motion, a.motion >= 60 ? "var(--rej)" : a.motion >= 40 ? "var(--doubt)" : "var(--keep)", a.motion >= 40 ? a.motion : "non");
   var ae = aesScore(a); h += ae == null ? bar("Œil artistique", 0, "var(--bg3)", "en cours…") : bar("Œil artistique (lumière, couleurs, composition)", ae, colOf(ae), (a.aes).toFixed(1) + " / 10");
+  if (a.noiseView != null) { var nb = Math.max(0, Math.min(100, Math.round(100 - a.noiseView * 8))); h += "<div class='expert'>" + bar("Bruit (grain)", nb, colOf(nb), a.noiseView < 2 ? "très faible" : a.noiseView < 5 ? "faible" : a.noiseView < 8.5 ? "visible" : "fort") + "</div>"; }
   var ex = expoScore(a); h += bar("Exposition", ex, colOf(ex), ex + (a.expo.hi > 2 ? " · blancs brûlés " + a.expo.hi + " %" : "") + (a.expo.lo > 5 ? " · noirs " + a.expo.lo + " %" : ""));
   $("pvBars").innerHTML = h;
   var w = p.why || reasons(p);
@@ -752,7 +767,7 @@ function showPanel() {
     (fz ? "<button data-cal='fermes'" + (ov2.eyes === "fermes" ? " class='on'" : "") + ">Yeux fermés</button><button data-cal='ouverts'" + (ov2.eyes === "ouverts" ? " class='on'" : "") + ">Yeux ouverts</button>" : "") + "</div>";
   var cv = $("pvHist"), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
   if (a.hist) { var mx = Math.max.apply(null, a.hist.slice(1, 63)) || 1; x.fillStyle = "#9aa3b2"; a.hist.forEach(function (v, i) { var hh = Math.min(1, v / mx) * (cv.height - 4); x.fillRect(i * cv.width / 64, cv.height - hh, cv.width / 64 + 0.5, hh); }); }
-  $("pvExif").innerHTML = exifTxt(a) + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px" + (p.raw ? " (aperçu du RAW)" : "") : "");
+  $("pvExif").innerHTML = (exifTxt(a) || "⚠ Aucune information de prise de vue (EXIF)") + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px · " + String(a.mp || "").replace(".", ",") + " Mpx" + (a.jq ? " · JPEG qualité " + a.jq : "") + (p.raw ? " (aperçu du RAW)" : "") : "");
 }
 $("pvCal").addEventListener("click", function (e) { var b = e.target.closest("button[data-cal]"); if (!b) return; var p = S.byId[S.view[S.cur]]; if (p) calAdd(p, b.dataset.cal); });
 $("pvBtns").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setStatus(b.dataset.st); });

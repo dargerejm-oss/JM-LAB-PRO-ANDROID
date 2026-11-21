@@ -170,6 +170,63 @@ function creteBlur(o) {
   return Math.max(res[0], res[1]);
 }
 function creteScore(b) { return b == null ? null : Math.max(0, Math.min(100, Math.round((0.62 - b) / (0.62 - 0.30) * 100))); }
+/* ---------- qualite d'image : bruit, pixelisation, compression, definition ---------- */
+var STDQ = [16,11,10,16,24,40,51,61,12,12,14,19,26,58,60,55,14,13,16,24,40,57,69,56,14,17,22,29,51,87,80,62,18,22,37,56,68,109,103,77,24,35,55,64,81,104,113,92,49,64,78,87,103,121,120,101,72,92,95,98,112,100,103,99];
+function jpegQuality(b) { // qualite JPEG lue dans la table de quantification du fichier (marqueur DQT)
+  if (!b || b[0] !== 0xFF || b[1] !== 0xD8) return null;
+  var i = 2;
+  while (i < b.length - 4 && b[i] === 0xFF) {
+    var m = b[i + 1], len = b[i + 2] << 8 | b[i + 3];
+    if (m === 0xDB) {
+      var pq = b[i + 4] >> 4, q = [], o = i + 5;
+      for (var k = 0; k < 64; k++) q.push(pq ? (b[o + 2 * k] << 8 | b[o + 2 * k + 1]) : b[o + k]);
+      // la table est rangee en zigzag ; on compare les sommes (insensible a l'ordre)
+      var sum = q.reduce(function (a, v) { return a + v; }, 0), best = 50, bd = Infinity;
+      for (var Q = 1; Q <= 100; Q++) { var sc = Q < 50 ? 5000 / Q : 200 - 2 * Q, t = 0; for (k = 0; k < 64; k++) t += Math.max(1, Math.min(255, Math.floor((STDQ[k] * sc + 50) / 100))); var dd = Math.abs(t - sum); if (dd < bd) { bd = dd; best = Q; } }
+      return best;
+    }
+    if (m === 0xDA) break; i += 2 + len;
+  }
+  return null;
+}
+function noiseSigma(o) { // bruit (Immerkaer 1996) : filtre qui annule les zones lisses et garde le grain
+  if (!o) return null;
+  var g = o.g, w = o.w, h = o.h, sum = 0, n = 0;
+  for (var y = 1; y < h - 1; y++) for (var x = 1; x < w - 1; x++) {
+    var p = y * w + x, v = g[p - w - 1] - 2 * g[p - w] + g[p - w + 1] - 2 * g[p - 1] + 4 * g[p] - 2 * g[p + 1] + g[p + w - 1] - 2 * g[p + w] + g[p + w + 1];
+    sum += Math.abs(v); n++;
+  }
+  return n ? Math.sqrt(Math.PI / 2) * sum / (6 * n) : null;
+}
+function blockiness(o) { // petits carres de compression : ecarts plus forts tous les 8 pixels
+  if (!o || o.w < 64) return null;
+  var g = o.g, w = o.w, h = o.h, a = 0, na = 0, b = 0, nb = 0;
+  for (var y = 0; y < h; y++) for (var x = 1; x < w - 1; x++) { var d = Math.abs(g[y * w + x] - g[y * w + x - 1]); if (x % 8 === 0) { a += d; na++; } else { b += d; nb++; } }
+  return nb && b > 0 ? (a / na) / (b / nb) : null;
+}
+function pixelStep(o) { // pixelisation : un « escalier » regulier tous les k pixels (image agrandie sans lissage)
+  if (!o || o.w < 48) return 0;
+  var g = o.g, w = o.w, h = o.h, best = 0;
+  for (var k = 2; k <= 8; k++) {
+    var acc = new Float64Array(k), cnt = new Float64Array(k);
+    for (var y = 0; y < h; y += 2) for (var x = 1; x < w; x++) { var d = Math.abs(g[y * w + x] - g[y * w + x - 1]); acc[x % k] += d; cnt[x % k]++; }
+    var mx = 0, rest = 0, nr = 0; for (var i = 0; i < k; i++) { var m = acc[i] / Math.max(1, cnt[i]); if (m > mx) mx = m; }
+    for (i = 0; i < k; i++) { m = acc[i] / Math.max(1, cnt[i]); if (m < mx) { rest += m; nr++; } }
+    rest = nr ? rest / nr : mx;
+    if (mx > 2 && rest < mx * 0.25) best = Math.max(best, k);
+  }
+  return best;
+}
+function equalPairs(o) { // pixels repetes (image agrandie « au plus proche »)
+  if (!o) return null;
+  var g = o.g, w = o.w, h = o.h, e = 0, n = 0;
+  for (var y = 0; y < h; y += 2) for (var x = 1; x < w; x++) { var d = Math.abs(g[y * w + x] - g[y * w + x - 1]); if (d > 0.5) n++; else e++; }
+  return (e + n) ? e / (e + n) : null;
+}
+function fullCrop(bmp, cx, cy, size) { // morceau a 100 % (sans reduction)
+  return cropGray(bmp, cx - size / 2, cy - size / 2, size, size, size);
+}
+
 function toScore(v) { return Math.max(0, Math.min(100, Math.round((v - 0.40) / (0.80 - 0.40) * 100))); }
 
 /* horizon penche : parmi les bords forts, cherche une ligne longue presque horizontale (entre 0,8 et 8 degres) */
@@ -219,7 +276,7 @@ function colorSig(img) {
 }
 
 async function analyse(msg) {
-  var out = {id: msg.id, v: 2};
+  var out = {id: msg.id, v: 3};
   var blob = new Blob([msg.buf], {type: "image/jpeg"});
   // informations de prise de vue
   try {
@@ -275,6 +332,24 @@ async function analyse(msg) {
     if (r) { all.push(r); if (!best || r.v > best.v) { best = r; best.zone = {x: (cx - crop / 2) / W, y: (cy - crop / 2) / H, w: crop / W, h: crop / H}; } }
   }
   out.sharp = best ? toScore(best.v) : 0;
+  // qualite d'image : bruit dans les zones unies (les moins detaillees, ni trop sombres ni brulees)
+  try {
+    out.mp = Math.round(W * H / 1e5) / 10; out.jq = jpegQuality(new Uint8Array(msg.buf));
+    var flat = tiles.slice().sort(function (a, b) { return a.e - b.e; }).filter(function (t) {
+      var x0 = Math.floor(t.x * aw), y0 = Math.floor(t.y * ah), s2 = 0, n2 = 0; for (var yy = y0; yy < y0 + t.h * ah; yy += 4) for (var xx = x0; xx < x0 + t.w * aw; xx += 4) { s2 += g[yy * aw + xx]; n2++; } var mm = s2 / Math.max(1, n2); return mm > 35 && mm < 225;
+    }).slice(0, 3), sig = [];
+    flat.forEach(function (t) { var sz = Math.min(256, Math.floor(Math.min(t.w * W, t.h * H))); var r = noiseSigma(fullCrop(bmp, (t.x + t.w / 2) * W, (t.y + t.h / 2) * H, sz)); if (r != null) sig.push(r); });
+    sig.sort(function (a, b) { return a - b; });
+    var sFull = sig.length ? sig[0] : null; // la zone la plus calme : le grain, pas un detail
+    out.noise = sFull != null ? Math.round(sFull * 10) / 10 : null;
+    // vu a la taille d'un ecran (2400 px), le grain se moyenne
+    out.noiseView = sFull != null ? Math.round(sFull * Math.min(1, Math.sqrt(2400 / Math.max(W, H))) * 10) / 10 : null;
+    // zone la plus detaillee a 100 % : carres de compression, pixels repetes, image agrandie
+    var dt = tiles[0], cz = Math.min(320, Math.floor(Math.min(W, H) / 3)), oc = fullCrop(bmp, (dt.x + dt.w / 2) * W, (dt.y + dt.h / 2) * H, cz);
+    out.pix = oc ? pixelStep(oc) : 0;
+    var bF = creteBlur(oc), bH = creteBlur(cropGray(bmp, (dt.x + dt.w / 2) * W - cz, (dt.y + dt.h / 2) * H - cz, cz * 2, cz * 2, cz));
+    out.up = bF != null && bH != null ? Math.round((bF - bH) * 100) / 100 : null; // tres flou a 100 % mais net a 50 % : photo agrandie
+  } catch (e) {}
   // double verification par « re-floutage » sur la zone la plus nette, ramenee a une taille fixe
   if (best && best.zone) { var zb = creteBlur(cropGray(bmp, best.zone.x * W, best.zone.y * H, best.zone.w * W, best.zone.h * H, 360)); out.sharpBlur = zb != null ? Math.round(zb * 1000) / 1000 : null; var zc = creteScore(zb); if (zc != null) out.sharp = Math.min(out.sharp, Math.round(zc * 0.5 + out.sharp * 0.5)); }
   out.sharpRaw = best ? Math.round(best.max * 1000) / 1000 + "/" + Math.round(best.min * 1000) / 1000 : 0;

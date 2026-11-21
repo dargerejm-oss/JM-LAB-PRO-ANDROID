@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.2 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -44,6 +44,9 @@ Version 3.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 
 ## « Pas d'accord » (3.1)
 - Sous Garder / Rejeter : « Elle est floue », « Elle est nette », « Yeux fermés », « Yeux ouverts ». L'avis s'applique à la photo et règle les seuils (netteté des yeux, netteté générale, yeux fermés) : on cherche le seuil qui colle le mieux à vos verdicts sans trop s'éloigner de l'origine (`calFit`). Tout le dossier est revu aussitôt. Compteur et « Remettre à zéro » dans la colonne de gauche. Stocké dans `rp_cal` (navigateur de l'appli).
+
+## Qualité d'image (3.2)
+- Bruit (méthode d'Immerkær, zone la plus calme, ramené à une vue écran 2400 px), qualité JPEG lue dans la table de quantification du fichier, pixelisation (escalier régulier tous les k pixels), photo agrandie (très floue à 100 % mais nette à 50 %), définition (Mpx + taille de tirage à 200 dpi), photos sans EXIF. Raisons, score, filtres « Qualité d'image » et « Sans EXIF ». Version d'analyse `AVER = 3`.
 
 ## Fabrication
 - Code : `app/` (Electron). La fenêtre est dans `app/renderer/` (HTML / JavaScript), la même base servira pour Android.
