@@ -427,6 +427,7 @@ var D = EN ? {
 "Touchez OUVRIR IMAGE en haut":"Tap OPEN IMAGE at the top",
 "MODE D'EMPLOI":"USER GUIDE","Le guide illustré de l'appli, et son PDF":"The illustrated app guide, and its PDF",
 "EFFETS":"EFFECTS",
+"Protection hautes lumières":"Highlight protection",
 "PARTAGE":"SHARE"
 } : {};
 

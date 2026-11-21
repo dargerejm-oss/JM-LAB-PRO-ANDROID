@@ -208,3 +208,6 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 /* comparaison : plus de curseur sur la photo, appui long (ou 👁) pour voir l avant */
 #divider{display:none!important}
 #filteredCanvas{clip-path:none!important}
+/* pas de menu copier / selectionner sur les appuis longs (sauf dans les champs de saisie) */
+html,body,body *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea,select,[contenteditable],.hubOut,.hubTa{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}

@@ -110,6 +110,12 @@ public class MainActivity extends Activity {
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setAllowFileAccess(false);
         web.addJavascriptInterface(new Bridge(), "JMNative");
+        /* appui long : pas de menu systeme (copier / selectionner) sur l'appli */
+        web.setOnLongClickListener(vv -> {
+            WebView.HitTestResult h = web.getHitTestResult();
+            return h == null || h.getType() != WebView.HitTestResult.EDIT_TEXT_TYPE;
+        });
+        web.setHapticFeedbackEnabled(false);
 
         web.setWebViewClient(new WebViewClient() {
             @Override

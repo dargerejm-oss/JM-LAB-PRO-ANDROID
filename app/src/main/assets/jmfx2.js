@@ -13,6 +13,8 @@ function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); 
 
 /* ---------- correction automatique ProLab : activee / desactivee (memorise) ---------- */
 try{ window.__jmsProLabOff = localStorage.getItem("jms_prolab") === "off"; }catch(e){ window.__jmsProLabOff = false; }
+/* protection des hautes lumieres (evite les aplats et virages de couleur dans les zones tres claires) */
+try{ var hpv = localStorage.getItem("jms_hp"); window.__jmsHP = hpv === null ? 30 : +hpv; }catch(e){ window.__jmsHP = 30; }
 
 /* ---------- etat ---------- */
 var KEY = "jms_fx2";
@@ -452,7 +454,7 @@ var TOOLS = {
 };
 function paramTool(key){
   var def = TOOLS[key], ph = needPhoto(); if(!ph) return;
-  var all = get(), st = lookGet(all, key), first = !Object.keys(def.start).some(function(k){ return st[k]; });
+  var all = get(), st = lookGet(all, key), saved = all[key] ? JSON.parse(JSON.stringify(all[key])) : null, first = !Object.keys(def.start).some(function(k){ return st[k]; });
   if(first) Object.assign(st, def.start);
   var idx = 0, showOrig = false, P = def.params;
   var sz = Math.min(1, 1100 / Math.max(ph.width, ph.height)), base = cvs(ph.width * sz, ph.height * sz);
@@ -460,7 +462,7 @@ function paramTool(key){
   /* les courbes deja reglees sont visibles dans l'apercu */
   if(curveOn(all)) applyCurves(base.getContext("2d"), base.width, base.height, all);
   show('<div class="x2Top"><div class="jmsTitle">' + def.icon + ' ' + def.title + '</div>' +
-     '<button id="x2KEye" style="background:#3a3a3a">👁</button><button data-a="help" style="background:#3a3a3a">?</button></div>' +
+     '<button data-a="full" style="background:#3a3a3a">⛶</button><button id="x2KEye" style="background:#3a3a3a">👁</button><button data-a="help" style="background:#3a3a3a">?</button></div>' +
    '<div class="x2PvW" id="x2KW" style="position:relative;touch-action:none">' +
      '<canvas id="x2KC" style="display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none"></canvas>' +
      '<div id="x2KL" style="position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#000b;color:#fff;font-weight:900;font-size:17px;padding:8px 16px;border-radius:20px;white-space:nowrap;pointer-events:none"></div>' +
@@ -533,7 +535,8 @@ function paramTool(key){
   HH.pip = function(){ pipMode(!pip); };
   HH.zero = function(){ P.forEach(function(p){ st[p[0]] = 0; }); labels(); later(); };
   HH.help = function(){ var h = $("x2KH"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser : choisir le réglage • ↔ glisser : moins / plus • 👁 maintenu : sans l'outil • ✓ garder, ✕ annuler.", "↕ swipe: pick a setting • ↔ swipe: less / more • hold 👁: without the tool • ✓ keep, ✕ cancel."); };
-  HH.cancel = hide;
+  HH.full = function(){ var s2 = get(); s2[key] = st; put(s2); if(window.__jmsFull) window.__jmsFull(); };
+  HH.cancel = function(){ var s2 = get(); if(saved) s2[key] = saved; else delete s2[key]; put(s2); hide(); };
   HH.ok = function(){ var s2 = get(); s2[key] = st; put(s2); hide(); };
   function layout(){ if(!document.body.contains(cv)){ window.removeEventListener("resize", layout); return; } labels(); draw(); }
   if(def.pipette && !st.t && !st.ti) setTimeout(function(){ pipMode(true); }, 50);
@@ -960,7 +963,7 @@ function tune(){
   var sl = tuneSliders(); if(sl.length < 14){ alert(T("Réglages introuvables.", "Settings not found.")); return; }
   var start = sl.map(function(r){ return r.value; }), showOrig = false;
   show('<div class="x2Top"><div class="jmsTitle">🎛️ ' + T("RETOUCHES", "TUNE IMAGE") + '</div>' +
-     '<button id="x2TEye" style="background:#3a3a3a">👁</button>' +
+     '<button data-a="full" style="background:#3a3a3a">⛶</button><button id="x2TEye" style="background:#3a3a3a">👁</button>' +
      '<button data-a="undo" style="background:#3a3a3a">↶</button><button data-a="redo" style="background:#3a3a3a">↷</button>' +
      '<button data-a="help" style="background:#3a3a3a">?</button></div>' +
    '<div class="x2PvW" id="x2TW" style="position:relative;touch-action:none">' +
@@ -1033,6 +1036,7 @@ function tune(){
   HH.pick = function(){ var i = (tuneIdx + 1) % TUNE.length; if(menu.style.display === "block"){ menu.style.display = "none"; return; }
     drawMenu(tuneIdx); menu.style.pointerEvents = "auto";
     menu.onclick = function(e){ var d = e.target.closest("div[style]"); if(!d || d === menu) return; var k = Array.prototype.indexOf.call(menu.children, d); if(k >= 0){ tuneIdx = k; labels(); } menu.style.display = "none"; menu.style.pointerEvents = "none"; }; };
+  HH.full = function(){ if(window.__jmsFull) window.__jmsFull(); };
   HH.undo = function(){ var b = $("jxU"); if(b) b.click(); setTimeout(labels, 700); };
   HH.redo = function(){ var b = $("jxR2"); if(b) b.click(); setTimeout(labels, 700); };
   HH.auto = function(){ if(window.__jmsX && window.__jmsX.x_auto){ var A = window.alert; window.alert = function(){}; try{ window.__jmsX.x_auto(); }finally{ window.alert = A; } setTimeout(labels, 300); } };
@@ -1187,17 +1191,21 @@ function proLab(bar){
   if(!c){
     c = document.createElement("div"); c.id = "jx2Pro";
     c.innerHTML = '<label class="pChk"><input type="checkbox" id="x2PL"><span>✨ ' + T("Correction automatique ProLab", "ProLab auto correction") + '<small>' + T("Exposition automatique + rendu LABO PRO", "Automatic exposure + LABO PRO look") + '</small></span></label>' +
-      '<div class="pRow"><span style="font-weight:800;font-size:13px;color:#ccc">' + T("Intensité", "Strength") + '</span><input type="range" id="x2PD" min="0" max="100" step="1"><b id="x2PDv"></b></div>';
+      '<div class="pRow"><span style="font-weight:800;font-size:13px;color:#ccc">' + T("Intensité", "Strength") + '</span><input type="range" id="x2PD" min="0" max="100" step="1"><b id="x2PDv"></b></div>' +
+      '<div class="pRow pHp"><span style="font-weight:800;font-size:12px;color:#ccc;line-height:1.1">' + T("Protection<br>hautes lumières", "Highlight<br>protection") + '</span><input type="range" id="x2HP" min="0" max="100" step="5"><b id="x2HPv"></b></div>';
     c.querySelector("#x2PL").onchange = function(){
       window.__jmsProLabOff = !this.checked; try{ localStorage.setItem("jms_prolab", this.checked ? "on" : "off"); }catch(e){}
       c.classList.toggle("off", !this.checked); rerender();
     };
+    var hpT = 0;
+    c.querySelector("#x2HP").oninput = function(){ window.__jmsHP = +this.value; c.querySelector("#x2HPv").textContent = this.value + " %"; try{ localStorage.setItem("jms_hp", this.value); }catch(e){} clearTimeout(hpT); hpT = setTimeout(rerender, 150); };
     c.querySelector("#x2PD").oninput = function(){ var d = dosage(); if(d){ tuneSet(d, this.value); } c.querySelector("#x2PDv").textContent = this.value + " %"; };
   }
   if(c.previousSibling !== bar) bar.parentNode.insertBefore(c, bar.nextSibling);
   var d = dosage(), r = c.querySelector("#x2PD"), ck = c.querySelector("#x2PL");
   if(d){ r.min = d.min; r.max = d.max; r.step = d.step || 1; if(document.activeElement !== r && r.value !== d.value){ r.value = d.value; } c.querySelector("#x2PDv").textContent = d.value + " %"; }
   ck.checked = !window.__jmsProLabOff; c.classList.toggle("off", !!window.__jmsProLabOff);
+  var hr = c.querySelector("#x2HP"); if(document.activeElement !== hr && +hr.value !== +window.__jmsHP){ hr.value = window.__jmsHP; } c.querySelector("#x2HPv").textContent = (+window.__jmsHP) + " %";
 }
 
 /* ================= VUE EN GRAND (rendu final, zoom, appui long = original) ================= */
@@ -1239,6 +1247,37 @@ full.querySelector("#jxFullX").onclick = closeFull;
   fcv.onpointerup = up; fcv.onpointercancel = up;
   window.addEventListener("resize", fullDraw);
 })();
+/* ---------- APERCU FIDELE : l'apercu principal montre le meme rendu final que le plein ecran ---------- */
+var finC = document.createElement("canvas"); finC.id = "jxFinal";
+finC.style.cssText = "position:fixed;z-index:1000;display:none;pointer-events:none;background:#222";
+document.body.appendChild(finC);
+var finSig = "", finBusy = false, finImg = null;
+function stateSig(){
+  var c = document.getElementById("filteredCanvas"), a = "";
+  try{ var t = document.createElement("canvas"); t.width = t.height = 8; t.getContext("2d").drawImage(c, 0, 0, 8, 8); a = Array.prototype.join.call(t.getContext("2d").getImageData(0, 0, 8, 8).data, ","); }catch(e){}
+  return a + "|" + JSON.stringify(get()) + "|" + JSON.stringify(window.__jmsFX && window.__jmsFX.get ? window.__jmsFX.get() : {}) + "|" + JSON.stringify(geo) + "|" + heals.length + "|" + JSON.stringify(sels) + "|" + brushes.length + "|" + (dbl ? [dbl.x, dbl.y, dbl.s, dbl.rot, dbl.op, dbl.mode].join() : "");
+}
+function placeFinal(){
+  var f = document.querySelector(".fixed-top"); if(!f || !finImg){ finC.style.display = "none"; return; }
+  var r = f.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  finC.style.left = r.left + "px"; finC.style.top = r.top + "px"; finC.style.width = r.width + "px"; finC.style.height = r.height + "px";
+  var W = Math.round(r.width * dpr), H = Math.round(r.height * dpr); if(finC.width !== W || finC.height !== H){ finC.width = W; finC.height = H; }
+  var x = finC.getContext("2d"), k = Math.min(W / finImg.width, H / finImg.height), w = finImg.width * k, h = finImg.height * k;
+  x.fillStyle = "#222"; x.fillRect(0, 0, W, H); x.imageSmoothingQuality = "high"; x.drawImage(finImg, (W - w) / 2, (H - h) / 2, w, h);
+  finC.style.display = "block";
+}
+setInterval(async function(){
+  var c = document.getElementById("filteredCanvas"), f = document.querySelector(".fixed-top");
+  var on = c && c.style.display !== "none" && f && f.getBoundingClientRect().height > 60 && window.__jmsFX && window.__jmsFX.active({single:true});
+  if(!on){ finImg = null; finSig = ""; finC.style.display = "none"; return; }
+  if(finBusy) return;
+  var sg = stateSig();
+  if(sg === finSig){ placeFinal(); return; }
+  finBusy = true;
+  try{ var ph = photo(); if(ph){ var bmp = await createImageBitmap(ph); var out = await window.__jmsFX.render(bmp, {single:true}); if(bmp.close) bmp.close(); finImg = out; finSig = sg; placeFinal(); } }catch(e){ finC.style.display = "none"; }
+  finBusy = false;
+}, 450);
+
 /* ouverture : bouton ⛶ a cote de 👁 ↶ ↷, ou deux tapotements rapides sur la photo */
 function fullBtn(){
   var ur = document.getElementById("jxUR"); if(!ur || document.getElementById("jxFullBtn")) return;
