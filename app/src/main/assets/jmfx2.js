@@ -1200,6 +1200,64 @@ function proLab(bar){
   ck.checked = !window.__jmsProLabOff; c.classList.toggle("off", !!window.__jmsProLabOff);
 }
 
+/* ================= VUE EN GRAND (rendu final, zoom, appui long = original) ================= */
+var full = document.createElement("div"); full.id = "jxFull";
+full.style.cssText = "position:fixed;inset:0;z-index:3700;background:#000;display:none;flex-direction:column;touch-action:none";
+full.innerHTML = '<div style="flex:none;display:flex;align-items:center;gap:8px;padding:max(8px,env(safe-area-inset-top)) 10px 8px;background:#000c;color:#fff;position:absolute;left:0;right:0;top:0;z-index:2">' +
+  '<b style="flex:1;font-size:14px;letter-spacing:.06em">⛶ ' + T("APERÇU FINAL", "FINAL PREVIEW") + '</b>' +
+  '<span id="jxFullZ" style="font-size:12px;color:#bbb"></span><button id="jxFullX" style="border:0;border-radius:10px;background:#3a3a3a;color:#fff;font-weight:900;font-size:18px;width:44px;height:40px">✕</button></div>' +
+  '<div id="jxFullW" style="position:absolute;inset:0;touch-action:none"><canvas id="jxFullC" style="display:block;width:100%;height:100%;touch-action:none"></canvas></div>' +
+  '<div id="jxFullL" style="position:absolute;left:50%;top:64px;transform:translateX(-50%);background:#000c;color:#fff;font-weight:900;font-size:14px;padding:6px 14px;border-radius:16px;display:none;pointer-events:none">' + T("AVANT", "BEFORE") + '</div>' +
+  '<div id="jxFullB" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000c;color:#fff;font-weight:900;padding:10px 16px;border-radius:12px;display:none;pointer-events:none">⏳</div>' +
+  '<div style="position:absolute;left:0;right:0;bottom:max(10px,env(safe-area-inset-bottom));text-align:center;color:#ccc;font-size:12px;pointer-events:none">' + T("Deux doigts : zoomer • doigt maintenu : avant • ✕ : fermer", "Two fingers: zoom • hold: before • ✕: close") + '</div>';
+document.body.appendChild(full);
+var fcv = full.querySelector("#jxFullC"), fwr = full.querySelector("#jxFullW"), fImg = null, fBefore = null, fShowB = false;
+var FV = viewer(fcv, fwr, function(){ return fImg || {width:1, height:1}; });
+function fullDraw(){ if(full.style.display === "none" || !fImg) return; FV.size(); FV.draw(fShowB && fBefore ? fBefore : fImg); full.querySelector("#jxFullZ").textContent = FV.zoom > 1.01 ? "×" + (Math.round(FV.zoom * 10) / 10) : ""; }
+async function openFull(){
+  var ph = photo(); if(!ph) return;
+  fImg = ph; fBefore = null; FV.zoom = 1; FV.ox = 0; FV.oy = 0;
+  full.style.display = "flex"; full.querySelector("#jxFullB").style.display = "block"; fullDraw();
+  /* version avant correction a la meme taille */
+  if(natImg){ fBefore = cvs(ph.width, ph.height); fBefore.getContext("2d").drawImage(natImg, 0, 0, ph.width, ph.height); }
+  /* rendu final : tous les outils (courbes, selection, pinceau, recadrage, effets...) */
+  try{ if(window.__jmsFX && window.__jmsFX.active({single:true})){ var bmp = await createImageBitmap(ph); fImg = await window.__jmsFX.render(bmp, {single:true}); if(bmp.close) bmp.close(); } }catch(e){}
+  full.querySelector("#jxFullB").style.display = "none"; fullDraw();
+}
+function closeFull(){ full.style.display = "none"; fImg = fBefore = null; }
+full.querySelector("#jxFullX").onclick = closeFull;
+(function(){
+  var ptrs = {}, mode = null, hold = null, start = null;
+  fcv.onpointerdown = function(e){ fcv.setPointerCapture(e.pointerId); ptrs[e.pointerId] = {x:e.clientX, y:e.clientY}; var k = Object.keys(ptrs);
+    if(k.length === 1){ mode = "pan"; start = {x:e.clientX, y:e.clientY, ox:FV.ox, oy:FV.oy}; hold = setTimeout(function(){ if(mode === "pan" && start && !start.moved){ fShowB = true; full.querySelector("#jxFullL").style.display = "block"; fullDraw(); } }, 260); }
+    else if(k.length === 2){ clearTimeout(hold); mode = "pinch"; FV.pinchStart(ptrs[k[0]], ptrs[k[1]]); } };
+  fcv.onpointermove = function(e){ if(!ptrs[e.pointerId]) return; ptrs[e.pointerId] = {x:e.clientX, y:e.clientY}; var k = Object.keys(ptrs);
+    if(mode === "pinch" && k.length === 2){ FV.pinchMove(ptrs[k[0]], ptrs[k[1]]); fullDraw(); }
+    else if(mode === "pan" && start){ var dx = e.clientX - start.x, dy = e.clientY - start.y; if(Math.hypot(dx, dy) > 8){ start.moved = true; clearTimeout(hold); } if(start.moved && !fShowB){ var s = FV.scale() / FV.dpr; FV.ox = start.ox - dx / s; FV.oy = start.oy - dy / s; FV.clamp(); fullDraw(); } } };
+  function up(e){ delete ptrs[e.pointerId]; clearTimeout(hold); if(fShowB){ fShowB = false; full.querySelector("#jxFullL").style.display = "none"; fullDraw(); }
+    var k = Object.keys(ptrs); if(k.length === 1){ var q = ptrs[k[0]]; mode = "pan"; start = {x:q.x, y:q.y, ox:FV.ox, oy:FV.oy, moved:true}; } else if(!k.length){ mode = null; start = null; } }
+  fcv.onpointerup = up; fcv.onpointercancel = up;
+  window.addEventListener("resize", fullDraw);
+})();
+/* ouverture : bouton ⛶ a cote de 👁 ↶ ↷, ou deux tapotements rapides sur la photo */
+function fullBtn(){
+  var ur = document.getElementById("jxUR"); if(!ur || document.getElementById("jxFullBtn")) return;
+  var b = document.createElement("button"); b.id = "jxFullBtn"; b.textContent = "⛶"; b.title = T("Voir en grand", "View large"); b.onclick = openFull;
+  var eye = document.getElementById("jxEye"); ur.insertBefore(b, eye ? eye : ur.firstChild);
+}
+setInterval(fullBtn, 1000); setTimeout(fullBtn, 500);
+var lastTap = 0, tapPos = null;
+document.addEventListener("pointerup", function(e){
+  var f = document.querySelector(".fixed-top"); if(!f || !f.contains(e.target)) return;
+  var c = document.getElementById("filteredCanvas"); if(!c || c.style.display === "none") return;
+  var now = Date.now();
+  if(now - lastTap < 320 && tapPos && Math.hypot(e.clientX - tapPos.x, e.clientY - tapPos.y) < 30){ lastTap = 0; openFull(); }
+  else { lastTap = now; tapPos = {x:e.clientX, y:e.clientY}; }
+}, true);
+var oldBackF = window.__jmsBack2;
+window.__jmsBack2 = function(){ if(full.style.display !== "none"){ closeFull(); return true; } return oldBackF ? oldBackF() : false; };
+window.__jmsFull = openFull;
+
 /* ---------- AVANT / APRES : doigt maintenu sur la photo, ou bouton 👁 maintenu ---------- */
 var befC = document.createElement("canvas"); befC.id = "jxBefore2";
 befC.style.cssText = "position:fixed;z-index:1200;display:none;pointer-events:none;background:#222";

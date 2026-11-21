@@ -15,7 +15,7 @@
 - Dire clairement ce qui est publié et ce qui ne l'est pas encore.
 
 ## Travail en cours (à reprendre)
-Version 4.9 prête (pas encore publiée) : grille OUTILS complète (Retouches, Détails, Courbes, Balance des blancs,
+Version 4.10 (vue en grand + bouton retour corrigé) : grille OUTILS complète (Retouches, Détails, Courbes, Balance des blancs,
 Contraste des tons, Sélection, Pinceau, Correcteur, Recadrer, Théâtral, HDR, Double exposition, Éclat glamour, Effets).
 Reste à faire :
 1. **Mode d'emploi** FR + EN mis à jour (sources dans `store/manuel`, `PAGES` dans `jmabout.js`).

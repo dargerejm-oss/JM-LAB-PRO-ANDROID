@@ -38,7 +38,7 @@ var bx = $("jxBox"), H = {};
 function show(h){ bx.innerHTML = h; ov.classList.add("show"); }
 function hide(){ ov.classList.remove("show"); }
 ov.addEventListener("click", function(e){ var b = e.target.closest("[data-x]"); if(b && H[b.dataset.x]) H[b.dataset.x](b, e); });
-window.__jmsBack2 = function(){ if(ov.classList.contains("show")){ hide(); return true; } return false; };
+var oldBackX = window.__jmsBack2; window.__jmsBack2 = function(){ if(ov.classList.contains("show")){ hide(); return true; } return oldBackX ? oldBackX() : false; };
 H.close = hide;
 function opts(l, none){ return (none ? '<option value="">'+none+'</option>' : '') + l.map(function(p,i){ return '<option value="'+i+'">'+esc(p.name)+'</option>'; }).join(""); }
 
