@@ -4,7 +4,7 @@ name: Regard Pur - modeles IA
 on:
   workflow_dispatch:
   push:
-    paths: ['.github/workflows/rp-modeles.yml', 'projets/RegardPur/app/tools/esrgan_export.py']
+    paths: ['.github/workflows/rp-modeles.yml', '.github/rp_modeles/**']
 permissions:
   contents: write
 jobs:
@@ -21,8 +21,20 @@ jobs:
           mkdir -p m
           curl -fL -o m/realesr-general-x4v3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth
           curl -fL -o m/realesr-general-wdn-x4v3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
-          python projets/RegardPur/app/tools/esrgan_export.py m/realesr-general-x4v3.pth m/realesr-general-x4v3.onnx
-          python projets/RegardPur/app/tools/esrgan_export.py m/realesr-general-wdn-x4v3.pth m/realesr-general-wdn-x4v3.onnx
+          python .github/rp_modeles/esrgan_export.py m/realesr-general-x4v3.pth m/realesr-general-x4v3.onnx
+          python .github/rp_modeles/esrgan_export.py m/realesr-general-wdn-x4v3.pth m/realesr-general-wdn-x4v3.onnx
+      - name: SCUNet (bruit) et GFPGAN (visages) vers ONNX
+        run: |
+          pip install timm einops
+          mkdir -p scunet_src gfpgan_src
+          curl -fL -o scunet_src/network_scunet.py https://raw.githubusercontent.com/cszn/SCUNet/main/models/network_scunet.py
+          curl -fL -o m/scunet_color_real_psnr.pth https://github.com/cszn/KAIR/releases/download/v1.0/scunet_color_real_psnr.pth
+          python .github/rp_modeles/scunet_export.py m/scunet_color_real_psnr.pth m/scunet_color_real_psnr.onnx
+          curl -fL -o gfpgan_src/gfpganv1_clean_arch.py https://raw.githubusercontent.com/TencentARC/GFPGAN/master/gfpgan/archs/gfpganv1_clean_arch.py
+          curl -fL -o gfpgan_src/stylegan2_clean_arch.py https://raw.githubusercontent.com/TencentARC/GFPGAN/master/gfpgan/archs/stylegan2_clean_arch.py
+          sed -i 's/from .stylegan2_clean_arch/from stylegan2_clean_arch/' gfpgan_src/gfpganv1_clean_arch.py
+          curl -fL -o m/GFPGANv1.4.pth https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth
+          python .github/rp_modeles/gfpgan_export.py m/GFPGANv1.4.pth m/gfpgan_v14.onnx
       - name: NAFNet (OpenCV) et fiches des modeles
         run: |
           curl -fL -o m/deblurring_nafnet.onnx https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx || true
@@ -38,5 +50,5 @@ jobs:
       - name: Publication regardpur-modeles
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
-          gh release view regardpur-modeles >/dev/null 2>&1 || gh release create regardpur-modeles --prerelease --title "Regard Pur - modeles IA" --notes "Modeles d'IA locale pour Regard Pur (Real-ESRGAN BSD-3, NAFNet MIT via OpenCV)." --target ${{ github.sha }}
+          gh release view regardpur-modeles >/dev/null 2>&1 || gh release create regardpur-modeles --prerelease --title "Regard Pur - modeles IA" --notes "Modeles d'IA locale pour Regard Pur (Real-ESRGAN BSD-3, NAFNet MIT via OpenCV, SCUNet Apache-2.0, GFPGAN Apache-2.0)." --target ${{ github.sha }}
           gh release upload regardpur-modeles m/*.onnx m/nafnet_* --clobber
