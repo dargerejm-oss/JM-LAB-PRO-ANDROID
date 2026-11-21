@@ -226,6 +226,7 @@ function reasons(p) {
   if (!a.exif || (!a.exif.date && !a.exif.model && !a.exif.make)) warn.push("Sans EXIF (copie, capture ou photo envoyée par message ?)");
   var ae = aesScore(a); if (ae != null && ae >= 72 && !rej.length && !warn.some(function (t) { return /Netteté|bougé/.test(t); })) good.push("Belle image (œil artistique)");
   if (a.cadre) warn.push("Cadre ajouté (export déjà finalisé ?)");
+  if (p.sig != null && p.sig >= 0.6) warn.push("Signature / filigrane trouvé (export déjà signé ?)");
   if (p.dup >= 0) { var dg = S.dups[p.dup], od = S.byId[dg.orig];
     if (p.dupOrig) good.push("Original gardé (" + dg.length + " versions de cette photo)");
     else warn.push("Doublon : autre version de " + (od ? od.name : "une photo") + (p.dupSize ? " (taille différente)" : ""));
@@ -299,6 +300,67 @@ function rejectDups() {
   S.photos.forEach(function (p) { if (p.dup >= 0 && !p.dupOrig && p.status !== "R") { p.status = "R"; p.auto = false; n++; updCard(p); } });
   drawFilters(); showPanel(); saveSoon(); toast(n ? n + " doublon" + (n > 1 ? "s rejetés" : " rejeté") + " : les originaux sont gardés (Ctrl+Z pour annuler)." : "Aucun doublon à rejeter.", 4000);
 }
+/* signature / filigrane (repris d'AUDIT PHOTOS PRO) : correlation normalisee avec l'image de la signature, dans les coins
+   du haut et la bande du bas, a plusieurs tailles ; signature claire ou foncee (valeur absolue de la correlation) */
+var SIG = null; try { SIG = JSON.parse(localStorage.getItem("rp_sig") || "null"); } catch (e) {}
+function grayOfCanvas(c) { var d = c.getContext("2d", {willReadFrequently: true}).getImageData(0, 0, c.width, c.height).data, g = new Float32Array(c.width * c.height); for (var i = 0; i < g.length; i++) g[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]; return g; }
+function hipass(g, w, h, r) { // retire le fond (moyenne locale) : seuls les traits fins comptent, quel que soit le fond
+  var t = new Float32Array(w * h), o = new Float32Array(w * h), x, y, s, n;
+  for (y = 0; y < h; y++) { s = 0; n = 0; for (x = -r; x < w + r; x++) { if (x + r < w && x + r >= 0) { s += g[y * w + x + r]; n++; } if (x - r - 1 >= 0) { s -= g[y * w + x - r - 1]; n--; } if (x >= 0 && x < w) t[y * w + x] = s / n; } }
+  for (x = 0; x < w; x++) { s = 0; n = 0; for (y = -r; y < h + r; y++) { if (y + r < h && y + r >= 0) { s += t[(y + r) * w + x]; n++; } if (y - r - 1 >= 0) { s -= t[(y - r - 1) * w + x]; n--; } if (y >= 0 && y < h) o[y * w + x] = g[y * w + x] - s / n; } }
+  return o;
+}
+function shrink(src, sw, sh, w, h) { var c = new OffscreenCanvas(w, h), x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(src, 0, 0, sw, sh, 0, 0, w, h); return c; }
+function ncc(Z, zw, zh, T, tw, th) {
+  var n = tw * th, tm = 0, i, x, y; for (i = 0; i < n; i++) tm += T[i]; tm /= n; var Tc = new Float32Array(n), ts = 0; for (i = 0; i < n; i++) { Tc[i] = T[i] - tm; ts += Tc[i] * Tc[i]; } ts = Math.sqrt(ts); if (ts < 1e-3) return 0;
+  var I = new Float64Array((zw + 1) * (zh + 1)), I2 = new Float64Array((zw + 1) * (zh + 1)), W1 = zw + 1;
+  for (y = 0; y < zh; y++) { var a = 0, a2 = 0; for (x = 0; x < zw; x++) { var v = Z[y * zw + x]; a += v; a2 += v * v; I[(y + 1) * W1 + x + 1] = I[y * W1 + x + 1] + a; I2[(y + 1) * W1 + x + 1] = I2[y * W1 + x + 1] + a2; } }
+  var best = 0;
+  for (y = 0; y + th <= zh; y++) for (x = 0; x + tw <= zw; x++) {
+    var s1 = I[(y + th) * W1 + x + tw] - I[y * W1 + x + tw] - I[(y + th) * W1 + x] + I[y * W1 + x], s2 = I2[(y + th) * W1 + x + tw] - I2[y * W1 + x + tw] - I2[(y + th) * W1 + x] + I2[y * W1 + x];
+    var zs = Math.sqrt(Math.max(0, s2 - s1 * s1 / n)); if (zs < 1e-3) continue;
+    var c = 0; for (var yy = 0; yy < th; yy++) { var zo = (y + yy) * zw + x, to = yy * tw; for (var xx = 0; xx < tw; xx++) c += Z[zo + xx] * Tc[to + xx]; }
+    c = Math.abs(c / (zs * ts)); if (c > best) best = c;
+  }
+  return best;
+}
+async function sigScore(p, tmpl) {
+  var by = await readBytes(p, true), bm;
+  if (by && !p.heic) { try { bm = await createImageBitmap(new Blob([by]), {imageOrientation: "from-image"}); var k0 = Math.min(1, 1200 / Math.max(bm.width, bm.height)); if (k0 < 1) { var b2 = await createImageBitmap(bm, {resizeWidth: Math.round(bm.width * k0), resizeHeight: Math.round(bm.height * k0), resizeQuality: "high"}); bm.close(); bm = b2; } } catch (e) { bm = null; } }
+  if (!bm) { if (!p.thumbUrl) return null; bm = await createImageBitmap(await (await fetch(p.thumbUrl)).blob()); }
+  var W = bm.width, H = bm.height, best = 0;
+  var zones = [[0, 0, W / 4, H / 4], [W * 3 / 4, 0, W / 4, H / 4], [0, H * 3 / 4, W, H / 4]];
+  var RL = [0.08, 0.11, 0.14, 0.17, 0.2, 0.24, 0.29, 0.35];
+  for (var k = 0; k < RL.length; k++) {
+    var rel = RL[k], tw0 = W * rel, th0 = tw0 * tmpl.h / tmpl.w, f = Math.max(1, tw0 / 64), tw = Math.max(8, Math.round(tw0 / f)), th = Math.max(4, Math.round(th0 / f));
+    var T = hipass(grayOfCanvas(shrink(tmpl.img, tmpl.w, tmpl.h, tw, th)), tw, th, 3);
+    for (var z = 0; z < zones.length; z++) { var Z = zones[z], zw = Math.round(Z[2] / f), zh = Math.round(Z[3] / f); if (zw <= tw || zh <= th) continue;
+      var zc = new OffscreenCanvas(zw, zh); zc.getContext("2d").drawImage(bm, Z[0], Z[1], Z[2], Z[3], 0, 0, zw, zh);
+      best = Math.max(best, ncc(hipass(grayOfCanvas(zc), zw, zh, 3), zw, zh, T, tw, th)); }
+  }
+  bm.close(); return Math.round(best * 100) / 100;
+}
+async function sigScan() {
+  if (!SIG) return; var im = new Image(); im.src = SIG.url; await im.decode();
+  var tmpl = {img: im, w: im.naturalWidth, h: im.naturalHeight}, L = S.photos.filter(function (p) { return p.thumbUrl; }), t0 = Date.now();
+  for (var i = 0; i < L.length; i++) {
+    try { L[i].sig = await sigScore(L[i], tmpl); } catch (e) {}
+    if (i % 10 === 0) { $("sigInfo").textContent = "⏳ " + (i + 1) + " / " + L.length; await new Promise(function (r) { setTimeout(r, 0); }); }
+  }
+  var n = L.filter(function (p) { return p.sig >= 0.6; }).length;
+  $("sigInfo").textContent = "Signature trouvée sur " + n + " / " + L.length + " (" + Math.round((Date.now() - t0) / 1000) + " s)";
+  rescore(); refresh(false); drawFilters(); saveSoon();
+}
+$("bSig").onclick = function () { $("fSig").click(); };
+$("fSig").addEventListener("change", function () {
+  var f = this.files[0]; if (!f) return; var rd = new FileReader();
+  rd.onload = function () { var im = new Image(); im.onload = function () { var k = Math.min(1, 240 / im.naturalWidth), c = document.createElement("canvas"); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+    SIG = {url: c.toDataURL("image/png"), name: f.name}; try { localStorage.setItem("rp_sig", JSON.stringify(SIG)); } catch (e) {} sigUi(); sigScan(); }; im.src = rd.result; };
+  rd.readAsDataURL(f);
+});
+$("bSigScan").onclick = function () { sigScan(); };
+function sigUi() { $("bSigScan").style.display = SIG ? "" : "none"; if (SIG && !/⏳|trouvée/.test($("sigInfo").textContent)) $("sigInfo").textContent = SIG.name; }
+sigUi();
 function rescore() { S.photos.forEach(function (p) { p.score = score(p); }); buildGroups(); buildDups(); S.photos.forEach(function (p) { p.why = reasons(p); }); }
 
 /* ---------------- ouverture d'un dossier ---------------- */
@@ -327,7 +389,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -343,7 +405,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -601,7 +663,9 @@ var ISSUES = [
   ["groups", "Rafales et séries", function (p) { return p.g >= 0; }],
   ["dups", "Doublons (même photo, autre fichier)", function (p) { return p.dup >= 0; }],
   ["dupsize", "Doublons de taille différente", function (p) { return p.dup >= 0 && p.dupSize; }],
-  ["cadre", "Cadre ajouté", function (p) { return !!(p.a && p.a.cadre); }]
+  ["cadre", "Cadre ajouté", function (p) { return !!(p.a && p.a.cadre); }],
+  ["sig", "Avec ma signature", function (p) { return p.sig != null && p.sig >= 0.6; }],
+  ["nosig", "Sans ma signature", function (p) { return p.sig != null && p.sig < 0.6; }]
 ];
 function has(p, re) { var w = p.why; if (!w) return false; return w.rej.concat(w.warn).some(function (t) { return re.test(t); }); }
 function fnOf(k) {

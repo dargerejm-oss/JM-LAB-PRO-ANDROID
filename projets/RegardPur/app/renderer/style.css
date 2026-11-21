@@ -293,3 +293,4 @@ body.tab-exporter #side,body.tab-exporter #panel{display:none}
 #rtTop .aiBtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:2px 0 4px}
 #rtTop .aiBtns button{padding:5px 2px;font-size:11px}
 #rtTop .aiBtns button:disabled{opacity:.45}
+.sigRow{display:flex;gap:4px;align-items:center;margin:6px 0;flex-wrap:wrap}.sigRow #sigInfo{font-size:11px;color:var(--mut)}
