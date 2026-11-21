@@ -393,7 +393,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; p.rot = o.rot || 0; p.qc = o.qc || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -409,7 +409,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -726,10 +726,11 @@ function buildCards() {
 }
 function updCard(p) {
   var c = cards[p.id]; if (!c) return;
+  c.classList.toggle("qc", !!p.qc);
   var im = c.querySelector(".im");
   if (p.thumbUrl && !im.querySelector("img")) { im.innerHTML = '<img alt="">'; im.querySelector("img").src = p.thumbUrl; }
   else if (p.thumbUrl && im.querySelector("img").src !== p.thumbUrl) im.querySelector("img").src = p.thumbUrl;
-  var ti = im.querySelector("img"); if (ti) ti.style.transform = p.quick && p.quick !== 0.001 ? "rotate(" + p.quick + "deg)" : "";
+  var ti = im.querySelector("img"); if (ti) ti.style.transform = (p.quick && p.quick !== 0.001 ? "rotate(" + p.quick + "deg)" : "") + (p.rot ? " rotate(" + p.rot + "deg)" : "");
   var cls = "card" + (p.status ? " " + p.status : "") + (p.auto && p.status ? " auto" : "") + (S.view[S.cur] === p.id ? " cur" : "") + (S.sel.has(p.id) ? " sel" : "") + (p.best && $("cGroup").checked ? " best" : "") + (p.g >= 0 && p.g === S.openGroup ? " open" : "");
   if (c.className !== cls) c.className = cls;
   var extra = im.querySelectorAll(".sc,.tags,.grp"); Array.prototype.forEach.call(extra, function (x) { x.remove(); });
@@ -1010,13 +1011,14 @@ function devShow(p) {
 }
 /* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
 function devStyle(p) {
-  if (!p.dev && !p.adj && !p.ret && !p.heals) return null;
+  if (!p.dev && !p.adj && !p.ret && !p.heals) return p.rot ? {rotOnly: true, rot: p.rot, q: 95} : null;
   var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   if (d.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
   if (p.ret) o.ret = rpEff(p.ret); if (p.heals) o.heals = p.heals;
+  if (p.rot) o.rot = p.rot;
   return o;
 }
 function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
@@ -1267,7 +1269,7 @@ function rpDraw() {
 function rpPreview() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
   var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
-  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm && !dst.tilt) dst = null; }
+  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm && !dst.tilt && !dst.rot) dst = null; }
   clearTimeout(rp.t);
   rp.t = setTimeout(function () {
     if (!eff && !heals.length && !dst) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
@@ -1746,6 +1748,7 @@ function styleFor(p, base) {
   if (REND.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
   if (p.ret) o.ret = rpEff(p.ret);
   if (p.heals) o.heals = p.heals;
+  if (p.rot) o.rot = p.rot;
   var ad = p.adj || adjBias(p);
   if (ad) { o.v = o.v || {}; o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100) / 0.85 * 0.85; o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   return o;
@@ -1805,12 +1808,12 @@ async function doExport() {
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
-      var nm = REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
+      var nm = st2.rotOnly ? pick[i].name.replace(/\.[^.]+$/, "") : REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
       try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
     } else if (pick[i].ai) { // seulement l'amelioration IA : on livre la version amelioree a cote de l'original
       try { await N.copyAs(pick[i].ai.file, join(dest, pick[i].name.replace(/\.[^.]+$/, "") + "_IA.jpg")); } catch (e) { err++; }
     }
-    if (withOrig || !st2) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
+    if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
     step();
   }
   for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }
@@ -1927,6 +1930,34 @@ function guide(i) {
 
 /* ---------------- fenetres de dialogue ---------------- */
 var dlgCb = null;
+/* repris de VISIONNEUSE_ENREGISTRE : tourner d'un quart de tour (applique a l'export, jamais a l'original),
+   corbeille de Windows (recuperable), copie rapide d'une touche vers un dossier toujours le meme */
+function rotate(delta) {
+  var L = fixTargets(); if (!L.length) return;
+  L.forEach(function (p) { p.rot = (((p.rot || 0) + delta) % 360 + 360) % 360; updCard(p); full.cache.delete(p.id); });
+  saveSoon(); if ($("loupe").classList.contains("show")) rpPreview();
+  toast("↻ Rotation " + (delta < 0 ? "à gauche" : "à droite") + (L.some(function (p) { return p.raw; }) ? " (RAW : appliquée à l'export JPEG seulement)" : " — appliquée à l'export, l'original n'est pas modifié"));
+}
+function trashSel() {
+  if (!N) return; var L = fixTargets(); if (!L.length) return;
+  dialog("<h3>Mettre à la corbeille ?</h3><p>" + (L.length > 1 ? L.length + " photos" : L[0].name) + " iront dans la Corbeille de Windows : vous pourrez les récupérer.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='yes' class='pri'>Corbeille</button></div>", async function (c) {
+    if (c !== "yes") return; var n = 0;
+    for (var i = 0; i < L.length; i++) { try { await N.trash(L[i].path); n++; var j = S.photos.indexOf(L[i]); if (j >= 0) S.photos.splice(j, 1); delete S.byId[L[i].id]; S.sel.delete(L[i].id); } catch (e) {} }
+    rescore(); refresh(false); drawFilters(); saveSoon(); toast(n + " photo" + (n > 1 ? "s" : "") + " à la corbeille.");
+  });
+}
+var QC = null; try { QC = localStorage.getItem("rp_qc") || null; } catch (e) {}
+async function quickCopy() {
+  if (!N) return; var L = fixTargets(); if (!L.length) return;
+  if (!QC) { QC = await N.pickDir("Dossier de copie rapide (choisi une seule fois)", S.dir); if (!QC) return; try { localStorage.setItem("rp_qc", QC); } catch (e) {} }
+  var n = 0, dj = 0;
+  for (var i = 0; i < L.length; i++) { var p = L[i]; if (p.qc) { dj++; continue; }
+    try { var st = p.rot && !p.raw ? devStyle(p) : null;
+      if (st && st.rotOnly) { var jpg = await developOne(p, st); await N.writeBin(join(QC, p.name.replace(/\.[^.]+$/, "") + ".jpg"), jpg); }
+      else await N.copyAs(p.path, join(QC, p.name));
+      p.qc = true; n++; updCard(p); } catch (e) {} }
+  saveSoon(); toast((n ? n + " copiée" + (n > 1 ? "s" : "") + " vers « " + QC.split(/[\\/]/).pop() + " »" : "") + (dj ? (n ? " · " : "") + dj + " déjà copiée" + (dj > 1 ? "s" : "") : "") + " (touche S ; Maj+S pour changer de dossier)");
+}
 function dialog(html, cb) { $("dlgBox").innerHTML = html; $("dlg").classList.add("show"); dlgCb = cb || null; }
 function closeDialog() { $("dlg").classList.remove("show"); }
 $("dlg").addEventListener("click", function (e) {
@@ -1969,6 +2000,7 @@ document.addEventListener("keydown", function (e) {
     case "ArrowDown": if (inLp) setCur(S.cur + 1); else setCur(S.cur + cols()); break;
     case "ArrowUp": if (inLp) setCur(S.cur - 1); else setCur(S.cur - cols()); break;
     case "Home": setCur(0); break;
+    case "Delete": trashSel(); break;
     case "End": setCur(S.view.length - 1); break;
     case "Enter": if (!inLp) openLoupe(); break;
     case "Escape": if (inLp) closeLoupe(); else { S.sel.clear(); S.photos.forEach(updCard); showPanel(); } break;
@@ -1980,6 +2012,9 @@ document.addEventListener("keydown", function (e) {
       else if (l === "c") openCompare();
       else if (l === "z") { if (!inLp) openLoupe(); $("lpZoom").click(); }
       else if (l === "b" && S.tab === "retoucher") { abToggle(); }
+      else if (k === "[") rotate(-90); else if (k === "]") rotate(90);
+      else if (k === "S") { QC = null; try { localStorage.removeItem("rp_qc"); } catch (e2) {} quickCopy(); }
+      else if (l === "s") quickCopy();
       else if (l === "f") { $("lpMarks").checked = !$("lpMarks").checked; if (inLp) showLoupe(); }
       else if (l === "g") { $("cGroup").checked = !$("cGroup").checked; S.openGroup = -1; refresh(); }
       else return;

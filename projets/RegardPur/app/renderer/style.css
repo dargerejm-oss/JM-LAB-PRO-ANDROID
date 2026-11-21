@@ -304,3 +304,4 @@ body.tab-exporter #side,body.tab-exporter #panel{display:none}
 #lpView.ab #abWrap,#lpView.ab #abLine{display:block}
 body:not(.tab-retoucher) .rtOnly{display:none}
 #sessions .flt small{display:block;color:var(--mut);font-size:10.5px}
+.card.qc .im::after{content:"✓ copiée";position:absolute;left:4px;bottom:4px;background:#1f7a3a;color:#fff;font-size:10px;padding:1px 5px;border-radius:4px}.card .im{position:relative}

@@ -475,7 +475,13 @@ function exifOf(buf) {
 /* rendu « JM LAB PRO » d'une image (en place) : correction de categorie, profil + ProLab + curseurs, peau protegee, courbe.
    Utilise a l'export (pleine resolution) ET pour l'apercu de l'etape Retoucher : meme resultat. */
 var DBI = null;
+function rotQ(c, deg) { // quart de tour dans le sens des aiguilles d'une montre (90 / 180 / 270)
+  deg = ((deg % 360) + 360) % 360; if (!deg) return c;
+  var sw = deg === 180, W = sw ? c.width : c.height, H = sw ? c.height : c.width, o = canvas(W, H), x = o.getContext("2d");
+  x.translate(W / 2, H / 2); x.rotate(deg * Math.PI / 180); x.drawImage(c, -c.width / 2, -c.height / 2); return o;
+}
 function renderStyle(c, S) {
+  if (S.rotOnly) return;
   if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; }
   // defloutage (CORRECTION FLOU PRO) : avant les reglages de tons, sur les pixels d'origine
   DBI = null;
@@ -576,6 +582,7 @@ async function develop(m) {
     var c2 = canvas(W, H), x2 = c2.getContext("2d"); x2.imageSmoothingQuality = "high";
     x2.translate(W / 2, H / 2); x2.rotate(-th); x2.scale(kz, kz); x2.drawImage(c, -W / 2, -H / 2); c = c2;
   }
+  if (S.rot) c = rotQ(c, S.rot);
   var out = new Uint8Array(await (await c.convertToBlob({type: "image/jpeg", quality: (S.q || 92) / 100})).arrayBuffer());
   var ex = m.heic ? null : exifOf(new Uint8Array(m.buf));
   if (ex) { var r = new Uint8Array(out.length + ex.length); r.set(out.subarray(0, 2), 0); r.set(ex, 2); r.set(out.subarray(2), 2 + ex.length); out = r; }
@@ -598,6 +605,7 @@ self.onmessage = function (e) {
       DBI = null; if (m.style) renderStyle(cv, m.style);
       var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;
       if (m.style && m.style.tilt) { var th = m.style.tilt * Math.PI / 180, W2 = cv.width, H2 = cv.height, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W2 * cs + H2 * sn) / W2, (W2 * sn + H2 * cs) / H2), c3 = canvas(W2, H2), x3 = c3.getContext("2d"); x3.imageSmoothingQuality = "high"; x3.translate(W2 / 2, H2 / 2); x3.rotate(-th); x3.scale(kz, kz); x3.drawImage(cv, -W2 / 2, -H2 / 2); cv = c3; }
+      if (m.style && m.style.rot) cv = rotQ(cv, m.style.rot);
       return {b: await cv.convertToBlob({type: "image/jpeg", quality: 0.9}), n: n};
     }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n, db: DBI}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
     return;
