@@ -27,10 +27,13 @@ document.addEventListener("change", function(e){ var t = e.target; if(t && t.typ
 function isLin(p){ return p.length === 2 && p[0][0] === 0 && p[0][1] === 0 && p[1][0] === 255 && p[1][1] === 255; }
 function curveOn(s){ return !(isLin(s.curve.m) && isLin(s.curve.r) && isLin(s.curve.g) && isLin(s.curve.b)); }
 function geoOn(){ return !!(geo.r90 || geo.flip || geo.rot || geo.crop); }
-function active(Q){ var s = get(); return curveOn(s) || !!(Q && Q.single && (geoOn() || heals.length)); }
+function active(Q){ var s = get(); return curveOn(s) || lookOn(s) || !!(Q && Q.single && (geoOn() || heals.length)); }
 function summary(){
   var s = get(), a = [];
   if(curveOn(s)) a.push(T("courbes", "curves"));
+  if(detailsOn(s)) a.push(T("détails", "details"));
+  if(dramaOn(s)) a.push(T("théâtral", "drama"));
+  if(glowOn(s)) a.push(T("éclat glamour", "glamour glow"));
   return a.join(" • ");
 }
 
@@ -329,6 +332,161 @@ function healer(){
   window.addEventListener("resize", layout); requestAnimationFrame(layout);
 }
 
+/* ================= DETAILS, THEATRAL, ECLAT GLAMOUR =================
+   Calcules avec les operations de dessin accelerees du telephone (flous, melanges, filtres) :
+   rapides, meme en pleine taille. Ils s'appliquent a la photo enregistree et au lot. */
+var LD = {details:{s:0, n:0}, drama:{f:0, sat:0, st:0}, glow:{g:0, sat:0, w:0}};
+function lookGet(s, k){ return Object.assign({}, LD[k], s[k] || {}); }
+function detailsOn(s){ var d = lookGet(s, "details"); return !!(d.s || d.n); }
+function dramaOn(s){ return lookGet(s, "drama").f > 0; }
+function glowOn(s){ var g = lookGet(s, "glow"); return !!(g.g || g.sat || g.w); }
+function lookOn(s){ return detailsOn(s) || dramaOn(s) || glowOn(s); }
+/* passe-haut centre sur le gris : base de la structure et de la nettete */
+function highpass(src, r){
+  var w = src.width, h = src.height, hp = cvs(w, h), hx = hp.getContext("2d"), inv = cvs(w, h), ix = inv.getContext("2d");
+  hx.drawImage(src, 0, 0); ix.filter = "blur(" + Math.max(0.6, r).toFixed(1) + "px) invert(1)"; ix.drawImage(src, 0, 0);
+  hx.globalAlpha = 0.5; hx.drawImage(inv, 0, 0); return hp;
+}
+function blend(c, layer, mode, a){
+  if(a <= 0) return; var x = c.getContext("2d"); x.save(); x.globalCompositeOperation = mode;
+  while(a > 0){ x.globalAlpha = Math.min(1, a); x.drawImage(layer, 0, 0); a -= 1; }
+  x.restore();
+}
+function filtered(c, f){ var t = cvs(c.width, c.height), x = t.getContext("2d"); x.filter = f; x.drawImage(c, 0, 0); return t; }
+function looks(src, s){
+  if(!lookOn(s)) return src;
+  var c = cvs(src.width, src.height); c.getContext("2d").drawImage(src, 0, 0);
+  var mn = Math.min(c.width, c.height);
+  var d = lookGet(s, "details");
+  if(d.s > 0) blend(c, highpass(c, mn / 110), "overlay", d.s / 100 * 1.1);
+  if(d.s < 0){ var bl = filtered(c, "blur(" + (mn / 260).toFixed(1) + "px)"); blend(c, bl, "source-over", -d.s / 100 * 0.6); }
+  if(d.n > 0) blend(c, highpass(c, Math.max(0.8, mn / 1000)), "overlay", d.n / 100 * 1.6);
+  var m = lookGet(s, "drama");
+  if(m.f > 0){
+    var k = m.f / 100, st = m.st | 0, rad = st % 2 ? mn / 18 : mn / 32;
+    blend(c, highpass(c, rad), "overlay", k * (st % 2 ? 2.2 : 1.6));
+    var br = st < 2 ? 1 + 0.06 * k : 1 - (st === 2 ? 0.12 : 0.2) * k, ct = 1 + (st % 2 ? 0.12 : 0.05) * k, sa = Math.max(0, 1 + (st < 2 ? 0.1 : -0.35) * k + m.sat / 100);
+    var t = filtered(c, "brightness(" + br.toFixed(3) + ") contrast(" + ct.toFixed(3) + ") saturate(" + sa.toFixed(3) + ")");
+    c.getContext("2d").drawImage(t, 0, 0);
+  }
+  var g = lookGet(s, "glow");
+  if(g.g > 0){
+    var gl = filtered(c, "blur(" + (mn / 45).toFixed(1) + "px) brightness(1.12)");
+    blend(c, gl, "screen", g.g / 100 * 0.5); blend(c, gl, "soft-light", g.g / 100 * 0.6);
+  }
+  if(g.sat) c.getContext("2d").drawImage(filtered(c, "saturate(" + Math.max(0, 1 + g.sat / 100).toFixed(3) + ")"), 0, 0);
+  if(g.w){ var x = c.getContext("2d"); x.save(); x.globalCompositeOperation = "soft-light"; x.globalAlpha = Math.abs(g.w) / 100 * 0.55; x.fillStyle = g.w > 0 ? "rgb(255,150,40)" : "rgb(40,120,255)"; x.fillRect(0, 0, c.width, c.height); x.restore(); }
+  return c;
+}
+
+/* ---------- ecran de reglage commun (gestes facon Snapseed) ---------- */
+var TOOLS = {
+  details:{title:T("DÉTAILS", "DETAILS"), icon:"🔎", params:[["s", T("Structure", "Structure"), -100, 100], ["n", T("Netteté", "Sharpening"), 0, 100]], start:{s:25}},
+  drama:{title:T("THÉÂTRAL", "DRAMA"), icon:"🎭", params:[["f", T("Force", "Strength"), 0, 100], ["sat", T("Saturation", "Saturation"), -100, 100]], start:{f:50},
+    styles:[T("Lumineux 1", "Bright 1"), T("Lumineux 2", "Bright 2"), T("Sombre 1", "Dark 1"), T("Sombre 2", "Dark 2")]},
+  glow:{title:T("ÉCLAT GLAMOUR", "GLAMOUR GLOW"), icon:"✨", params:[["g", T("Éclat", "Glow"), 0, 100], ["sat", T("Saturation", "Saturation"), -100, 100], ["w", T("Chaleur", "Warmth"), -100, 100]], start:{g:40}}
+};
+function paramTool(key){
+  var def = TOOLS[key], ph = needPhoto(); if(!ph) return;
+  var all = get(), st = lookGet(all, key), first = !Object.keys(def.start).some(function(k){ return st[k]; });
+  if(first) Object.assign(st, def.start);
+  var idx = 0, showOrig = false, P = def.params;
+  var sz = Math.min(1, 1100 / Math.max(ph.width, ph.height)), base = cvs(ph.width * sz, ph.height * sz);
+  base.getContext("2d").drawImage(ph, 0, 0, base.width, base.height);
+  /* les courbes deja reglees sont visibles dans l'apercu */
+  if(curveOn(all)) applyCurves(base.getContext("2d"), base.width, base.height, all);
+  show('<div class="x2Top"><div class="jmsTitle">' + def.icon + ' ' + def.title + '</div>' +
+     '<button id="x2KEye" style="background:#3a3a3a">👁</button><button data-a="help" style="background:#3a3a3a">?</button></div>' +
+   '<div class="x2PvW" id="x2KW" style="position:relative;touch-action:none">' +
+     '<canvas id="x2KC" style="display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none"></canvas>' +
+     '<div id="x2KL" style="position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#000b;color:#fff;font-weight:900;font-size:17px;padding:8px 16px;border-radius:20px;white-space:nowrap;pointer-events:none"></div>' +
+     '<div id="x2KM" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000d;border-radius:14px;padding:6px 0;display:none;min-width:200px;pointer-events:none"></div></div>' +
+   (def.styles ? '<div class="x2Chips" id="x2KS">' + def.styles.map(function(n, i){ return '<button data-a="sty" data-i="' + i + '">' + n + '</button>'; }).join("") + '</div>' : '') +
+   '<div class="x2Hint" id="x2KH" style="flex:none;margin:2px 0">' + T("Glisse ↕ sur la photo pour choisir le réglage, ↔ pour le modifier.", "Swipe ↕ on the photo to pick a setting, ↔ to change it.") + '</div>' +
+   '<div style="flex:none;display:flex;align-items:center;gap:8px;margin:2px 0"><button data-a="pick" style="border:0;border-radius:10px;background:#3a3a3a;color:#fff;font-weight:900;padding:8px 10px;font-size:13px">☰</button>' +
+     '<div style="flex:1;font-weight:800;color:#ddd" id="x2KN"></div><div id="x2KV" style="font-weight:900;color:#FFD600;font-family:monospace;font-size:16px"></div></div>' +
+   '<canvas id="x2KR" style="display:block;flex:none;width:100%;height:46px;touch-action:none"></canvas>' +
+   '<div style="display:flex;align-items:center;justify-content:space-between;flex:none;padding:6px 0">' +
+     '<button data-a="cancel" style="border:0;background:none;color:#fff;font-size:30px;width:52px">✕</button>' +
+     '<button data-a="zero" style="border:0;background:#3a3a3a;color:#fff;border-radius:22px;padding:10px 18px;font-weight:900">' + T("Désactiver", "Turn off") + '</button>' +
+     '<button data-a="ok" style="border:0;background:none;color:#4CAF50;font-size:34px;width:52px">✓</button></div>', true);
+  var wrap = $("x2KW"), cv = $("x2KC"), ctx = cv.getContext("2d"), rul = $("x2KR"), rx = rul.getContext("2d"), dpr = window.devicePixelRatio || 1, menu = $("x2KM");
+  function fmt(v){ return (v > 0 && P[idx][2] < 0 ? "+" : "") + Math.round(v); }
+  function labels(){
+    var p = P[idx], v = st[p[0]] || 0; $("x2KL").textContent = p[1] + "  " + fmt(v); $("x2KN").textContent = p[1]; $("x2KV").textContent = fmt(v);
+    if($("x2KS")) Array.prototype.forEach.call($("x2KS").children, function(b, i){ b.classList.toggle("on", i === (st.st | 0)); b.style.background = i === (st.st | 0) ? "#1E88E5" : ""; });
+    ruler();
+  }
+  function ruler(){
+    var p = P[idx], W = rul.clientWidth * dpr, H = 46 * dpr; if(rul.width !== W) rul.width = W; rul.height = H;
+    var f = ((st[p[0]] || 0) - p[2]) / (p[3] - p[2]), z = (0 - p[2]) / (p[3] - p[2]); rx.clearRect(0, 0, W, H);
+    for(var i = 0; i <= 60; i++){ var x = 8 * dpr + (W - 16 * dpr) * i / 60; rx.fillStyle = "#bbb"; rx.fillRect(x - dpr, H * 0.35, 2 * dpr, H * 0.45); }
+    var zx = 8 * dpr + (W - 16 * dpr) * z, vx = 8 * dpr + (W - 16 * dpr) * f;
+    rx.fillStyle = "rgba(255,214,0,.35)"; rx.fillRect(Math.min(zx, vx), H * 0.35, Math.abs(vx - zx), H * 0.45);
+    rx.fillStyle = "#FFD600"; rx.fillRect(vx - 2 * dpr, H * 0.2, 4 * dpr, H * 0.65); rx.beginPath(); rx.moveTo(vx - 8 * dpr, 0); rx.lineTo(vx + 8 * dpr, 0); rx.lineTo(vx, H * 0.2); rx.fill();
+  }
+  var pend = 0;
+  function draw(){
+    if(!document.body.contains(cv)) return;
+    var CW = Math.max(10, wrap.clientWidth), CH = Math.max(10, wrap.clientHeight);
+    if(cv.width !== Math.round(CW * dpr) || cv.height !== Math.round(CH * dpr)){ cv.width = Math.round(CW * dpr); cv.height = Math.round(CH * dpr); }
+    var tmp = {}; tmp[key] = st; var img = showOrig ? base : looks(base, tmp);
+    var k = Math.min(cv.width / img.width, cv.height / img.height), w = img.width * k, h = img.height * k;
+    ctx.fillStyle = "#111"; ctx.fillRect(0, 0, cv.width, cv.height); ctx.imageSmoothingQuality = "high"; ctx.drawImage(img, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+  }
+  function later(){ if(!pend) pend = requestAnimationFrame(function(){ pend = 0; draw(); }); }
+  function setV(v){ var p = P[idx]; st[p[0]] = Math.max(p[2], Math.min(p[3], Math.round(v))); labels(); later(); }
+  function drawMenu(sel){ menu.innerHTML = P.map(function(p, i){ return '<div style="padding:9px 18px;font-weight:900;font-size:15px;' + (i === sel ? 'background:#1E88E5;color:#fff' : 'color:#ccc') + '">' + p[1] + '<span style="float:right;margin-left:14px;color:' + (i === sel ? '#fff' : '#FFD600') + '">' + fmt(st[p[0]] || 0) + '</span></div>'; }).join(""); menu.style.display = "block"; }
+  var g = null;
+  cv.onpointerdown = function(e){ cv.setPointerCapture(e.pointerId); g = {x:e.clientX, y:e.clientY, mode:null, v0:st[P[idx][0]] || 0, i0:idx}; };
+  cv.onpointermove = function(e){
+    if(!g) return; var dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if(!g.mode && Math.hypot(dx, dy) > 10) g.mode = Math.abs(dy) > Math.abs(dx) ? "menu" : "value";
+    if(g.mode === "value"){ var p = P[idx]; setV(g.v0 + dx * (p[3] - p[2]) / (wrap.clientWidth * 2)); }
+    else if(g.mode === "menu"){ var i = Math.max(0, Math.min(P.length - 1, g.i0 + Math.round(dy / 30))); if(i !== g.sel){ g.sel = i; drawMenu(i); } }
+  };
+  function up(){ if(g && g.mode === "menu" && g.sel !== undefined){ idx = g.sel; labels(); } menu.style.display = "none"; g = null; }
+  cv.onpointerup = up; cv.onpointercancel = up;
+  function rulerSet(e){ var p = P[idx], b = rul.getBoundingClientRect(), f = Math.max(0, Math.min(1, (e.clientX - b.left - 8) / (b.width - 16))); setV(p[2] + f * (p[3] - p[2])); }
+  rul.onpointerdown = function(e){ rul.setPointerCapture(e.pointerId); rulerSet(e); rul.onpointermove = rulerSet; };
+  rul.onpointerup = rul.onpointercancel = function(){ rul.onpointermove = null; };
+  var eye = $("x2KEye"); eye.onpointerdown = function(){ showOrig = true; draw(); }; eye.onpointerup = eye.onpointerleave = eye.onpointercancel = function(){ showOrig = false; draw(); };
+  HH.pick = function(){ idx = (idx + 1) % P.length; labels(); };
+  HH.sty = function(b){ st.st = +b.dataset.i; labels(); later(); };
+  HH.zero = function(){ P.forEach(function(p){ st[p[0]] = 0; }); labels(); later(); };
+  HH.help = function(){ var h = $("x2KH"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser : choisir le réglage • ↔ glisser : moins / plus • 👁 maintenu : sans l'outil • ✓ garder, ✕ annuler.", "↕ swipe: pick a setting • ↔ swipe: less / more • hold 👁: without the tool • ✓ keep, ✕ cancel."); };
+  HH.cancel = hide;
+  HH.ok = function(){ var s2 = get(); s2[key] = st; put(s2); hide(); };
+  function layout(){ if(!document.body.contains(cv)){ window.removeEventListener("resize", layout); return; } labels(); draw(); }
+  window.addEventListener("resize", layout); requestAnimationFrame(layout);
+}
+
+/* ================= GRILLE OUTILS ================= */
+function tuneOn(){ var sl = tuneSliders(); return sl.slice(1).some(function(r){ return +r.value !== 0; }); }
+var GRID = [
+  [T("Réglages", "Adjust"), [["tune", "🎛️", T("Retouches", "Tune"), function(){ return tuneOn(); }], ["details", "🔎", T("Détails", "Details"), function(s){ return detailsOn(s); }], ["curves", "📈", T("Courbes", "Curves"), function(s){ return curveOn(s); }]]],
+  [T("Retouche locale", "Local"), [["heal", "🩹", T("Correcteur", "Healing"), function(){ return heals.length > 0; }]]],
+  [T("Cadrage", "Framing"), [["crop", "✂️", T("Recadrer", "Crop"), function(){ return geoOn(); }]]],
+  [T("Créatif", "Creative"), [["drama", "🎭", T("Théâtral", "Drama"), function(s){ return dramaOn(s); }], ["glow", "✨", T("Éclat glamour", "Glamour glow"), function(s){ return glowOn(s); }], ["fx", "🌤️", T("Effets (ciel, visage, grain, N&B)", "Effects (sky, face, grain, B&W)"), function(){ return !!(window.__jmsFX && window.__jmsFX.get && (function(f){ return f.sky || f.face || f.grad || f.grain || f.bw || f.sharp || f.smooth || f.denoise; })(window.__jmsFX.get())); }]]]
+];
+function openTool(k){
+  if(k === "tune") return tune(); if(k === "crop") return crop(); if(k === "curves") return curves(); if(k === "heal") return healer();
+  if(k === "fx"){ if(window.__jmsX && window.__jmsX.x_fx) window.__jmsX.x_fx(); return; }
+  paramTool(k);
+}
+function toolsGrid(){
+  var s = get();
+  show('<div class="x2Top"><div class="jmsTitle">🧰 ' + T("OUTILS", "TOOLS") + '</div><button data-a="close" style="background:#3a3a3a">✕</button></div>' +
+   '<div style="overflow-y:auto;flex:1">' + GRID.map(function(sec){
+     return '<div class="x2Sec">' + sec[0] + '</div><div class="x2Grid">' + sec[1].map(function(t){
+       return '<button class="x2Tool" data-a="tool" data-k="' + t[0] + '"><span class="i">' + t[1] + '</span>' + t[2] + (t[3](s) ? '<i class="dot"></i>' : '') + '</button>'; }).join("") + '</div>'; }).join("") +
+   '<div class="x2Hint" style="margin-top:10px">' + T("Un point jaune = outil actif sur cette photo.", "A yellow dot = tool in use on this photo.") + '</div></div>', true);
+  HH.tool = function(b){ var k = b.dataset.k; hide(); setTimeout(function(){ openTool(k); }, 30); };
+  HH.close = hide;
+}
+window.__jmsTools = toolsGrid;
+window.__jmsOpenTool = openTool;
+
 /* ---------- branchement dans le rendu des effets ---------- */
 async function pre(bmp, Q){
   var s = get(), single = Q && Q.single, c = null;
@@ -336,6 +494,7 @@ async function pre(bmp, Q){
   if(single && heals.length) healAll(base(), heals);
   if(curveOn(s)){ var b = base(); applyCurves(b.getContext("2d"), b.width, b.height, s); }
   if(single && geoOn()) c = geometry(c || bmp, geo);
+  if(lookOn(s)) c = looks(c || bmp, s);
   return c || bmp;
 }
 function post(c, Q){ return c; }
@@ -366,7 +525,13 @@ function needPhoto(){ var p = photo(); if(!p) alert(T("Ouvre d'abord une image (
 /* ---------- fenetre commune ---------- */
 var css = document.createElement("style");
 css.textContent =
-"#jx2Bar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}" +
+"#jx2Bar #x2TB{width:100%;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:12px;border:0;border-radius:16px;padding:12px 14px;background:linear-gradient(90deg,#1565C0,#6A1B9A);color:#fff;font-weight:900;font-size:17px;text-align:left;box-shadow:0 3px 8px #0007}" +
+"#jx2Bar #x2TB .i{font-size:26px}#jx2Bar #x2TB .t{flex:1}#jx2Bar #x2TB small{display:block;font-weight:600;font-size:11px;opacity:.9;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw}" +
+".x2Sec{font-weight:900;font-size:13px;letter-spacing:.08em;color:#C9A24A;margin:14px 2px 6px;text-transform:uppercase}" +
+".x2Grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}" +
+".x2Tool{position:relative;border:0;border-radius:14px;background:#2a2a2a;color:#fff;font-weight:800;font-size:12px;padding:12px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:78px}" +
+".x2Tool .i{font-size:26px}.x2Tool .dot{position:absolute;top:7px;right:7px;width:10px;height:10px;border-radius:50%;background:#FFD600;box-shadow:0 0 6px #FFD600}" +
+"#jx2Bar{display:block;margin:0 0 10px}" +
 "#jx2Bar button{border:0;border-radius:14px;padding:10px 2px;font-weight:900;font-size:11px;color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 3px 8px #0007}" +
 "#jx2Bar button .i{font-size:22px;line-height:1}#jx2Bar button.on{outline:3px solid #FFB300;outline-offset:1px}" +
 "#jx2Bar .b0{background:#1565C0}#jx2Bar .b1{background:#6D4C41}#jx2Bar .b2{background:#00897B}#jx2Bar .b3{background:#C62828}#jx2Bar .b4{background:#5E35B1}" +
@@ -702,19 +867,15 @@ function bar(){
   var b = $("jx2Bar");
   if(!b){
     b = document.createElement("div"); b.id = "jx2Bar";
-    b.innerHTML = '<button class="b0" data-t="tune"><span class="i">🎛️</span>' + T("RETOUCHES", "TUNE") + '</button>' +
-      '<button class="b1" data-t="crop"><span class="i">✂️</span>' + T("RECADRER", "CROP") + '</button>' +
-      '<button class="b2" data-t="curves"><span class="i">📈</span>' + T("COURBES", "CURVES") + '</button>' +
-      '<button class="b3" data-t="heal"><span class="i">🩹</span>' + T("CORRECTEUR", "HEALING") + '</button>';
-    b.onclick = function(e){ var t = e.target.closest("button"); if(!t) return; ({tune:tune, crop:crop, curves:curves, heal:healer})[t.dataset.t](); };
+    b.innerHTML = '<button id="x2TB"><span class="i">🧰</span><span class="t">' + T("OUTILS", "TOOLS") + '<small id="x2TBs"></small></span><span style="font-size:22px">›</span></button>';
+    b.onclick = function(){ toolsGrid(); };
   }
   var anchor = $("jxFav") && $("jxFav").parentNode === c.parentNode ? $("jxFav") : c;
   if(b.nextSibling !== anchor || b.parentNode !== anchor.parentNode) anchor.parentNode.insertBefore(b, anchor);
   proLab(b);
-  var s = get();
-  b.querySelector('[data-t="crop"]').classList.toggle("on", geoOn());
-  b.querySelector('[data-t="curves"]').classList.toggle("on", curveOn(s));
-  b.querySelector('[data-t="heal"]').classList.toggle("on", heals.length > 0);
+  var s = get(), on = [];
+  GRID.forEach(function(sec){ sec[1].forEach(function(t){ try{ if(t[3](s)) on.push(t[2]); }catch(e){} }); });
+  var sm = $("x2TBs"); if(sm){ var txt = on.length ? T("Actifs : ", "In use: ") + on.join(", ") : T("Retouches, Détails, Courbes, Correcteur, Recadrer, Théâtral, Éclat…", "Tune, Details, Curves, Healing, Crop, Drama, Glow…"); if(sm.textContent !== txt) sm.textContent = txt; }
 }
 setInterval(bar, 700); setTimeout(bar, 300);
 })();
