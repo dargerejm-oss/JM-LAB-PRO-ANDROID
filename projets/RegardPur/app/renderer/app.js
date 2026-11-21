@@ -229,7 +229,10 @@ function ensurePool() {
   }
 }
 function analyse(list) {
-  ensurePool(); runId++;
+  ensurePool();
+  // une analyse est deja en cours : on ajoute a la file sans l'interrompre
+  if (S.analysing && queue.length) { list.forEach(function (p) { if (queue.indexOf(p) < 0) { queue.push(p); totalN++; } }); prog(); pump(); return; }
+  runId++;
   // d'abord les photos visibles, dans l'ordre de la grille
   var order = {}; S.view.forEach(function (id, i) { order[id] = i; });
   queue = list.slice().sort(function (a, b) { return (order[a.id] == null ? 1e9 : order[a.id]) - (order[b.id] == null ? 1e9 : order[b.id]); });
