@@ -67,7 +67,7 @@ document.addEventListener("click", function(e){
 
 /* ---------- MODE D'EMPLOI : pages du PDF affichees dans l'appli + enregistrement du PDF ---------- */
 /* francais ou anglais selon la langue de l'appli */
-var MDIR = EN ? "manuel/en/" : "manuel/", PAGES = 12, PDF = MDIR + (EN ? "JM_LAB_PRO_user_guide.pdf" : "JM_LAB_PRO_mode_emploi.pdf");
+var MDIR = EN ? "manuel/en/" : "manuel/", PAGES = 16, PDF = MDIR + (EN ? "JM_LAB_PRO_user_guide.pdf" : "JM_LAB_PRO_mode_emploi.pdf");
 var mc = document.createElement("style");
 mc.textContent = "#jmMan{position:fixed;inset:0;z-index:3650;background:#2b2b2b;display:none;flex-direction:column;font-family:system-ui,sans-serif}#jmMan.show{display:flex}" +
  "#jmMan .mTop{flex:none;display:flex;align-items:center;gap:6px;padding:max(8px,env(safe-area-inset-top)) 8px 8px;background:#141414;color:#fff}" +

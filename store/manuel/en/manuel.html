@@ -23,6 +23,7 @@ b { color: #000; }
 .row .txt { flex: 1; min-width: 0; }
 .shot { flex: none; width: 50mm; border-radius: 4mm; border: 0.6mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; }
 .shot.sm { width: 44mm; }
+.shot.xs { width: 33mm; }
 .tip { background: #FFF7E0; border-left: 1.2mm solid #C9A24A; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
 .warn { background: #FDECEA; border-left: 1.2mm solid #D84315; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
 .k { display: inline-block; background: #1d1d1f; color: #fff; border-radius: 1.4mm; padding: 0 1.6mm; font-weight: 800; font-size: 8.6pt; white-space: nowrap; }
@@ -37,7 +38,7 @@ th { background: #f4f1ea; font-size: 8.8pt; }
 .cover .who { font-size: 10pt; color: #aaa; }
 .cover .ver { position: absolute; bottom: 10mm; font-size: 9pt; color: #777; }
 .toc { list-style: none; padding: 0; margin: 4mm 0 0; }
-.toc li { display: flex; gap: 3mm; padding: 1.8mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 10.5pt; }
+.toc li { display: flex; gap: 3mm; padding: 0.9mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 9.6pt; }
 .toc li span:first-child { width: 7mm; color: #C9A24A; font-weight: 800; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 5mm; }
 </style>
@@ -48,7 +49,7 @@ th { background: #f4f1ea; font-size: 8.8pt; }
   <h1>JM LAB PRO</h1>
   <div class="sub">User guide</div>
   <div class="who">Offline photo editing<br>by JM.Dargère</div>
-  <div class="ver">Version 4.7 • November 2026</div>
+  <div class="ver">Version 4.10 • November 2026</div>
 </section>
 
 <section class="page">
@@ -56,15 +57,19 @@ th { background: #f4f1ea; font-size: 8.8pt; }
   <ul class="toc">
     <li><span>1</span><span>The main screen</span></li>
     <li><span>2</span><span>Film profiles and settings</span></li>
-    <li><span>3</span><span>Tune image (like Snapseed)</span></li>
+    <li><span>3</span><span>Tune image</span></li>
     <li><span>4</span><span>Crop and straighten</span></li>
     <li><span>5</span><span>Curves</span></li>
-    <li><span>6</span><span>Healing</span></li>
-    <li><span>7</span><span>Saving – where are my photos?</span></li>
-    <li><span>8</span><span>Editing a batch of photos</span></li>
-    <li><span>9</span><span>Styles, QR codes and tools</span></li>
-    <li><span>10</span><span>About, language, privacy</span></li>
-    <li><span>11</span><span>Tips and FAQ</span></li>
+    <li><span>6</span><span>Details, Drama, Glamour glow</span></li>
+    <li><span>7</span><span>White balance, Tonal contrast, HDR</span></li>
+    <li><span>8</span><span>Selective and Brush</span></li>
+    <li><span>9</span><span>Healing</span></li>
+    <li><span>10</span><span>Double exposure, Effects, large view</span></li>
+    <li><span>11</span><span>Saving – where are my photos?</span></li>
+    <li><span>12</span><span>Editing a batch of photos</span></li>
+    <li><span>13</span><span>Styles, QR codes and tools</span></li>
+    <li><span>14</span><span>About, language, privacy</span></li>
+    <li><span>15</span><span>Tips and FAQ</span></li>
   </ul>
   <h3>In three steps</h3>
   <ol>
@@ -83,19 +88,20 @@ th { background: #f4f1ea; font-size: 8.8pt; }
       <h3>At the top</h3>
       <ul>
         <li><span class="k y">📂 OPEN IMAGE</span>: choose a photo.</li>
-        <li><span class="k b">🗂 OPEN A BATCH</span>: choose several photos to edit at once (chapter 8).</li>
+        <li><span class="k b">🗂 OPEN A BATCH</span>: choose several photos to edit at once (chapter 12).</li>
         <li><span class="k g">💾 SAVE</span>: save the edited photo (appears as soon as a photo is open).</li>
       </ul>
       <h3>The preview</h3>
       <ul>
         <li><b>Keep your finger pressed on the photo</b> (or on <b>👁</b>): you see the photo <b>before correction</b>; lift your finger to go back.</li>
         <li><b>Histogram</b> at the bottom left: how the tones are spread. A blue dot = crushed shadows, red = blown highlights. Tap it to shrink it.</li>
-        <li><b>👁 ↶ ↷</b> at the bottom right: see before (held), undo, redo.</li>
+        <li><b>⛶ 👁 ↶ ↷</b> at the bottom right: view large, see before (held), undo, redo.</li>
+        <li><b>Double-tap</b> the photo (or <b>⛶</b>): the photo <b>full screen</b> with all corrections (chapter 10).</li>
       </ul>
       <h3>The tabs at the bottom</h3>
       <p><b>SETTINGS</b> • <b>FILM PROFILES</b> • <b>STYLES / QR</b> • <b>VIEWER</b></p>
     </div>
-    <img class="shot" src="02_reglages.jpg" alt="">
+    <img class="shot sm" src="02_reglages.jpg" alt="">
   </div>
   <div class="tip">The green banner: tap <b>JM.DARGERE LAB PRO</b> to open <b>About</b>, and <b>📷 INSTAGRAM</b> for the Instagram page.</div>
   <div class="foot"><span>JM LAB PRO – User guide</span><span>3</span></div>
@@ -104,7 +110,7 @@ th { background: #f4f1ea; font-size: 8.8pt; }
 <section class="page">
   <h2><span class="n">2</span>Film profiles and settings</h2>
   <div class="row">
-    <img class="shot" src="03_profils.jpg" alt="">
+    <img class="shot xs" src="03_profils.jpg" alt="">
     <div class="txt">
       <h3>Film profiles</h3>
       <p>Tap a profile: the photo takes its look at once. The chosen profile is outlined in yellow.</p>
@@ -115,15 +121,14 @@ th { background: #f4f1ea; font-size: 8.8pt; }
         <span><b>Black &amp; White</b></span><span><b>Color Film</b></span>
       </div>
       <h3>SETTINGS tab</h3>
-      <p>At the top, the <b>toolbar</b>:</p>
-      <p><span class="k b">🎛️ TUNE</span> <span class="k">✂️ CROP</span> <span class="k g">📈 CURVES</span> <span class="k" style="background:#C62828">🩹 HEALING</span></p>
-      <p>An active tool is outlined in yellow.</p>
+      <p>At the top, the <span class="k b">🧰 TOOLS</span> button opens the tools grid, sorted by family: <b>Adjust</b> (Tune, Details, Curves, White balance, Tonal contrast), <b>Local</b> (Selective, Brush, Healing), <b>Framing</b> (Crop), <b>Creative</b> (Drama, HDR, Double exposure, Glamour glow, Effects).</p>
+      <p>A <b>yellow dot</b> marks a tool in use; the TOOLS button lists the tools used.</p>
       <h3>✨ ProLab auto correction</h3>
       <p>The <b>checkbox</b> turns the automatic correction on or off (automatic exposure + LABO PRO look). The <b>Strength</b> slider sets how strong it is: <b>65 %</b> by default.</p>
       <p>Light and colour adjustments are made with <b>🎛️ Tune</b> (chapter 3). <b>RESET</b> sets everything back (ProLab at 65 %).</p>
     </div>
   </div>
-  <div class="tip"><b>⭐ Favourites</b>: your favourite styles appear as buttons below the ProLab correction (see chapter 9).</div>
+  <div class="tip"><b>⭐ Favourites</b>: your favourite styles appear as buttons below the ProLab correction (see chapter 13).</div>
   <div class="foot"><span>JM LAB PRO – User guide</span><span>4</span></div>
 </section>
 
@@ -188,7 +193,63 @@ th { background: #f4f1ea; font-size: 8.8pt; }
 </section>
 
 <section class="page">
-  <h2><span class="n">6</span>Healing</h2>
+  <h2><span class="n">6</span>Details, Drama, Glamour glow</h2>
+  <p>Three tools from the <b>Adjust / Creative</b> families, in <b>🧰 TOOLS</b>. Same gestures as Tune image: <b>↕</b> to pick the setting, <b>↔</b> to change it, hold <b>👁</b> to see without the tool, <b>Turn off</b> to reset everything.</p>
+  <div class="row">
+    <div class="txt">
+      <h3>🔎 Details</h3>
+      <ul><li><b>Structure</b>: brings out textures (to the right) or softens them (to the left).</li><li><b>Sharpening</b>: crisper edges.</li></ul>
+      <h3>🎭 Drama</h3>
+      <ul><li>Strong local contrast, dramatic mood. Four styles: <b>Bright 1 and 2</b>, <b>Dark 1 and 2</b>.</li><li><b>Strength</b> and <b>Saturation</b>.</li></ul>
+      <h3>✨ Glamour glow</h3>
+      <ul><li>Soft, luminous glow, flattering for portraits.</li><li><b>Glow</b>, <b>Saturation</b>, <b>Warmth</b>.</li></ul>
+    </div>
+    <img class="shot sm" src="13_theatral.jpg" alt="">
+  </div>
+  <div class="tip">These three tools apply to the saved photo <b>and to batches</b>.</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>8</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">7</span>White balance, Tonal contrast, HDR</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>💧 White balance</h3>
+      <ul><li>The tool opens in <b>picker</b> mode: tap a spot that should be <b>grey or white</b> (wall, cloud, T-shirt). The colour cast disappears.</li>
+      <li>Then fine-tune <b>Temperature</b> and <b>Tint</b> (swipe ↕ then ↔). <b>💧 Picker</b> to start again.</li></ul>
+      <h3>🌗 Tonal contrast</h3>
+      <ul><li>Separate contrast in <b>high tones</b>, <b>mid tones</b> and <b>low tones</b>.</li><li><b>Protect shadows / highlights</b> avoids crushed blacks or blown whites.</li></ul>
+      <h3>🌄 HDR</h3>
+      <ul><li>Brings out detail in shadows and highlights. Styles <b>Nature, People, Fine, Strong</b>.</li><li><b>Strength</b>, <b>Brightness</b>, <b>Saturation</b>.</li></ul>
+    </div>
+    <img class="shot sm" src="14_wb.jpg" alt="">
+  </div>
+  <div class="tip">These three tools also apply to <b>batches</b>: the white balance found on one photo is used for the whole group (ideal under the same light).</div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>9</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">8</span>Selective and Brush</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>🎯 Selective</h3>
+      <ol><li>Tap <b>＋ Point</b>, then the spot to adjust.</li><li>Only the surrounding area <b>of similar colour</b> changes: <b>Brightness, Contrast, Saturation, Structure</b>, and the <b>Size</b> of the area (↕ to pick, ↔ to adjust).</li><li>Drag a point to move it; several points allowed; <b>🗑</b> deletes.</li></ol>
+      <p><b>▦</b> shows the affected area in <b>red</b>.</p>
+    </div>
+    <img class="shot xs" src="15_selection.jpg" alt="">
+  </div>
+  <div class="row" style="margin-top:3mm">
+    <img class="shot xs" src="16_pinceau.jpg" alt="">
+    <div class="txt">
+      <h3>🖌️ Brush</h3>
+      <ul><li>Pick the effect: <b>Light, Temperature, Saturation, Structure</b>, then the strength (−100 to +100).</li><li><b>Paint</b> with your finger; <b>🧽 Eraser</b> removes; two fingers to zoom.</li><li><b>▦</b> shows painted areas (red = more, blue = less).</li></ul>
+    </div>
+  </div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>10</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">9</span>Healing</h2>
   <p>Like Snapseed's <b>Healing</b> tool: it removes dust, a blemish, a wire, a small spot.</p>
   <div class="row">
     <div class="txt">
@@ -207,11 +268,27 @@ th { background: #f4f1ea; font-size: 8.8pt; }
     <img class="shot" src="08_correcteur.jpg" alt="">
   </div>
   <div class="tip">Healing only applies to the <b>open photo</b> (each photo has its own spots).</div>
-  <div class="foot"><span>JM LAB PRO – User guide</span><span>8</span></div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>11</span></div>
 </section>
 
 <section class="page">
-  <h2><span class="n">7</span>Saving – where are my photos?</h2>
+  <h2><span class="n">10</span>Double exposure, Effects, large view</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>🖼️ Double exposure</h3>
+      <ul><li><b>📷 Photo</b>: choose the 2nd photo.</li><li><b>One finger</b> moves it, <b>two fingers</b> resize and rotate it; <b>⌖</b> recenters.</li><li>Blend: <b>Normal, Lighten, Darken, Overlay, Add</b>; <b>Opacity</b>.</li></ul>
+      <h3>🌤️ Effects</h3>
+      <p>Darker sky, brighter face, smooth skin, gradient, grain, black and white, noise reduction, ready-to-post format, watermark.</p>
+      <h3>⛶ Large view</h3>
+      <ul><li><b>⛶</b> or <b>double-tap</b> the photo: full screen with <b>all corrections</b>.</li><li><b>Two fingers</b>: zoom; <b>hold</b>: before; <b>✕</b> or back: close.</li></ul>
+    </div>
+    <img class="shot sm" src="17_double.jpg" alt="">
+  </div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>12</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">11</span>Saving – where are my photos?</h2>
   <p>Tap <span class="k g">💾 SAVE</span>. A banner shows the processing time, then <b>✔ SAVED</b> with the file name. The original photo is never changed: the copy ends with <b>_JMD_LAB_PRO.jpg</b>.</p>
   <table>
     <tr><th>What you do</th><th>Where it goes</th></tr>
@@ -227,12 +304,12 @@ th { background: #f4f1ea; font-size: 8.8pt; }
   <h3>Finding them</h3>
   <p>In the <b>Gallery</b> or <b>Google Photos</b>: <b>JM LAB PRO</b> album. Or in the <b>Files</b> app: Pictures › JM LAB PRO.</p>
   <h3>What is applied when saving</h3>
-  <p>ProLab correction + profile + Tune image + Curves + Crop + Healing + Effects (sky, face, grain…) + Frame and signature if turned on.</p>
-  <div class="foot"><span>JM LAB PRO – User guide</span><span>9</span></div>
+  <p>ProLab correction + profile + Tune image + every active tool (yellow dot in 🧰 TOOLS) + Effects + Frame and signature if turned on. The <b>⛶ final preview</b> shows this result before saving.</p>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>13</span></div>
 </section>
 
 <section class="page">
-  <h2><span class="n">8</span>Editing a batch of photos</h2>
+  <h2><span class="n">12</span>Editing a batch of photos</h2>
   <div class="row">
     <div class="txt">
       <ol>
@@ -246,15 +323,15 @@ th { background: #f4f1ea; font-size: 8.8pt; }
         <li><b>⛔ STOP</b> stops the running batch.</li>
         <li><b>HEIC</b> photos are converted automatically; <b>very large</b> photos are reduced to avoid a crash.</li>
       </ul>
-      <div class="warn"><b>Crop</b> and <b>healing</b> do not apply to batches (they belong to one photo). <b>Curves</b> and <b>Tune image</b> do.</div>
+      <div class="warn"><b>Crop, Selective, Brush, Healing, Double exposure</b> belong to one photo: they do not apply to batches. All the others (Tune, Curves, Details, White balance, Tonal contrast, Drama, HDR, Glow, Effects) do.</div>
     </div>
     <img class="shot" src="10_lot.jpg" alt="">
   </div>
-  <div class="foot"><span>JM LAB PRO – User guide</span><span>10</span></div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>14</span></div>
 </section>
 
 <section class="page">
-  <h2><span class="n">9</span>Styles, QR codes and tools</h2>
+  <h2><span class="n">13</span>Styles, QR codes and tools</h2>
   <div class="row">
     <img class="shot sm" src="09_styles.jpg" alt="">
     <div class="txt" style="font-size:9.4pt">
@@ -269,16 +346,15 @@ th { background: #f4f1ea; font-size: 8.8pt; }
         <li><b>Compare profiles</b>: your photo with each profile side by side.</li>
         <li><b>Learn a retouch style</b>: before photo + edited photo → settings.</li>
         <li><b>Style from a reference</b>, <b>intensity &amp; blend</b>, <b>style → several folders</b>.</li>
-        <li><b>Effects</b>: sky, face, gradient, grain, B&amp;W, sharpness, noise, ready-to-post crop, watermark, brush.</li>
-        <li><b>Lesson mode</b>, <b>lesson sheet</b>, <b>daily challenge</b>, <b>large text</b>, <b>.cube LUT</b>, <b>batch history</b>, <b>favourites</b>.</li>
+        <li><b>Lesson sheet</b>, <b>daily challenge</b>, <b>large text</b>, <b>.cube LUT</b>, <b>batch history</b>, <b>favourites</b>, <b>user guide</b>.</li>
       </ul>
     </div>
   </div>
-  <div class="foot"><span>JM LAB PRO – User guide</span><span>11</span></div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>15</span></div>
 </section>
 
 <section class="page">
-  <h2><span class="n">10</span>About, language, privacy</h2>
+  <h2><span class="n">14</span>About, language, privacy</h2>
   <div class="row">
     <div class="txt">
       <p>Tap <b>JM.DARGERE LAB PRO</b> in the green banner.</p>
@@ -292,14 +368,14 @@ th { background: #f4f1ea; font-size: 8.8pt; }
     </div>
     <img class="shot sm" src="11_apropos.jpg" alt="">
   </div>
-  <h2 style="margin-top:4mm"><span class="n">11</span>Tips and FAQ</h2>
+  <h2 style="margin-top:4mm"><span class="n">15</span>Tips and FAQ</h2>
   <ul style="font-size:9.3pt">
     <li><b>Open a photo from the gallery</b>: “Share” or “Open with / Edit with” → <b>JM LAB PRO</b>.</li>
     <li><b>Android back button</b>: closes the open window first, then leaves the app.</li>
     <li><b>Updating the app</b>: install the new APK file over the old one; your settings and presets are kept.</li>
     <li><b>The saved photo looks different from the preview</b>: the preview is reduced; crop, healing and effects are computed at full size when saving.</li>
   </ul>
-  <div class="foot"><span>JM LAB PRO – User guide</span><span>12</span></div>
+  <div class="foot"><span>JM LAB PRO – User guide</span><span>16</span></div>
 </section>
 
 </body>

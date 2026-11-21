@@ -23,6 +23,7 @@ b { color: #000; }
 .row .txt { flex: 1; min-width: 0; }
 .shot { flex: none; width: 50mm; border-radius: 4mm; border: 0.6mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; }
 .shot.sm { width: 44mm; }
+.shot.xs { width: 33mm; }
 .tip { background: #FFF7E0; border-left: 1.2mm solid #C9A24A; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
 .warn { background: #FDECEA; border-left: 1.2mm solid #D84315; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
 .k { display: inline-block; background: #1d1d1f; color: #fff; border-radius: 1.4mm; padding: 0 1.6mm; font-weight: 800; font-size: 8.6pt; white-space: nowrap; }
@@ -37,7 +38,7 @@ th { background: #f4f1ea; font-size: 8.8pt; }
 .cover .who { font-size: 10pt; color: #aaa; }
 .cover .ver { position: absolute; bottom: 10mm; font-size: 9pt; color: #777; }
 .toc { list-style: none; padding: 0; margin: 4mm 0 0; }
-.toc li { display: flex; gap: 3mm; padding: 1.8mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 10.5pt; }
+.toc li { display: flex; gap: 3mm; padding: 0.9mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 9.6pt; }
 .toc li span:first-child { width: 7mm; color: #C9A24A; font-weight: 800; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 5mm; }
 </style>
@@ -50,7 +51,7 @@ th { background: #f4f1ea; font-size: 8.8pt; }
   <h1>JM LAB PRO</h1>
   <div class="sub">Mode d'emploi</div>
   <div class="who">Retouche photo hors ligne<br>par JM.Dargère</div>
-  <div class="ver">Version 4.7 • novembre 2026</div>
+  <div class="ver">Version 4.10 • novembre 2026</div>
 </section>
 
 <!-- 2. Sommaire + premiers pas -->
@@ -59,15 +60,19 @@ th { background: #f4f1ea; font-size: 8.8pt; }
   <ul class="toc">
     <li><span>1</span><span>L'écran principal</span></li>
     <li><span>2</span><span>Profils film et réglages</span></li>
-    <li><span>3</span><span>Retouches (comme Snapseed)</span></li>
+    <li><span>3</span><span>Retouches</span></li>
     <li><span>4</span><span>Recadrer et redresser</span></li>
     <li><span>5</span><span>Courbes</span></li>
-    <li><span>6</span><span>Correcteur</span></li>
-    <li><span>7</span><span>Enregistrer – où sont mes photos ?</span></li>
-    <li><span>8</span><span>Traiter un lot de photos</span></li>
-    <li><span>9</span><span>Styles, QR codes et outils</span></li>
-    <li><span>10</span><span>À propos, langue, confidentialité</span></li>
-    <li><span>11</span><span>Astuces et questions fréquentes</span></li>
+    <li><span>6</span><span>Détails, Théâtral, Éclat glamour</span></li>
+    <li><span>7</span><span>Balance des blancs, Contraste des tons, HDR</span></li>
+    <li><span>8</span><span>Sélection et Pinceau</span></li>
+    <li><span>9</span><span>Correcteur</span></li>
+    <li><span>10</span><span>Double exposition, Effets, vue en grand</span></li>
+    <li><span>11</span><span>Enregistrer – où sont mes photos ?</span></li>
+    <li><span>12</span><span>Traiter un lot de photos</span></li>
+    <li><span>13</span><span>Styles, QR codes et outils</span></li>
+    <li><span>14</span><span>À propos, langue, confidentialité</span></li>
+    <li><span>15</span><span>Astuces et questions fréquentes</span></li>
   </ul>
   <h3>En trois gestes</h3>
   <ol>
@@ -87,19 +92,20 @@ th { background: #f4f1ea; font-size: 8.8pt; }
       <h3>En haut</h3>
       <ul>
         <li><span class="k y">📂 OUVRIR IMAGE</span> : choisir une photo.</li>
-        <li><span class="k b">🗂 OUVRIR UN LOT</span> : choisir plusieurs photos à corriger d'un coup (chapitre 8).</li>
+        <li><span class="k b">🗂 OUVRIR UN LOT</span> : choisir plusieurs photos à corriger d'un coup (chapitre 12).</li>
         <li><span class="k g">💾 ENREGISTRER</span> : enregistrer la photo retouchée (apparaît dès qu'une photo est ouverte).</li>
       </ul>
       <h3>L'aperçu</h3>
       <ul>
         <li><b>Gardez le doigt appuyé sur la photo</b> (ou sur <b>👁</b>) : vous voyez la photo <b>avant correction</b> ; levez le doigt pour revenir.</li>
         <li><b>Histogramme</b> en bas à gauche : la répartition des tons. Un point bleu = ombres bouchées, rouge = hautes lumières brûlées. Touchez-le pour le réduire.</li>
-        <li><b>👁 ↶ ↷</b> en bas à droite : voir l'avant (maintenu), annuler, rétablir.</li>
+        <li><b>⛶ 👁 ↶ ↷</b> en bas à droite : voir en grand, voir l'avant (maintenu), annuler, rétablir.</li>
+        <li><b>Deux tapotements</b> sur la photo (ou <b>⛶</b>) : la photo en <b>plein écran</b> avec toutes les corrections (chapitre 10).</li>
       </ul>
       <h3>Les onglets en bas</h3>
       <p><b>RÉGLAGES</b> • <b>PROFILS FILM</b> • <b>STYLES / QR</b> • <b>VISIONNEUSE</b></p>
     </div>
-    <img class="shot" src="02_reglages.jpg" alt="">
+    <img class="shot sm" src="02_reglages.jpg" alt="">
   </div>
   <div class="tip">Le bandeau vert : touchez <b>JM.DARGERE LAB PRO</b> pour ouvrir <b>À propos</b>, et <b>📷 INSTAGRAM</b> pour la page Instagram.</div>
   <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>3</span></div>
@@ -109,7 +115,7 @@ th { background: #f4f1ea; font-size: 8.8pt; }
 <section class="page">
   <h2><span class="n">2</span>Profils film et réglages</h2>
   <div class="row">
-    <img class="shot" src="03_profils.jpg" alt="">
+    <img class="shot xs" src="03_profils.jpg" alt="">
     <div class="txt">
       <h3>Profils film</h3>
       <p>Touchez un profil : la photo prend aussitôt son rendu. Le profil choisi est entouré de jaune.</p>
@@ -120,15 +126,14 @@ th { background: #f4f1ea; font-size: 8.8pt; }
         <span><b>Noir &amp; Blanc</b></span><span><b>Pellicule Couleur</b></span>
       </div>
       <h3>Onglet RÉGLAGES</h3>
-      <p>En haut, la <b>barre d'outils</b> :</p>
-      <p><span class="k b">🎛️ RETOUCHES</span> <span class="k">✂️ RECADRER</span> <span class="k g">📈 COURBES</span> <span class="k" style="background:#C62828">🩹 CORRECTEUR</span></p>
-      <p>Un outil actif est entouré de jaune.</p>
+      <p>En haut, le bouton <span class="k b">🧰 OUTILS</span> ouvre la grille des outils, rangés par familles : <b>Réglages</b> (Retouches, Détails, Courbes, Balance des blancs, Contraste des tons), <b>Retouche locale</b> (Sélection, Pinceau, Correcteur), <b>Cadrage</b> (Recadrer), <b>Créatif</b> (Théâtral, HDR, Double exposition, Éclat glamour, Effets).</p>
+      <p>Un <b>point jaune</b> signale un outil actif ; le bouton OUTILS indique les outils utilisés.</p>
       <h3>✨ Correction automatique ProLab</h3>
       <p>La <b>case</b> active ou désactive la correction automatique (exposition automatique + rendu LABO PRO). Le curseur <b>Intensité</b> règle sa force : <b>65 %</b> par défaut.</p>
       <p>Les réglages de lumière et de couleur se font avec <b>🎛️ Retouches</b> (chapitre 3). <b>RESET</b> remet tout à zéro (ProLab à 65 %).</p>
     </div>
   </div>
-  <div class="tip"><b>⭐ Favoris</b> : vos styles préférés apparaissent en boutons sous la correction ProLab (voir chapitre 9).</div>
+  <div class="tip"><b>⭐ Favoris</b> : vos styles préférés apparaissent en boutons sous la correction ProLab (voir chapitre 13).</div>
   <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>4</span></div>
 </section>
 
@@ -198,7 +203,63 @@ th { background: #f4f1ea; font-size: 8.8pt; }
 
 <!-- 7. Correcteur -->
 <section class="page">
-  <h2><span class="n">6</span>Correcteur</h2>
+  <h2><span class="n">6</span>Détails, Théâtral, Éclat glamour</h2>
+  <p>Trois outils de la famille <b>Réglages / Créatif</b>, dans <b>🧰 OUTILS</b>. Même geste que les Retouches : <b>↕</b> pour choisir le réglage, <b>↔</b> pour le changer, <b>👁</b> maintenu pour voir sans l'outil, <b>Désactiver</b> pour tout remettre à zéro.</p>
+  <div class="row">
+    <div class="txt">
+      <h3>🔎 Détails</h3>
+      <ul><li><b>Structure</b> : fait ressortir les textures (vers la droite) ou les adoucit (vers la gauche).</li><li><b>Netteté</b> : affine les contours.</li></ul>
+      <h3>🎭 Théâtral</h3>
+      <ul><li>Contraste local fort, ambiance dramatique. Quatre styles : <b>Lumineux 1 et 2</b>, <b>Sombre 1 et 2</b>.</li><li><b>Force</b> et <b>Saturation</b>.</li></ul>
+      <h3>✨ Éclat glamour</h3>
+      <ul><li>Lueur douce et lumineuse, flatteuse pour les portraits.</li><li><b>Éclat</b>, <b>Saturation</b>, <b>Chaleur</b>.</li></ul>
+    </div>
+    <img class="shot sm" src="13_theatral.jpg" alt="">
+  </div>
+  <div class="tip">Ces trois outils s'appliquent à la photo enregistrée <b>et au lot</b>.</div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>8</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">7</span>Balance des blancs, Contraste des tons, HDR</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>💧 Balance des blancs</h3>
+      <ul><li>L'outil s'ouvre en mode <b>pipette</b> : touchez un endroit qui devrait être <b>gris ou blanc</b> (mur, nuage, t-shirt). La dominante de couleur disparaît.</li>
+      <li>Affinez ensuite <b>Température</b> et <b>Teinte</b> (glisser ↕ puis ↔). <b>💧 Pipette</b> pour recommencer.</li></ul>
+      <h3>🌗 Contraste des tons</h3>
+      <ul><li>Contraste séparé dans les <b>tons clairs</b>, <b>tons moyens</b> et <b>tons foncés</b>.</li><li><b>Protéger les ombres / hautes lumières</b> évite de boucher les noirs ou brûler les blancs.</li></ul>
+      <h3>🌄 HDR</h3>
+      <ul><li>Fait ressortir les détails des ombres et des lumières. Styles <b>Nature, Personnes, Fin, Fort</b>.</li><li><b>Force</b>, <b>Luminosité</b>, <b>Saturation</b>.</li></ul>
+    </div>
+    <img class="shot sm" src="14_wb.jpg" alt="">
+  </div>
+  <div class="tip">Ces trois outils s'appliquent aussi au <b>lot</b> : la balance trouvée sur une photo vaut pour tout le groupe (idéal sous la même lumière).</div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>9</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">8</span>Sélection et Pinceau</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>🎯 Sélection</h3>
+      <ol><li>Touchez <b>＋ Point</b>, puis l'endroit à modifier.</li><li>Seule la zone autour <b>de couleur semblable</b> change : <b>Luminosité, Contraste, Saturation, Structure</b>, et la <b>Taille</b> de la zone (↕ pour choisir, ↔ pour régler).</li><li>Faites glisser un point pour le déplacer ; plusieurs points possibles ; <b>🗑</b> supprime.</li></ol>
+      <p><b>▦</b> montre la zone touchée en <b>rouge</b>.</p>
+    </div>
+    <img class="shot xs" src="15_selection.jpg" alt="">
+  </div>
+  <div class="row" style="margin-top:3mm">
+    <img class="shot xs" src="16_pinceau.jpg" alt="">
+    <div class="txt">
+      <h3>🖌️ Pinceau</h3>
+      <ul><li>Choisissez l'effet : <b>Lumière, Température, Saturation, Structure</b>, puis la force (−100 à +100).</li><li><b>Peignez</b> au doigt ; <b>🧽 Gomme</b> efface ; deux doigts pour zoomer.</li><li><b>▦</b> montre les zones peintes (rouge = plus, bleu = moins).</li></ul>
+    </div>
+  </div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>10</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">9</span>Correcteur</h2>
   <p>Comme le <b>Correcteur</b> de Snapseed : il efface une poussière, un bouton, un fil, une petite tache.</p>
   <div class="row">
     <div class="txt">
@@ -217,12 +278,28 @@ th { background: #f4f1ea; font-size: 8.8pt; }
     <img class="shot" src="08_correcteur.jpg" alt="">
   </div>
   <div class="tip">Le correcteur vaut pour la <b>photo ouverte</b> seulement (chaque photo a ses propres taches).</div>
-  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>8</span></div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>11</span></div>
+</section>
+
+<section class="page">
+  <h2><span class="n">10</span>Double exposition, Effets, vue en grand</h2>
+  <div class="row">
+    <div class="txt">
+      <h3>🖼️ Double exposition</h3>
+      <ul><li><b>📷 Photo</b> : choisissez la 2ᵉ photo.</li><li><b>Un doigt</b> la déplace, <b>deux doigts</b> l'agrandissent et la tournent ; <b>⌖</b> recentre.</li><li>Mélange : <b>Normal, Éclaircir, Assombrir, Superposition, Ajouter</b> ; <b>Opacité</b>.</li></ul>
+      <h3>🌤️ Effets</h3>
+      <p>Ciel assombri, visage éclairci, peau lissée, dégradé, grain, noir et blanc, réduction du bruit, format prêt à publier, filigrane.</p>
+      <h3>⛶ Vue en grand</h3>
+      <ul><li><b>⛶</b> ou <b>deux tapotements</b> sur la photo : plein écran avec <b>toutes les corrections</b>.</li><li><b>Deux doigts</b> : zoomer ; <b>doigt maintenu</b> : avant ; <b>✕</b> ou retour : fermer.</li></ul>
+    </div>
+    <img class="shot sm" src="17_double.jpg" alt="">
+  </div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>12</span></div>
 </section>
 
 <!-- 8. Enregistrer -->
 <section class="page">
-  <h2><span class="n">7</span>Enregistrer – où sont mes photos ?</h2>
+  <h2><span class="n">11</span>Enregistrer – où sont mes photos ?</h2>
   <p>Touchez <span class="k g">💾 ENREGISTRER</span>. Un bandeau indique le temps de traitement, puis <b>✔ ENREGISTRÉ</b> avec le nom du fichier. La photo d'origine n'est jamais modifiée : la copie se termine par <b>_JMD_LAB_PRO.jpg</b>.</p>
   <table>
     <tr><th>Ce que vous faites</th><th>Où ça va</th></tr>
@@ -238,13 +315,13 @@ th { background: #f4f1ea; font-size: 8.8pt; }
   <h3>Les retrouver</h3>
   <p>Dans la <b>Galerie</b> ou <b>Google Photos</b> : album <b>JM LAB PRO</b>. Ou dans l'appli <b>Fichiers</b> : Images (Pictures) › JM LAB PRO.</p>
   <h3>Ce qui est appliqué à l'enregistrement</h3>
-  <p>Correction ProLab + profil + Retouches + Courbes + Recadrage + Correcteur + Effets (ciel, visage, grain…) + Cadre et signature si activés.</p>
-  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>9</span></div>
+  <p>Correction ProLab + profil + Retouches + tous les outils actifs (point jaune dans 🧰 OUTILS) + Effets + Cadre et signature si activés. Le <b>⛶ aperçu final</b> montre ce résultat avant d'enregistrer.</p>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>13</span></div>
 </section>
 
 <!-- 9. Lot -->
 <section class="page">
-  <h2><span class="n">8</span>Traiter un lot de photos</h2>
+  <h2><span class="n">12</span>Traiter un lot de photos</h2>
   <div class="row">
     <div class="txt">
       <ol>
@@ -258,16 +335,16 @@ th { background: #f4f1ea; font-size: 8.8pt; }
         <li><b>⛔ STOP</b> arrête le lot en cours.</li>
         <li>Les photos <b>HEIC</b> sont converties automatiquement ; les <b>très grandes</b> photos sont réduites pour éviter un plantage.</li>
       </ul>
-      <div class="warn">Le <b>recadrage</b> et le <b>correcteur</b> ne s'appliquent pas au lot (ils sont propres à une photo). Les <b>courbes</b> et les <b>Retouches</b>, si.</div>
+      <div class="warn"><b>Recadrer, Sélection, Pinceau, Correcteur, Double exposition</b> sont propres à une photo : ils ne s'appliquent pas au lot. Tous les autres (Retouches, Courbes, Détails, Balance des blancs, Contraste des tons, Théâtral, HDR, Éclat, Effets), si.</div>
     </div>
     <img class="shot" src="10_lot.jpg" alt="">
   </div>
-  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>10</span></div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>14</span></div>
 </section>
 
 <!-- 10. Styles -->
 <section class="page">
-  <h2><span class="n">9</span>Styles, QR codes et outils</h2>
+  <h2><span class="n">13</span>Styles, QR codes et outils</h2>
   <div class="row">
     <img class="shot sm" src="09_styles.jpg" alt="">
     <div class="txt" style="font-size:9.4pt">
@@ -281,17 +358,16 @@ th { background: #f4f1ea; font-size: 8.8pt; }
         <li><b>Comparer les profils</b> : votre photo avec chaque profil côte à côte.</li>
         <li><b>Apprendre la retouche</b> : photo avant + photo retouchée → réglages.</li>
         <li><b>Style depuis une référence</b>, <b>intensité &amp; mélange</b>, <b>style → plusieurs dossiers</b>.</li>
-        <li><b>Effets</b> : ciel, visage, dégradé, grain, N&amp;B, netteté, bruit, recadrage prêt à publier, filigrane, pinceau.</li>
-        <li><b>Mode cours</b>, <b>fiche de cours</b>, <b>défi du jour</b>, <b>grand texte</b>, <b>LUT .cube</b>, <b>historique des lots</b>, <b>favoris</b>.</li>
+        <li><b>Fiche de cours</b>, <b>défi du jour</b>, <b>grand texte</b>, <b>LUT .cube</b>, <b>historique des lots</b>, <b>favoris</b>, <b>mode d'emploi</b>.</li>
       </ul>
     </div>
   </div>
-  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>11</span></div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>15</span></div>
 </section>
 
 <!-- 11. A propos + FAQ -->
 <section class="page">
-  <h2><span class="n">10</span>À propos, langue, confidentialité</h2>
+  <h2><span class="n">14</span>À propos, langue, confidentialité</h2>
   <div class="row">
     <div class="txt">
       <p>Touchez <b>JM.DARGERE LAB PRO</b> dans le bandeau vert.</p>
@@ -305,14 +381,14 @@ th { background: #f4f1ea; font-size: 8.8pt; }
     </div>
     <img class="shot sm" src="11_apropos.jpg" alt="">
   </div>
-  <h2 style="margin-top:4mm"><span class="n">11</span>Astuces et questions fréquentes</h2>
+  <h2 style="margin-top:4mm"><span class="n">15</span>Astuces et questions fréquentes</h2>
   <ul style="font-size:9.3pt">
     <li><b>Ouvrir une photo depuis la galerie</b> : « Partager » ou « Ouvrir avec / Modifier avec » → <b>JM LAB PRO</b>.</li>
     <li><b>Bouton retour</b> d'Android : ferme d'abord la fenêtre ouverte, puis quitte l'appli.</li>
     <li><b>Mettre à jour l'appli</b> : installer le nouveau fichier APK par-dessus ; vos réglages et presets sont conservés.</li>
     <li><b>La photo enregistrée semble différente de l'aperçu</b> : l'aperçu est réduit ; recadrage, correcteur et effets sont calculés en pleine taille à l'enregistrement.</li>
   </ul>
-  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>12</span></div>
+  <div class="foot"><span>JM LAB PRO – Mode d'emploi</span><span>16</span></div>
 </section>
 
 </body>

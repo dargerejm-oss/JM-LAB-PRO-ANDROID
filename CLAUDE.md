@@ -14,10 +14,8 @@
 - Expliquer simplement, sans jargon technique ; l'utilisateur teste sur son téléphone Android.
 - Dire clairement ce qui est publié et ce qui ne l'est pas encore.
 
-## Travail en cours (à reprendre)
-Version 4.10 (vue en grand + bouton retour corrigé) : grille OUTILS complète (Retouches, Détails, Courbes, Balance des blancs,
-Contraste des tons, Sélection, Pinceau, Correcteur, Recadrer, Théâtral, HDR, Double exposition, Éclat glamour, Effets).
-Reste à faire :
-1. **Mode d'emploi** FR + EN mis à jour (sources dans `store/manuel`, `PAGES` dans `jmabout.js`).
-2. Publier sur `main` quand l'utilisateur le demande.
+## État actuel
+Version 4.11 : tous les outils demandés sont faits (grille OUTILS : Retouches, Détails, Courbes, Balance des blancs,
+Contraste des tons, Sélection, Pinceau, Correcteur, Recadrer, Théâtral, HDR, Double exposition, Éclat glamour, Effets),
+vue en grand, mode d'emploi FR + EN à jour (16 pages, sources dans `store/manuel`, `PAGES` dans `jmabout.js`).
 Ne PAS ajouter : Perspective, Noir et blanc complet.

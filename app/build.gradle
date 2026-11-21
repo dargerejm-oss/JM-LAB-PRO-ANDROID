@@ -10,8 +10,8 @@ android {
         applicationId "com.jmdargere.jmlab"
         minSdk 26
         targetSdk 36
-        versionCode 31
-        versionName "4.10"
+        versionCode 32
+        versionName "4.11"
     }
 
     // Cle de signature PRIVEE : fournie par GitHub (secrets), jamais dans le depot.
