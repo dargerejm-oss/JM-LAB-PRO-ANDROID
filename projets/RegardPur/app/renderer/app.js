@@ -6,7 +6,7 @@ var N = window.RPNative || null;               // partie PC (absente dans un sim
 var RAWX = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|x3f|3fr|iiq|rwl|mrw|kdc|erf)$/i;
 var IMGX = /\.(jpe?g|png|webp|bmp|gif|tiff?|heic|heif|hif)$/i, HEICX = /\.(heic|heif|hif)$/i;
 
-var AVER = 3; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
+var AVER = 4; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
 var S = {
   photos: [], byId: {}, view: [], cur: -1, sel: new Set(), filter: "all", dir: null, groups: [], openGroup: -1,
   undo: [], analysing: false, saveT: 0
@@ -225,6 +225,11 @@ function reasons(p) {
     else if (a.mp < 2.5) warn.push("Petite définition (" + String(a.mp).replace(".", ",") + " Mpx) : tirage jusqu'à ~" + cmW + "×" + cmH + " cm"); }
   if (!a.exif || (!a.exif.date && !a.exif.model && !a.exif.make)) warn.push("Sans EXIF (copie, capture ou photo envoyée par message ?)");
   var ae = aesScore(a); if (ae != null && ae >= 72 && !rej.length && !warn.some(function (t) { return /Netteté|bougé/.test(t); })) good.push("Belle image (œil artistique)");
+  if (a.cadre) warn.push("Cadre ajouté (export déjà finalisé ?)");
+  if (p.dup >= 0) { var dg = S.dups[p.dup], od = S.byId[dg.orig];
+    if (p.dupOrig) good.push("Original gardé (" + dg.length + " versions de cette photo)");
+    else warn.push("Doublon : autre version de " + (od ? od.name : "une photo") + (p.dupSize ? " (taille différente)" : ""));
+  }
   var g = p.g >= 0 ? S.groups[p.g] : null;
   if (g) {
     if (p.best) good.push("Meilleure de la série (" + g.length + " photos)");
@@ -258,7 +263,43 @@ function buildGroups() {
     var ids = arr.map(function (p) { return p.id; }); ids.best = best.id; S.groups.push(ids);
   });
 }
-function rescore() { S.photos.forEach(function (p) { p.score = score(p); }); buildGroups(); S.photos.forEach(function (p) { p.why = reasons(p); }); }
+/* doublons (repris d'AUDIT PHOTOS PRO) : la meme photo dans un autre fichier (reexport, retouche, recadrage, version redressee,
+   avec cadre ou plus petite). Original garde : sans cadre, puis la plus grande, puis la plus ancienne. */
+function pc32(x) { x = x - ((x >>> 1) & 0x55555555); x = (x & 0x33333333) + ((x >>> 2) & 0x33333333); return (((x + (x >>> 4)) & 0x0F0F0F0F) * 0x01010101) >>> 24; }
+function hx(h) { return [parseInt(h.slice(0, 8), 16) >>> 0, parseInt(h.slice(8, 16), 16) >>> 0]; }
+function hd(a, b) { return pc32((a[0] ^ b[0]) >>> 0) + pc32((a[1] ^ b[1]) >>> 0); }
+function buildDups() {
+  var L = S.photos.filter(function (p) { p.dup = -1; p.dupOrig = false; p.dupSize = false; return p.a && !p.a.err && p.a.dh; });
+  var H = L.map(function (p) { return p.a.dh.map(hx); }), par = L.map(function (x, i) { return i; });
+  var find = function (i) { while (par[i] !== i) { par[i] = par[par[i]]; i = par[i]; } return i; };
+  for (var i = 0; i < L.length; i++) for (var j = i + 1; j < L.length; j++) {
+    var d0 = hd(H[i][0], H[j][0]); if (d0 > 22) continue;
+    var dc = d0; for (var k = 1; k < 5; k++) { dc = Math.min(dc, hd(H[i][0], H[j][k]), hd(H[j][0], H[i][k])); }
+    if (d0 > 6 && dc > 10) continue;
+    // une rafale (deux instants differents) n'est pas un doublon : meme date de prise de vue, ou date absente
+    var ea = L[i].a.exif && L[i].a.exif.date, eb = L[j].a.exif && L[j].a.exif.date;
+    if (ea && eb && Math.abs(ea - eb) > 1000) continue;
+    if (ea && eb && d0 > 4 && dc > 6 && Math.abs(ea - eb) > 0) continue;
+    par[find(i)] = find(j);
+  }
+  var G = {}; L.forEach(function (p, i) { var r = find(i); (G[r] = G[r] || []).push(p); });
+  S.dups = [];
+  Object.keys(G).forEach(function (r) {
+    var g = G[r]; if (g.length < 2) return;
+    var gi = S.dups.length, key = function (p) { return [p.a.cadre ? 1 : 0, -(p.a.w * p.a.h), p.mtime || 0]; };
+    var o = g.slice().sort(function (a, b) { var A = key(a), B = key(b); for (var q = 0; q < 3; q++) if (A[q] !== B[q]) return A[q] - B[q]; return 0; })[0];
+    var dims = {}; g.forEach(function (p) { var dk = p.a.w + "x" + p.a.h; dims[dk] = (dims[dk] || 0) + 1; });
+    var modal = Object.keys(dims).sort(function (a, b) { return dims[b] - dims[a]; })[0].split("x").map(Number);
+    g.forEach(function (p) { p.dup = gi; p.dupOrig = p === o; p.dupSize = Math.abs(p.a.w * p.a.h - modal[0] * modal[1]) / (modal[0] * modal[1]) >= 0.05; });
+    var ids = g.map(function (p) { return p.id; }); ids.orig = o.id; S.dups.push(ids);
+  });
+}
+function rejectDups() {
+  var n = 0; pushUndo(S.photos.filter(function (p) { return p.dup >= 0 && !p.dupOrig; }));
+  S.photos.forEach(function (p) { if (p.dup >= 0 && !p.dupOrig && p.status !== "R") { p.status = "R"; p.auto = false; n++; updCard(p); } });
+  drawFilters(); showPanel(); saveSoon(); toast(n ? n + " doublon" + (n > 1 ? "s rejetés" : " rejeté") + " : les originaux sont gardés (Ctrl+Z pour annuler)." : "Aucun doublon à rejeter.", 4000);
+}
+function rescore() { S.photos.forEach(function (p) { p.score = score(p); }); buildGroups(); buildDups(); S.photos.forEach(function (p) { p.why = reasons(p); }); }
 
 /* ---------------- ouverture d'un dossier ---------------- */
 async function openFolder() {
@@ -556,7 +597,10 @@ var ISSUES = [
   ["qual", "Qualité d'image (bruit, pixels, compression, définition)", function (p) { return has(p, /Pixelisée|agrandie|Compression|bruit|Bruit|bruitée|définition/); }],
   ["noexif", "Sans EXIF", function (p) { return has(p, /Sans EXIF/); }],
   ["faces", "Avec visages", function (p) { return bigFaces(p.a).length > 0; }],
-  ["groups", "Rafales et doublons", function (p) { return p.g >= 0; }]
+  ["groups", "Rafales et séries", function (p) { return p.g >= 0; }],
+  ["dups", "Doublons (même photo, autre fichier)", function (p) { return p.dup >= 0; }],
+  ["dupsize", "Doublons de taille différente", function (p) { return p.dup >= 0 && p.dupSize; }],
+  ["cadre", "Cadre ajouté", function (p) { return !!(p.a && p.a.cadre); }]
 ];
 function has(p, re) { var w = p.why; if (!w) return false; return w.rej.concat(w.warn).some(function (t) { return re.test(t); }); }
 function fnOf(k) {
@@ -566,9 +610,9 @@ function fnOf(k) {
 function drawFilters() {
   function row(f) { var n = S.photos.filter(f[2]).length; return '<div class="flt' + (S.filter === f[0] ? " on" : "") + '" data-f="' + f[0] + '"><span>' + f[1] + "</span><span>" + n + "</span></div>"; }
   $("filters").innerHTML = FILTERS.map(row).join("");
-  $("issues").innerHTML = ISSUES.map(row).join("");
+  $("issues").innerHTML = ISSUES.map(row).join("") + (S.dups && S.dups.some(function (g) { return g.some(function (id) { var q = S.byId[id]; return q && !q.dupOrig && q.status !== "R"; }); }) ? '<button id="bRejDup" class="mini" style="width:100%;margin-top:4px" data-tip="Rejette toutes les versions en double et garde l\'original de chaque photo (sans cadre, la plus grande, puis la plus ancienne)">Rejeter les doublons (garder les originaux)</button>' : "");
 }
-$("side").addEventListener("click", function (e) { var f = e.target.closest(".flt"); if (!f) return; S.filter = f.dataset.f; S.openGroup = -1; refresh(true); });
+$("side").addEventListener("click", function (e) { if (e.target.id === "bRejDup") { rejectDups(); return; } var f = e.target.closest(".flt"); if (!f) return; S.filter = f.dataset.f; S.openGroup = -1; refresh(true); });
 
 /* ---------------- grille ---------------- */
 var cards = {};

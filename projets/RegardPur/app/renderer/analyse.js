@@ -264,6 +264,43 @@ function dhash(g, w, h) {
   for (j = 0; j < H; j++) for (i = 0; i < 8; i++) { nib = (nib << 1) | (s[j * W + i] < s[j * W + i + 1] ? 1 : 0); bits++; if (bits === 4) { hex += nib.toString(16); nib = 0; bits = 0; } }
   return hex;
 }
+// cadre ajoute (repris d'AUDIT PHOTOS PRO) : bordure unie de n'importe quelle couleur sur au moins 3 bords,
+// suivie d'une transition franche vers la photo (un ciel ou un fond studio change en douceur)
+function frameAny(img) {
+  var d = img.data, w = img.width, h = img.height; if (w < 40 || h < 40) return null;
+  var px = function (x, y) { var i = (y * w + x) * 4; return [d[i], d[i + 1], d[i + 2]]; };
+  var cs = [px(0, 0), px(w - 1, 0), px(0, h - 1), px(w - 1, h - 1)], col = [0, 1, 2].map(function (k) { var v = cs.map(function (c) { return c[k]; }).sort(function (a, b) { return a - b; }); return (v[1] + v[2]) / 2; });
+  var near = function (c) { return Math.abs(c[0] - col[0]) + Math.abs(c[1] - col[1]) + Math.abs(c[2] - col[2]) < 32; };
+  var row = function (y) { var n = 0, t = 0; for (var x = 0; x < w; x += 2) { t++; if (near(px(x, y))) n++; } return n / t > 0.9; };
+  var colm = function (x) { var n = 0, t = 0; for (var y = 0; y < h; y += 2) { t++; if (near(px(x, y))) n++; } return n / t > 0.9; };
+  var lim = Math.floor(Math.min(w, h) / 4), cnt = function (f) { var n = 0; while (n < lim && f(n)) n++; return n; };
+  var e = [cnt(row), cnt(function (i) { return row(h - 1 - i); }), cnt(colm), cnt(function (i) { return colm(w - 1 - i); })];
+  var t = e.slice().sort(function (a, b) { return a - b; })[1]; if (t < 6) return null;
+  var m = Math.min(t + 4, Math.floor(h / 2) - 1, Math.floor(w / 2) - 1); if (m <= t) return null;
+  var ins = [px(w >> 1, m), px(w >> 1, h - 1 - m), px(m, h >> 1), px(w - 1 - m, h >> 1)], ec = 0;
+  for (var k = 0; k < 3; k++) ec += Math.abs((ins[0][k] + ins[1][k] + ins[2][k] + ins[3][k]) / 4 - col[k]);
+  if (ec < 28) return null;
+  return {t: e, c: col.map(Math.round)};
+}
+// empreintes tolerantes (reprises d'AUDIT PHOTOS PRO) : image egalisee (retouches de lumiere / couleur), redressee si penchee,
+// sans le cadre, puis entiere et recadrages centraux de 90 a 60 % (une version recadree reste reconnue)
+function dupHashes(cv, W, H, tilt, fr) {
+  var x0 = 0, y0 = 0, x1 = W, y1 = H;
+  if (fr) { var k = W / fr.w; x0 = fr.t[2] * k; x1 = W - fr.t[3] * k; y0 = fr.t[0] * k; y1 = H - fr.t[1] * k; }
+  var cw = x1 - x0, ch = y1 - y0, s = Math.min(1, 256 / Math.max(cw, ch)), tw = Math.max(16, Math.round(cw * s)), th = Math.max(16, Math.round(ch * s));
+  var c = canvas(tw, th), x = c.getContext("2d", {willReadFrequently: true}); x.imageSmoothingQuality = "high";
+  if (tilt && Math.abs(tilt) >= 2) { x.translate(tw / 2, th / 2); x.rotate(-tilt * Math.PI / 180); var z = 1 + Math.abs(Math.sin(tilt * Math.PI / 180)) * 1.2; x.scale(z, z); x.translate(-tw / 2, -th / 2); }
+  x.drawImage(cv, x0, y0, cw, ch, 0, 0, tw, th);
+  var id = x.getImageData(0, 0, tw, th).data, g = new Float32Array(tw * th), hist = new Float32Array(256), i;
+  for (i = 0; i < g.length; i++) { var v = Math.round(0.299 * id[i * 4] + 0.587 * id[i * 4 + 1] + 0.114 * id[i * 4 + 2]); g[i] = v; hist[v]++; }
+  var cdf = new Float32Array(256), acc = 0; for (i = 0; i < 256; i++) { acc += hist[i]; cdf[i] = acc / g.length * 255; }
+  for (i = 0; i < g.length; i++) g[i] = cdf[g[i]];
+  return [1, 0.9, 0.8, 0.7, 0.6].map(function (r) {
+    var w2 = Math.max(9, Math.round(tw * r)), h2 = Math.max(8, Math.round(th * r)), ox = (tw - w2) >> 1, oy = (th - h2) >> 1, sub = new Float32Array(w2 * h2);
+    for (var yy = 0; yy < h2; yy++) for (var xx = 0; xx < w2; xx++) sub[yy * w2 + xx] = g[(yy + oy) * tw + xx + ox];
+    return dhash(sub, w2, h2);
+  });
+}
 function colorSig(img) {
   // couleur moyenne en 4x4 cases : aide a separer deux scenes qui se ressemblent en noir et blanc
   var d = img.data, w = img.width, h = img.height, out = [];
@@ -276,7 +313,7 @@ function colorSig(img) {
 }
 
 async function analyse(msg) {
-  var out = {id: msg.id, v: 3};
+  var out = {id: msg.id, v: 4};
   var blob = new Blob([msg.buf], {type: "image/jpeg"});
   // informations de prise de vue
   try {
@@ -309,12 +346,14 @@ async function analyse(msg) {
   // un fin liseré dans le cadre : on le saute aussi
   if (bt || bl) { bt = Math.min(Math.round(ah * lim), bt + 6); bl = Math.min(Math.round(aw * lim), bl + 6); bb = Math.max(Math.round(ah * (1 - lim)), bb - 6); br = Math.max(Math.round(aw * (1 - lim)), br - 6); }
   out.frame = !!(bt || bl);
+  var fa = frameAny(aimg); if (fa) { out.cadre = {t: fa.t, c: fa.c, w: aw}; }
   var hist = new Uint32Array(64), hi = 0, lo = 0, sum = 0, n = 0;
   for (var yy = bt; yy <= bb; yy++) for (var xx = bl; xx <= br; xx++) { var v = g[yy * aw + xx]; sum += v; n++; hist[Math.min(63, v >> 2)]++; if (v >= 250) hi++; if (v <= 5) lo++; }
   n = Math.max(1, n); out.expo = {mean: Math.round(sum / n), hi: Math.round(hi / n * 1000) / 10, lo: Math.round(lo / n * 1000) / 10};
   out.hist = Array.prototype.slice.call(hist);
   out.hash = dhash(g, aw, ah); out.col = colorSig(aimg);
   out.tilt = horizonTilt(g, aw, ah);
+  try { out.dh = dupHashes(ac, aw, ah, out.tilt, out.cadre); } catch (e) {}
   // zones les plus detaillees (grille 6 x 4) -> nettete mesuree a 100 % sur les 3 meilleures
   var GX = 6, GY = 4, tiles = [];
   for (var ty = 0; ty < GY; ty++) for (var tx2 = 0; tx2 < GX; tx2++) {

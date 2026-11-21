@@ -78,13 +78,11 @@ jobs:
           gh release delete-asset "$TAG" RegardPur.exe -y -R "${{ github.repository }}" || true
 
       - name: Publier
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'regardpur' || 'regardpur-test' }}
-          name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'Regard Pur (PC)' || 'Regard Pur TEST (PC)' }}
-          prerelease: ${{ github.ref_name != 'main' && github.ref_name != 'master' }}
-          make_latest: 'false'
-          body: "Regard Pur pour Windows. RegardPur.zip : a decompresser, puis double-clic sur RegardPur.exe (sans installation). RegardPur_Installation.exe : installe avec un raccourci. Construit le ${{ github.event.head_commit.timestamp }}."
-          files: |
-            projets/RegardPur/app/dist/RegardPur.zip
-            projets/RegardPur/app/dist/RegardPur_Installation.exe
+        # depot des fichiers seulement (sans modifier la publication elle-meme : evite le refus « Resource not accessible »)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'regardpur' || 'regardpur-test' }}
+          gh release view "$TAG" -R "${{ github.repository }}" >/dev/null 2>&1 || gh release create "$TAG" -R "${{ github.repository }}" --prerelease --title "Regard Pur (PC)" --notes "Regard Pur pour Windows. RegardPur.zip : a decompresser, puis double-clic sur RegardPur.exe. RegardPur_Installation.exe : installe avec un raccourci." --target "${{ github.sha }}"
+          gh release upload "$TAG" dist/RegardPur.zip dist/RegardPur_Installation.exe --clobber -R "${{ github.repository }}"
