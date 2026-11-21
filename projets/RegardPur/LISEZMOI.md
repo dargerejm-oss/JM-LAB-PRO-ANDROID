@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.5 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.6 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
@@ -16,6 +16,7 @@ Version 2.5 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - **Personnes** : reconnaissance des visages (face-api, sans internet), liste avec photo de chaque personne, filtre par personne, double-clic pour lui donner un nom (gardé dans la session).
 - **Photos semblables** : bouton dans le panneau de droite, triées de la plus proche à la moins proche.
 - **Œil artistique** (2.5) : note de beauté sur 10 (lumière, couleurs, composition) par le modèle NIMA MobileNet (idealo, licence Apache 2.0), calculée sur le PC sans internet ; elle entre dans le score et dans l'apprentissage de vos goûts. Poids préparés par `tools/nima_export.py` (lancé par GitHub).
+- **Composition** (2.6) : visage coupé par le bord, personne qui tourne la tête dans un groupe, horizon penché (vraie longue ligne droite, mesurée au degré) ; filtre « Composition ».
 - Score sur 100 qui **apprend de vos choix P / X**.
 - **Tri automatique** avec trois niveaux d'exigence ; vos choix faits à la main ne sont jamais touchés.
 - Grille de vignettes, **vue en grand** avec zoom à 100 % sur les yeux, **comparaison** de 2 à 6 photos avec zoom synchronisé.

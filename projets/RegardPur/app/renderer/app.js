@@ -123,6 +123,10 @@ function reasons(p) {
   var fl = f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }), faceOk = fl.length && avg(fl) >= 55 && avg(fl) <= 225;
   if (a.expo.hi > TH.hi[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très clair" : "Très surexposée"); else if (a.expo.hi > 4) warn.push("Blancs brûlés (" + a.expo.hi + " %)");
   if (a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très sombre" : "Très sombre"); else if (a.expo.mean < 62 && !faceOk) warn.push("Sombre");
+  // composition
+  if (f.some(function (x) { return x.x < 0.004 || x.y < 0.004 || x.x + x.w > 0.996 || x.y + x.h > 0.996; }) && f.length) warn.push("Visage coupé par le bord");
+  if (f.length >= 2) { var turned = f.filter(function (x) { return x.yaw != null && Math.abs(x.yaw) > 0.42; }).length; if (turned) warn.push(turned + " personne" + (turned > 1 ? "s tournent" : " tourne") + " la tête"); }
+  if (a.tilt) warn.push("Horizon penché (" + Math.abs(a.tilt).toFixed(1).replace(".", ",") + "°)");
   var ae = aesScore(a); if (ae != null && ae >= 72) good.push("Belle image (œil artistique)");
   var g = p.g >= 0 ? S.groups[p.g] : null;
   if (g) {
@@ -446,6 +450,7 @@ var ISSUES = [
   ["motion", "Flou de bougé", function (p) { return has(p, /bougé/i); }],
   ["eyes", "Yeux fermés / mi-clos", function (p) { return has(p, /Yeux fermés|mi-clos/); }],
   ["expo", "Exposition ratée", function (p) { return has(p, /exposée|sombre|brûlés/i); }],
+  ["compo", "Composition (bord, tête, horizon)", function (p) { return has(p, /coupé|tête|Horizon/); }],
   ["faces", "Avec visages", function (p) { return bigFaces(p.a).length > 0; }],
   ["groups", "Rafales et doublons", function (p) { return p.g >= 0; }]
 ];

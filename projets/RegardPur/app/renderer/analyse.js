@@ -144,6 +144,29 @@ function sharpAt(bmp, sx, sy, sw, sh, k) {
 }
 function toScore(v) { return Math.max(0, Math.min(100, Math.round((v - 0.40) / (0.80 - 0.40) * 100))); }
 
+/* horizon penche : parmi les bords forts, cherche une ligne longue presque horizontale (entre 0,8 et 8 degres) */
+function horizonTilt(g, w, h) {
+  // une vraie longue ligne droite presque horizontale (horizon, bord de mer, mur) : transformee de Hough
+  var mags = [];
+  for (var y = 1; y < h - 1; y += 2) for (var x = 1; x < w - 1; x += 2) {
+    var p = y * w + x, gy = g[p + w] - g[p - w]; if (Math.abs(gy) > 30) mags.push(Math.abs(gy));
+  }
+  if (mags.length < 300) return 0;
+  mags.sort(function (a, b) { return b - a; }); var T = Math.max(30, mags[Math.floor(mags.length * 0.25)]);
+  var NA = 33, R = h + w, acc = new Uint16Array(NA * R), cs = [], sn = [];
+  for (var k = 0; k < NA; k++) { var t = (k - 16) * 0.5 * Math.PI / 180; cs.push(Math.cos(t)); sn.push(Math.sin(t)); }
+  for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x += 2) {
+    p = y * w + x; var gx = g[p + 1] - g[p - 1]; gy = g[p + w] - g[p - w];
+    if (Math.abs(gy) < T || Math.abs(gx) > Math.abs(gy) * 0.2) continue;   // bord presque horizontal
+    for (k = 0; k < NA; k++) { var r = Math.round(y * cs[k] - x * sn[k]) + w; if (r >= 0 && r < R) acc[k * R + r]++; }
+  }
+  var best = 0, bk = 16; for (k = 0; k < NA; k++) for (r = 0; r < R; r++) { var v = acc[k * R + r] + (r + 1 < R ? acc[k * R + r + 1] : 0); if (v > best) { best = v; bk = k; } }
+  // la ligne doit couvrir au moins un tiers de la largeur (un point sur deux est compte)
+  if (best < w / 2 * 0.33) return 0;
+  var ang = (bk - 16) * 0.5;
+  return Math.abs(ang) >= 1 && Math.abs(ang) <= 8 ? ang : 0;
+}
+
 function dhash(g, w, h) {
   // empreinte 8x8 (difference horizontale) sur l'image reduite
   var W = 9, H = 8, s = new Float32Array(W * H);
@@ -206,6 +229,7 @@ async function analyse(msg) {
   n = Math.max(1, n); out.expo = {mean: Math.round(sum / n), hi: Math.round(hi / n * 1000) / 10, lo: Math.round(lo / n * 1000) / 10};
   out.hist = Array.prototype.slice.call(hist);
   out.hash = dhash(g, aw, ah); out.col = colorSig(aimg);
+  out.tilt = horizonTilt(g, aw, ah);
   // zones les plus detaillees (grille 6 x 4) -> nettete mesuree a 100 % sur les 3 meilleures
   var GX = 6, GY = 4, tiles = [];
   for (var ty = 0; ty < GY; ty++) for (var tx2 = 0; tx2 < GX; tx2++) {
@@ -254,7 +278,9 @@ async function analyse(msg) {
           ax2.imageSmoothingQuality = "high"; ax2.translate(75, 75); ax2.rotate(-ang); ax2.scale(150 / side, 150 / side); ax2.drawImage(bmp, -fcx, -fcy);
           var px = ax2.getImageData(0, 0, 150, 150).data;
           var fl = 0, fn = 0; for (var fy = Math.floor((miny + bh * 0.25) * ah); fy < (miny + bh * 0.8) * ah; fy += 2) for (var fx = Math.floor((minx + bw * 0.2) * aw); fx < (minx + bw * 0.8) * aw; fx += 2) { if (fy >= 0 && fy < ah && fx >= 0 && fx < aw) { fl += g[fy * aw + fx]; fn++; } }
-          out.faces.push({px: px, lum: fn ? Math.round(fl / fn) : null, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
+          var nose = pts[1], eyeMid = (le.x + re.x) / 2, eyeD = Math.max(1, Math.hypot(re.x - le.x, re.y - le.y));
+          var yaw = Math.round((nose.x * W - eyeMid) / eyeD * 100) / 100;
+          out.faces.push({yaw: yaw, px: px, lum: fn ? Math.round(fl / fn) : null, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
             closed: blinkMin > 0.5, half: !(blinkMin > 0.5) && blink > 0.45, smile: Math.round(smile * 100) / 100,
             eyeSharp: es ? toScore(es.v) : null, faceSharp: fs2 ? toScore(fs2.v) : null});
         });
