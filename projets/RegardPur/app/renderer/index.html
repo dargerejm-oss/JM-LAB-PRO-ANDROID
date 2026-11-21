@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regard Pur</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand"><img src="icon.png" alt=""><div><b>Regard Pur</b><small id="folderName">Trie. Épure. Garde le regard.</small></div></div>
+  <button id="bOpen" class="pri">📂 Ouvrir un dossier</button>
+  <button id="bAuto" disabled>✨ Tri automatique</button>
+  <label class="sel">Exigence
+    <select id="sStrict"><option value="0">Souple</option><option value="1" selected>Normale</option><option value="2">Stricte</option></select>
+  </label>
+  <button id="bCompare" disabled>⇆ Comparer</button>
+  <button id="bExport" disabled>📤 Exporter</button>
+  <div class="grow"></div>
+  <div id="prog"><div id="progBar"></div><span id="progTxt"></span></div>
+  <button id="bHelp" title="Raccourcis clavier">❔</button>
+</header>
+
+<div id="main">
+  <aside id="side">
+    <h4>Afficher</h4>
+    <div id="filters"></div>
+    <h4>Problèmes repérés</h4>
+    <div id="issues"></div>
+    <h4>Options</h4>
+    <label class="ck"><input type="checkbox" id="cGroup" checked> Regrouper les rafales et doublons</label>
+    <label class="ck"><input type="checkbox" id="cAdvance" checked> Passer à la suivante après P / X</label>
+    <label class="sel full">Trier par
+      <select id="sSort"><option value="date">Date de prise de vue</option><option value="score">Score (meilleures d'abord)</option><option value="name">Nom du fichier</option></select>
+    </label>
+    <label class="sel full">Taille des vignettes
+      <input type="range" id="rSize" min="120" max="360" value="200">
+    </label>
+    <div id="learn" class="note"></div>
+  </aside>
+
+  <section id="center">
+    <div id="empty">
+      <div class="big">👁️</div>
+      <h2>Ouvrez un dossier de photos</h2>
+      <p>Regard Pur analyse chaque photo : <b>netteté réelle</b>, <b>flou de bougé</b>, <b>yeux fermés</b>, <b>exposition</b>, <b>rafales et doublons</b>.<br>
+      Ensuite : <b>P</b> pour garder, <b>X</b> pour rejeter, <b>1 à 5</b> pour les étoiles, ou <b>✨ Tri automatique</b>.</p>
+      <button class="pri" id="bOpen2">📂 Ouvrir un dossier</button>
+      <p class="small">JPEG, PNG, TIFF et RAW (CR2, CR3, NEF, ARW, RAF, ORF, RW2, DNG…). Rien n'est modifié dans vos photos.</p>
+    </div>
+    <div id="grid" tabindex="0"></div>
+  </section>
+
+  <aside id="panel">
+    <div id="pvWrap"><img id="pvImg" alt=""><div id="pvOver"></div></div>
+    <div id="pvName"></div>
+    <div id="pvBtns">
+      <button data-st="P" class="keep">✔ Garder <kbd>P</kbd></button>
+      <button data-st="X" class="rej">✖ Rejeter <kbd>X</kbd></button>
+      <button data-st="" class="neu">↺ <kbd>U</kbd></button>
+    </div>
+    <div id="pvStars"></div>
+    <div id="pvScore"></div>
+    <div id="pvBars"></div>
+    <div id="pvWhy"></div>
+    <canvas id="pvHist" width="280" height="70"></canvas>
+    <div id="pvExif"></div>
+  </aside>
+</div>
+
+<div id="loupe" class="ovl">
+  <div id="lpBar">
+    <button id="lpBack">← Grille <kbd>Échap</kbd></button>
+    <span id="lpName"></span>
+    <div class="grow"></div>
+    <label class="ck"><input type="checkbox" id="lpMarks" checked> Visages et zone nette <kbd>F</kbd></label>
+    <button id="lpZoom">🔍 100 % <kbd>Z</kbd></button>
+    <button data-st="P" class="keep">✔ Garder</button>
+    <button data-st="X" class="rej">✖ Rejeter</button>
+    <span id="lpStars"></span>
+  </div>
+  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="lpOver"></div></div>
+  <div id="lpInfo"></div>
+  <div id="lpStrip"></div>
+</div>
+
+<div id="compare" class="ovl">
+  <div id="cpBar"><button id="cpBack">← Grille <kbd>Échap</kbd></button><span id="cpTitle"></span><div class="grow"></div>
+    <span class="hint">Cliquez une photo pour zoomer à 100 % (toutes en même temps), glissez pour vous déplacer. <kbd>P</kbd>/<kbd>X</kbd> agit sur la photo encadrée.</span>
+    <button id="cpKeepBest">✔ Garder la sélection, rejeter les autres</button></div>
+  <div id="cpGrid"></div>
+</div>
+
+<div id="dlg" class="ovl"><div class="box" id="dlgBox"></div></div>
+<input type="file" id="fallbackPick" webkitdirectory multiple hidden>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

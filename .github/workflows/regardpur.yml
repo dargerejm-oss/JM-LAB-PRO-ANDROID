@@ -1,0 +1,51 @@
+name: Regard Pur (PC Windows)
+
+on:
+  push:
+    branches: [main, master, 'claude/**']
+    paths: ['projets/RegardPur/**', '.github/workflows/regardpur.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: projets/RegardPur/app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Installer les briques
+        run: npm ci --no-audit --no-fund
+
+      - name: Embarquer le module visages (hors ligne)
+        run: node tools/vendor.js
+
+      - name: Fabriquer RegardPur.exe (portable) et l'installateur
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win portable nsis --x64 --publish never
+
+      - name: Lister les fichiers
+        shell: bash
+        run: ls -la dist
+
+      - name: Publier
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'regardpur' || 'regardpur-test' }}
+          name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'Regard Pur (PC)' || 'Regard Pur TEST (PC)' }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ github.ref_name != 'main' && github.ref_name != 'master' }}
+          make_latest: 'false'
+          body: "Regard Pur pour Windows. RegardPur.exe se lance sans installation ; RegardPur_Installation.exe l'installe avec un raccourci. Construit le ${{ github.event.head_commit.timestamp }}."
+          files: |
+            projets/RegardPur/app/dist/RegardPur.exe
+            projets/RegardPur/app/dist/RegardPur_Installation.exe

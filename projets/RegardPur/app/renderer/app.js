@@ -1,0 +1,750 @@
+/* Regard Pur - interface : grille, vue en grand, comparaison, tri automatique, export */
+"use strict";
+(function () {
+var $ = function (id) { return document.getElementById(id); };
+var N = window.RPNative || null;               // partie PC (absente dans un simple navigateur)
+var RAWX = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|x3f|3fr|iiq|rwl|mrw|kdc|erf)$/i;
+var IMGX = /\.(jpe?g|png|webp|bmp|gif|tiff?)$/i;
+
+var S = {
+  photos: [], byId: {}, view: [], cur: -1, sel: new Set(), filter: "all", dir: null, groups: [], openGroup: -1,
+  undo: [], analysing: false, saveT: 0
+};
+
+/* ---------------- petits outils ---------------- */
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function avg(a) { return a.length ? a.reduce(function (s, v) { return s + v; }, 0) / a.length : 0; }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+function toast(t, ms) { var e = $("toast"); e.innerHTML = t; e.style.display = "block"; clearTimeout(e._t); e._t = setTimeout(function () { e.style.display = "none"; }, ms || 2600); }
+function join() { var a = Array.prototype.slice.call(arguments), sep = N ? N.sep : "/"; return a.join(sep).replace(/[\\\/]+/g, sep); }
+function strHash(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+function ham(a, b) { if (!a || !b) return 64; var d = 0; for (var i = 0; i < a.length; i++) { var x = parseInt(a[i], 16) ^ parseInt(b[i], 16); while (x) { d += x & 1; x >>= 1; } } return d; }
+function colDist(a, b) { if (!a || !b) return 999; var s = 0; for (var i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; }
+function when(p) { return p.a && p.a.exif && p.a.exif.date ? p.a.exif.date : p.mtime || 0; }
+function fmtDate(t) { if (!t) return ""; var d = new Date(t); return d.toLocaleDateString("fr-FR") + " " + d.toLocaleTimeString("fr-FR"); }
+
+/* plus grande image JPEG cachee dans un RAW (version navigateur ; sur PC c'est fait par la partie Windows) */
+function rawPreview(buf) {
+  var best = null;
+  for (var i = 0; i < buf.length - 4; i++) {
+    if (buf[i] !== 0xFF || buf[i + 1] !== 0xD8 || buf[i + 2] !== 0xFF) continue;
+    var j = i + 2, ok = false;
+    while (j < buf.length - 4) { if (buf[j] !== 0xFF) break; if (buf[j + 1] === 0xDA) { ok = true; break; } j += 2 + (buf[j + 2] << 8 | buf[j + 3]); }
+    if (!ok) continue;
+    var k = j; while (k < buf.length - 1 && !(buf[k] === 0xFF && buf[k + 1] === 0xD9)) k++;
+    if (!best || k + 2 - i > best.len) best = {start: i, len: k + 2 - i};
+    i = k;
+  }
+  return best && best.len > 20000 ? buf.subarray(best.start, best.start + best.len) : null;
+}
+async function readBytes(p) {
+  if (N) return await N.read(p.path, p.raw);
+  var b = new Uint8Array(await p.file.arrayBuffer());
+  return p.raw ? rawPreview(b) : b;
+}
+
+/* ---------------- score ---------------- */
+var TH = { // seuils selon l'exigence : souple / normale / stricte
+  sharp: [22, 34, 46], motion: [85, 70, 55], hi: [22, 12, 7], lo: [50, 32, 20], dark: [26, 36, 48], keep: [48, 58, 68], burst: [28, 16, 8]
+};
+function strict() { return +$("sStrict").value; }
+function bigFaces(a) { return (a && a.faces || []).filter(function (f) { return f.w > 0.035; }); }
+function expoScore(a) {
+  var e = a.expo, s = 100; s -= Math.max(0, e.hi - 1.5) * 5; s -= Math.max(0, e.lo - 4) * 3;
+  var d = Math.abs(e.mean - 118); if (d > 55) s -= (d - 55) * 2; return clamp(Math.round(s), 0, 100);
+}
+function sharpEff(a) {
+  var f = bigFaces(a), s = a.sharp;
+  if (f.length) { var es = Math.max.apply(null, f.map(function (x) { return x.eyeSharp != null ? x.eyeSharp : (x.faceSharp != null ? x.faceSharp : 0); })); s = Math.max(es, a.sharp * 0.6); }
+  return Math.round(s);
+}
+function eyesScore(a) { var f = bigFaces(a); return f.length ? avg(f.map(function (x) { return x.closed ? 0 : x.half ? 50 : 100; })) : null; }
+function feat(a) { var e = eyesScore(a), f = bigFaces(a); return [1, sharpEff(a) / 100, expoScore(a) / 100, e == null ? 0.7 : e / 100, f.length ? avg(f.map(function (x) { return x.smile; })) : 0, (a.motion || 0) / 100, f.length ? 1 : 0]; }
+function baseScore(a) {
+  var se = sharpEff(a), ex = expoScore(a), e = eyesScore(a), f = bigFaces(a), s;
+  if (e == null) s = 0.72 * se + 0.28 * ex;
+  else s = 0.45 * se + 0.2 * ex + 0.35 * e + 5 * avg(f.map(function (x) { return x.smile; }));
+  if (a.motion > 40) s -= (a.motion - 40) * 0.35;
+  // une photo floue ou mal exposee ne peut pas avoir une bonne note, meme si le reste va bien
+  s = Math.min(s, se + 25, ex + 25);
+  return clamp(Math.round(s), 0, 100);
+}
+/* apprentissage : le score s'adapte a vos choix P / X (regression logistique simple) */
+var L = (function () { try { return JSON.parse(localStorage.getItem("rp_learn")) || null; } catch (e) { return null; } })() || {w: [0, 0, 0, 0, 0, 0, 0], ex: [], n: 0};
+function sig(z) { return 1 / (1 + Math.exp(-z)); }
+function learnFrom(p, keep) {
+  if (!p.a || p.a.err) return;
+  L.ex.push({x: feat(p.a), y: keep ? 1 : 0}); if (L.ex.length > 800) L.ex.shift(); L.n++;
+  var w = [0, 0, 0, 0, 0, 0, 0];
+  for (var it = 0; it < 200; it++) {
+    var g = [0, 0, 0, 0, 0, 0, 0];
+    L.ex.forEach(function (o) { var z = 0; for (var i = 0; i < 7; i++) z += w[i] * o.x[i]; var d = sig(z) - o.y; for (i = 0; i < 7; i++) g[i] += d * o.x[i]; });
+    for (var i = 0; i < 7; i++) w[i] -= 0.5 * (g[i] / L.ex.length + 0.01 * w[i]);
+  }
+  L.w = w; try { localStorage.setItem("rp_learn", JSON.stringify(L)); } catch (e) {}
+}
+function score(p) {
+  if (!p.a || p.a.err) return 0;
+  var b = baseScore(p.a), keeps = L.ex.filter(function (o) { return o.y; }).length;
+  if (L.ex.length < 15 || keeps < 3 || keeps > L.ex.length - 3) return b;
+  var x = feat(p.a), z = 0; for (var i = 0; i < 7; i++) z += L.w[i] * x[i];
+  var al = Math.min(0.4, L.ex.length / 150);
+  return clamp(Math.round(b * (1 - al) + sig(z) * 100 * al), 0, 100);
+}
+
+/* ---------------- raisons (pourquoi garder / rejeter) ---------------- */
+function reasons(p) {
+  var a = p.a, k = strict(), rej = [], warn = [], good = [];
+  if (!a) return {rej: rej, warn: ["Analyse en cours…"], good: good};
+  if (a.err) return {rej: ["Image illisible"], warn: [], good: []};
+  var se = sharpEff(a), f = bigFaces(a);
+  if (se < TH.sharp[k]) rej.push(f.length ? "Visage / yeux flous" : "Floue");
+  else if (se < TH.sharp[k] + 15) warn.push("Netteté moyenne");
+  else good.push(f.length ? "Yeux nets" : "Nette");
+  if (a.motion >= TH.motion[k] && a.sharp < 70) rej.push("Flou de bougé");
+  else if (a.motion >= TH.motion[k] - 20 && a.sharp < 70) warn.push("Léger bougé");
+  if (f.length) {
+    var cl = f.filter(function (x) { return x.closed; }).length, hf = f.filter(function (x) { return x.half; }).length;
+    if (cl === f.length) rej.push(f.length > 1 ? "Yeux fermés (tout le monde)" : "Yeux fermés");
+    else if (cl) (k >= 1 ? rej : warn).push("Yeux fermés (" + cl + " sur " + f.length + ")");
+    else if (hf) warn.push("Yeux mi-clos");
+    else good.push(f.length > 1 ? f.length + " visages, yeux ouverts" : "Yeux ouverts");
+    if (avg(f.map(function (x) { return x.smile; })) > 0.55) good.push("Sourire");
+  }
+  if (a.expo.hi > TH.hi[k]) rej.push("Très surexposée"); else if (a.expo.hi > 4) warn.push("Blancs brûlés (" + a.expo.hi + " %)");
+  if (a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) rej.push("Très sombre"); else if (a.expo.mean < 62) warn.push("Sombre");
+  var g = p.g >= 0 ? S.groups[p.g] : null;
+  if (g) {
+    if (p.best) good.push("Meilleure de la série (" + g.length + " photos)");
+    else { var b = S.byId[g.best]; if (b && b.score - p.score > TH.burst[k]) rej.push("Moins bonne de la série"); else warn.push("Série de " + g.length + " : la meilleure est mise en avant"); }
+  }
+  return {rej: rej, warn: warn, good: good};
+}
+
+/* ---------------- groupes : rafales et doublons ---------------- */
+function similar(p, q) {
+  if (!p.a || !q.a || p.a.err || q.a.err) return false;
+  var dt = Math.abs(when(p) - when(q)) / 1000, h = ham(p.a.hash, q.a.hash), c = colDist(p.a.col, q.a.col);
+  if (dt <= 2.5 && h <= 22 && c < 40) return true;     // rafale
+  if (h <= 10 && c < 22 && dt <= 180) return true;     // meme scene, quelques instants plus tard
+  if (h <= 4 && c < 10) return true;                    // doublon (copie)
+  return false;
+}
+function buildGroups() {
+  var list = S.photos.filter(function (p) { return p.a && !p.a.err; }).sort(function (a, b) { return when(a) - when(b) || (a.name < b.name ? -1 : 1); });
+  var groups = [], g = null;
+  S.photos.forEach(function (p) { p.g = -1; p.best = false; });
+  list.forEach(function (p) {
+    if (g && (similar(p, g[g.length - 1]) || (g.length > 1 && similar(p, g[0])))) g.push(p); else { g = [p]; groups.push(g); }
+  });
+  S.groups = [];
+  groups.forEach(function (arr) {
+    if (arr.length < 2) return;
+    var gi = S.groups.length, best = arr[0];
+    arr.forEach(function (p) { p.g = gi; if (p.score > best.score) best = p; });
+    best.best = true;
+    var ids = arr.map(function (p) { return p.id; }); ids.best = best.id; S.groups.push(ids);
+  });
+}
+function rescore() { S.photos.forEach(function (p) { p.score = score(p); }); buildGroups(); S.photos.forEach(function (p) { p.why = reasons(p); }); }
+
+/* ---------------- ouverture d'un dossier ---------------- */
+async function openFolder() {
+  if (!N) { $("fallbackPick").click(); return; }
+  var dir = await N.pickFolder(); if (!dir) return;
+  var list = await N.list(dir);
+  await load(dir, list.map(function (o) { return {id: o.rel, name: o.name, path: o.path, rel: o.rel, size: o.size, mtime: o.mtime, raw: o.raw}; }));
+}
+$("fallbackPick").addEventListener("change", function () {
+  var fs = Array.prototype.filter.call(this.files, function (f) { return IMGX.test(f.name) || RAWX.test(f.name); });
+  var root = fs.length ? (fs[0].webkitRelativePath || fs[0].name).split("/")[0] : "Dossier";
+  load(null, fs.map(function (f) { var rel = f.webkitRelativePath || f.name; return {id: rel, name: f.name, rel: rel, size: f.size, mtime: f.lastModified, raw: RAWX.test(f.name), file: f}; }), root);
+  this.value = "";
+});
+function sessPath(n) { return join(S.dir, ".regardpur", n); }
+async function load(dir, items, label) {
+  if (!items.length) { toast("Aucune photo dans ce dossier."); return; }
+  stopAnalysis();
+  S.photos.forEach(function (p) { if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl); });
+  S.dir = dir; S.photos = items; S.byId = {}; S.sel.clear(); S.cur = 0; S.openGroup = -1; S.undo = []; S.filter = "all";
+  items.forEach(function (p) { p.status = ""; p.auto = false; p.stars = 0; p.a = null; p.score = 0; p.g = -1; S.byId[p.id] = p; });
+  $("folderName").textContent = (dir || label || "") + " — " + items.length + " photos";
+  // reprise de la session precedente (choix + analyses + vignettes deja faites)
+  if (N && dir) {
+    try {
+      var t = await N.readText(sessPath("session.json"));
+      if (t) { var ss = JSON.parse(t); Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+    } catch (e) {}
+  }
+  $("empty").style.display = "none"; $("grid").style.display = "grid";
+  ["bAuto", "bCompare", "bExport"].forEach(function (b) { $(b).disabled = false; });
+  rescore(); buildCards(); refresh(); updLearn();
+  var todo = S.photos.filter(function (p) { return !p.a; });
+  if (todo.length) analyse(todo); else toast("Session reprise : " + items.length + " photos déjà analysées.");
+}
+function saveSoon() {
+  if (!N || !S.dir) return;
+  clearTimeout(S.saveT);
+  S.saveT = setTimeout(function () {
+    var o = {v: 1, saved: Date.now(), photos: {}};
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a}; });
+    N.writeText(sessPath("session.json"), JSON.stringify(o));
+  }, 700);
+}
+
+/* ---------------- analyse en arriere-plan ---------------- */
+var pool = [], queue = [], runId = 0, doneN = 0, totalN = 0;
+function stopAnalysis() { runId++; queue = []; pool.forEach(function (w) { w.inflight = 0; }); }
+function ensurePool() {
+  if (pool.length) return;
+  var n = clamp((navigator.hardwareConcurrency || 4) - 1, 1, 4);
+  for (var i = 0; i < n; i++) {
+    var w = new Worker("analyse.js"); w.inflight = 0; w.jobs = {};
+    w.onmessage = onResult.bind(null, w); pool.push(w);
+  }
+}
+function analyse(list) {
+  ensurePool(); runId++;
+  // d'abord les photos visibles, dans l'ordre de la grille
+  var order = {}; S.view.forEach(function (id, i) { order[id] = i; });
+  queue = list.slice().sort(function (a, b) { return (order[a.id] == null ? 1e9 : order[a.id]) - (order[b.id] == null ? 1e9 : order[b.id]); });
+  doneN = 0; totalN = queue.length; S.analysing = true; prog(); pump();
+}
+function pump() {
+  var rid = runId;
+  pool.forEach(function (w) {
+    while (w.inflight < 2 && queue.length) {
+      var p = queue.shift(); w.inflight++;
+      (function (p, w) {
+        readBytes(p).then(function (buf) {
+          if (rid !== runId) { w.inflight--; return; }
+          if (!buf) { w.inflight--; done(p, {err: "Aperçu introuvable dans ce RAW"}); return; }
+          var copy = buf.buffer.byteLength === buf.byteLength ? buf : buf.slice();
+          w.jobs[p.id] = rid; w.postMessage({id: p.id, buf: copy}, [copy.buffer]);
+        }, function () { w.inflight--; done(p, {err: "Fichier illisible"}); });
+      })(p, w);
+    }
+  });
+}
+function onResult(w, e) {
+  var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (w.jobs[r.id] == null) return;
+  var rid = w.jobs[r.id]; delete w.jobs[r.id]; w.inflight--;
+  if (rid !== runId) { pump(); return; }
+  var p = S.byId[r.id]; if (p) done(p, r);
+  pump();
+}
+function done(p, r) {
+  if (r.thumb) {
+    if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl);
+    p.thumbUrl = URL.createObjectURL(r.thumb);
+    if (N && S.dir) r.thumb.arrayBuffer().then(function (b) { N.writeBin(sessPath(join("vignettes", strHash(p.id) + ".jpg")), new Uint8Array(b)); });
+    delete r.thumb;
+  }
+  delete r.id; p.a = r; p.score = score(p); p.why = reasons(p);
+  doneN++; prog(); updCard(p);
+  if (S.view[S.cur] === p.id) showPanel();
+  if (doneN >= totalN) { S.analysing = false; prog(); rescore(); refresh(); saveSoon(); toast("Analyse terminée : " + totalN + " photos. Touchez <b>✨ Tri automatique</b> ou triez vous-même (P / X)."); }
+  else if (doneN % 25 === 0) { rescore(); refresh(); saveSoon(); }
+}
+function prog() {
+  var e = $("prog"); if (!S.analysing) { e.style.display = "none"; return; }
+  e.style.display = "block"; $("progBar").style.width = (doneN / Math.max(1, totalN) * 100) + "%";
+  $("progTxt").textContent = "Analyse " + doneN + " / " + totalN;
+}
+/* vignettes deja faites (session reprise) : chargees quand elles deviennent visibles */
+var io = new IntersectionObserver(function (es) {
+  es.forEach(function (en) {
+    if (!en.isIntersecting) return;
+    var p = S.byId[en.target.dataset.id]; if (!p || p.thumbUrl || p.loadingT || !N || !S.dir) return;
+    p.loadingT = true;
+    N.read(sessPath(join("vignettes", strHash(p.id) + ".jpg")), false).then(function (b) {
+      p.loadingT = false;
+      if (b && b.length) { p.thumbUrl = URL.createObjectURL(new Blob([b], {type: "image/jpeg"})); updCard(p); if (S.view[S.cur] === p.id) showPanel(); }
+      else if (p.a) { p.a = null; analyse([p]); }
+    }, function () { p.loadingT = false; if (p.a) { p.a = null; analyse([p]); } });
+  });
+}, {root: $("grid"), rootMargin: "400px"});
+
+/* ---------------- filtres ---------------- */
+var FILTERS = [
+  ["all", "Toutes", function () { return true; }],
+  ["P", "✔ Gardées", function (p) { return p.status === "P"; }],
+  ["X", "✖ Rejetées", function (p) { return p.status === "X"; }],
+  ["todo", "À voir", function (p) { return !p.status; }],
+  ["stars", "★ Avec étoiles", function (p) { return p.stars > 0; }]
+];
+var ISSUES = [
+  ["blur", "Floues", function (p) { return has(p, /Flou|flous/); }],
+  ["motion", "Flou de bougé", function (p) { return has(p, /bougé/i); }],
+  ["eyes", "Yeux fermés / mi-clos", function (p) { return has(p, /Yeux fermés|mi-clos/); }],
+  ["expo", "Exposition ratée", function (p) { return has(p, /exposée|sombre|brûlés/i); }],
+  ["faces", "Avec visages", function (p) { return bigFaces(p.a).length > 0; }],
+  ["groups", "Rafales et doublons", function (p) { return p.g >= 0; }]
+];
+function has(p, re) { var w = p.why; if (!w) return false; return w.rej.concat(w.warn).some(function (t) { return re.test(t); }); }
+function fnOf(k) { var f = FILTERS.concat(ISSUES).filter(function (x) { return x[0] === k; })[0]; return f ? f[2] : FILTERS[0][2]; }
+function drawFilters() {
+  function row(f) { var n = S.photos.filter(f[2]).length; return '<div class="flt' + (S.filter === f[0] ? " on" : "") + '" data-f="' + f[0] + '"><span>' + f[1] + "</span><span>" + n + "</span></div>"; }
+  $("filters").innerHTML = FILTERS.map(row).join("");
+  $("issues").innerHTML = ISSUES.map(row).join("");
+}
+$("side").addEventListener("click", function (e) { var f = e.target.closest(".flt"); if (!f) return; S.filter = f.dataset.f; S.openGroup = -1; refresh(true); });
+
+/* ---------------- grille ---------------- */
+var cards = {};
+function buildCards() {
+  var g = $("grid"); g.innerHTML = ""; cards = {}; io.disconnect();
+  S.photos.forEach(function (p) {
+    var c = document.createElement("div"); c.className = "card"; c.dataset.id = p.id;
+    c.innerHTML = '<div class="im"><span class="ph">⏳</span></div><div class="ft"><span class="nm"></span><span class="st"></span></div>';
+    c.querySelector(".nm").textContent = p.name; cards[p.id] = c; io.observe(c);
+  });
+}
+function updCard(p) {
+  var c = cards[p.id]; if (!c) return;
+  var im = c.querySelector(".im");
+  if (p.thumbUrl && !im.querySelector("img")) { im.innerHTML = '<img alt="">'; im.querySelector("img").src = p.thumbUrl; }
+  else if (p.thumbUrl && im.querySelector("img").src !== p.thumbUrl) im.querySelector("img").src = p.thumbUrl;
+  var cls = "card" + (p.status ? " " + p.status : "") + (p.auto && p.status ? " auto" : "") + (S.view[S.cur] === p.id ? " cur" : "") + (S.sel.has(p.id) ? " sel" : "") + (p.best && $("cGroup").checked ? " best" : "") + (p.g >= 0 && p.g === S.openGroup ? " open" : "");
+  if (c.className !== cls) c.className = cls;
+  var extra = im.querySelectorAll(".sc,.tags,.grp"); Array.prototype.forEach.call(extra, function (x) { x.remove(); });
+  if (p.a && !p.a.err) {
+    var sc = document.createElement("div"); sc.className = "sc " + (p.score >= 65 ? "g" : p.score >= 45 ? "m" : "b"); sc.textContent = p.score; im.appendChild(sc);
+    var w = p.why || {rej: [], warn: []}, tg = document.createElement("div"); tg.className = "tags";
+    w.rej.slice(0, 2).forEach(function (t) { tg.innerHTML += '<span class="tag r">' + esc(t) + "</span>"; });
+    if (!w.rej.length) w.warn.filter(function (t) { return !/^Série/.test(t); }).slice(0, 1).forEach(function (t) { tg.innerHTML += '<span class="tag y">' + esc(t) + "</span>"; });
+    im.appendChild(tg);
+  }
+  if (p.g >= 0 && $("cGroup").checked && p.best && S.openGroup !== p.g) { var gb = document.createElement("div"); gb.className = "grp"; gb.textContent = "▣ " + S.groups[p.g].length; gb.title = "Série : cliquez pour voir toutes les photos"; gb.dataset.g = p.g; im.appendChild(gb); }
+  c.querySelector(".st").textContent = p.stars ? "★".repeat(p.stars) : "";
+}
+function computeView() {
+  var f = fnOf(S.filter), list = S.photos.filter(f), sort = $("sSort").value;
+  if (sort === "score") list.sort(function (a, b) { return b.score - a.score || when(a) - when(b); });
+  else if (sort === "name") list.sort(function (a, b) { return a.rel < b.rel ? -1 : 1; });
+  else list.sort(function (a, b) { return when(a) - when(b) || (a.name < b.name ? -1 : 1); });
+  if ($("cGroup").checked && S.filter !== "groups") {
+    // une seule photo par serie (la meilleure), sauf la serie ouverte
+    var out = [], seen = {};
+    list.forEach(function (p) {
+      if (p.g < 0) { out.push(p); return; }
+      if (seen[p.g]) return;
+      if (p.g === S.openGroup) { seen[p.g] = 1; S.groups[p.g].forEach(function (id) { var q = S.byId[id]; if (f(q)) out.push(q); }); return; }
+      var best = S.byId[S.groups[p.g].best];
+      if (f(best)) { seen[p.g] = 1; out.push(best); } else out.push(p);
+    });
+    list = out;
+  }
+  return list.map(function (p) { return p.id; });
+}
+function refresh(keepCur) {
+  var curId = S.view[S.cur];
+  S.view = computeView();
+  var g = $("grid"), frag = document.createDocumentFragment();
+  S.view.forEach(function (id) { frag.appendChild(cards[id]); });
+  g.innerHTML = ""; g.appendChild(frag);
+  var i = S.view.indexOf(curId); S.cur = i >= 0 ? i : (S.view.length ? clamp(S.cur, 0, S.view.length - 1) : -1);
+  S.photos.forEach(updCard); drawFilters(); showPanel();
+  if (keepCur !== false) scrollToCur();
+}
+function scrollToCur() { var c = cards[S.view[S.cur]]; if (c && c.scrollIntoView) c.scrollIntoView({block: "nearest"}); }
+function setCur(i, opt) {
+  if (!S.view.length) return;
+  var old = S.byId[S.view[S.cur]]; S.cur = clamp(i, 0, S.view.length - 1);
+  if (old) updCard(old); updCard(S.byId[S.view[S.cur]]); scrollToCur(); showPanel();
+  if ($("loupe").classList.contains("show")) showLoupe();
+}
+$("grid").addEventListener("click", function (e) {
+  var gb = e.target.closest(".grp");
+  if (gb) { S.openGroup = S.openGroup === +gb.dataset.g ? -1 : +gb.dataset.g; refresh(); return; }
+  var c = e.target.closest(".card"); if (!c) return;
+  var i = S.view.indexOf(c.dataset.id);
+  if (e.ctrlKey || e.metaKey) { if (S.sel.has(c.dataset.id)) S.sel.delete(c.dataset.id); else S.sel.add(c.dataset.id); if (!S.sel.size) {} }
+  else if (e.shiftKey && S.cur >= 0) { var a = Math.min(S.cur, i), b = Math.max(S.cur, i); for (var k = a; k <= b; k++) S.sel.add(S.view[k]); }
+  else { S.sel.forEach(function (id) { S.sel.delete(id); updCard(S.byId[id]); }); }
+  setCur(i);
+  S.sel.forEach(function (id) { updCard(S.byId[id]); });
+});
+$("grid").addEventListener("dblclick", function (e) { var c = e.target.closest(".card"); if (c) { setCur(S.view.indexOf(c.dataset.id)); openLoupe(); } });
+$("rSize").addEventListener("input", function () { $("grid").style.setProperty("--sz", this.value + "px"); try { localStorage.setItem("rp_size", this.value); } catch (e) {} });
+try { var sz = localStorage.getItem("rp_size"); if (sz) { $("rSize").value = sz; $("grid").style.setProperty("--sz", sz + "px"); } var st = localStorage.getItem("rp_strict"); if (st) $("sStrict").value = st; } catch (e) {}
+$("sSort").addEventListener("change", function () { refresh(); });
+$("cGroup").addEventListener("change", function () { S.openGroup = -1; refresh(); });
+$("sStrict").addEventListener("change", function () { try { localStorage.setItem("rp_strict", this.value); } catch (e) {} rescore(); refresh(); toast("Exigence : " + this.options[this.selectedIndex].text + ". Relancez ✨ Tri automatique pour l'appliquer."); });
+
+/* ---------------- statut, etoiles, annuler ---------------- */
+function targets() { if (S.sel.size > 1) return Array.from(S.sel).map(function (id) { return S.byId[id]; }); var p = S.byId[S.view[S.cur]]; return p ? [p] : []; }
+function pushUndo(list) { S.undo.push(list.map(function (p) { return {id: p.id, st: p.status, au: p.auto, s: p.stars}; })); if (S.undo.length > 200) S.undo.shift(); }
+function setStatus(st, list) {
+  list = list || targets(); if (!list.length) return;
+  pushUndo(list);
+  list.forEach(function (p) { p.status = st; p.auto = false; if (st) learnFrom(p, st === "P"); updCard(p); });
+  updLearn(); drawFilters(); saveSoon();
+  if (list.length === 1 && st && $("cAdvance").checked && !$("compare").classList.contains("show")) {
+    // la photo peut sortir du filtre en cours : on reste a la meme place
+    var keepFilter = fnOf(S.filter)(list[0]);
+    if (keepFilter) setCur(S.cur + 1); else { var i = S.cur; refresh(); setCur(Math.min(i, S.view.length - 1)); }
+  } else { showPanel(); if ($("loupe").classList.contains("show")) showLoupe(); }
+  if ($("compare").classList.contains("show")) drawCompare();
+}
+function setStars(n, list) {
+  list = list || targets(); if (!list.length) return;
+  pushUndo(list); list.forEach(function (p) { p.stars = p.stars === n ? 0 : n; updCard(p); });
+  drawFilters(); showPanel(); saveSoon(); if ($("loupe").classList.contains("show")) showLoupe();
+}
+function undo() {
+  var u = S.undo.pop(); if (!u) { toast("Rien à annuler."); return; }
+  u.forEach(function (o) { var p = S.byId[o.id]; if (!p) return; p.status = o.st; p.auto = o.au; p.stars = o.s; updCard(p); });
+  drawFilters(); showPanel(); saveSoon(); toast("Annulé.");
+}
+function updLearn() {
+  var n = L.ex.length, k = L.ex.filter(function (o) { return o.y; }).length;
+  $("learn").innerHTML = "🧠 <b>Apprentissage</b> : " + n + " choix retenus (" + k + " gardées, " + (n - k) + " rejetées)." +
+    (n >= 15 && k >= 3 && n - k >= 3 ? " Le score suit maintenant vos goûts." : " Le score s'adaptera à vos goûts après une quinzaine de choix P / X.");
+}
+
+/* ---------------- tri automatique ---------------- */
+function autoCull() {
+  rescore();
+  var k = strict(), nP = 0, nX = 0, nT = 0, manual = 0;
+  S.photos.forEach(function (p) {
+    if (!p.a) return;
+    if (p.status && !p.auto) { manual++; return; }
+    var w = p.why;
+    if (w.rej.length) { p.status = "X"; nX++; }
+    else if (p.score >= TH.keep[k] && (p.g < 0 || p.best)) { p.status = "P"; nP++; }
+    else { p.status = ""; nT++; }
+    p.auto = !!p.status;
+  });
+  refresh(); saveSoon();
+  dialog("<h3>✨ Tri automatique</h3><p><b style='color:var(--keep)'>" + nP + " gardées</b>, <b style='color:var(--rej)'>" + nX + " rejetées</b>, <b>" + nT + " à voir</b>" + (manual ? " — vos " + manual + " choix faits à la main ne sont pas touchés." : ".") + "</p>" +
+    "<p class='small'>Les choix automatiques ont un contour pointillé. Vérifiez vite les rejetées (filtre « ✖ Rejetées ») et les « À voir », puis corrigez avec P / X : chaque correction apprend vos goûts.</p>" +
+    "<div class='row'><button data-c='rej'>Voir les rejetées</button><button data-c='todo'>Voir les « À voir »</button><button class='pri' data-c='ok'>OK</button></div>",
+    function (c) { if (c === "rej") { S.filter = "X"; refresh(); } if (c === "todo") { S.filter = "todo"; refresh(); } });
+}
+
+/* ---------------- panneau de droite ---------------- */
+function bar(label, v, col, txt) { return '<div class="bar"><div class="l"><span>' + label + "</span><span>" + (txt != null ? txt : v) + '</span></div><div class="t"><i style="width:' + clamp(v, 0, 100) + "%;background:" + col + '"></i></div></div>'; }
+function colOf(v) { return v >= 65 ? "var(--keep)" : v >= 45 ? "var(--doubt)" : "var(--rej)"; }
+function marks(over, img, a, big) {
+  over.innerHTML = ""; if (!a || a.err || !img.naturalWidth) return;
+  var W = img.clientWidth, H = img.clientHeight; over.style.left = img.offsetLeft + "px"; over.style.top = img.offsetTop + "px"; over.style.width = W + "px"; over.style.height = H + "px";
+  if (a.zone && !bigFaces(a).length) over.innerHTML += '<div class="box-zone" style="left:' + a.zone.x * W + "px;top:" + a.zone.y * H + "px;width:" + a.zone.w * W + "px;height:" + a.zone.h * H + 'px"></div>';
+  bigFaces(a).forEach(function (f) {
+    var t = f.closed ? "yeux fermés" : f.half ? "mi-clos" : "yeux ouverts";
+    over.innerHTML += '<div class="box-face' + (f.closed ? " closed" : f.half ? " half" : "") + '" style="left:' + f.x * W + "px;top:" + f.y * H + "px;width:" + f.w * W + "px;height:" + f.h * H + 'px">' + (big ? "<span>" + t + (f.eyeSharp != null ? " · netteté yeux " + f.eyeSharp : "") + "</span>" : "") + "</div>";
+  });
+}
+function starsHtml(n) { var h = ""; for (var i = 1; i <= 5; i++) h += '<span class="star' + (i <= n ? " on" : "") + '" data-s="' + i + '">★</span>'; return h; }
+function exifTxt(a) {
+  var e = a && a.exif; if (!e) return "";
+  var t = [];
+  if (e.date) t.push("📅 " + fmtDate(e.date));
+  if (e.make || e.model) t.push("📷 " + esc((e.model || "").indexOf(e.make || "#") === 0 ? e.model : ((e.make || "") + " " + (e.model || "")).trim()));
+  if (e.lens) t.push("🔭 " + esc(e.lens));
+  var s = [];
+  if (e.speed) s.push(e.speed >= 1 ? e.speed + " s" : "1/" + Math.round(1 / e.speed) + " s");
+  if (e.f) s.push("f/" + e.f); if (e.iso) s.push("ISO " + e.iso); if (e.focal) s.push(Math.round(e.focal) + " mm");
+  if (s.length) t.push("⚙️ " + s.join(" · "));
+  return t.join("<br>");
+}
+function showPanel() {
+  var p = S.byId[S.view[S.cur]];
+  if (!p) { $("pvImg").removeAttribute("src"); $("pvName").textContent = ""; ["pvScore", "pvBars", "pvWhy", "pvExif", "pvStars", "pvOver"].forEach(function (k) { $(k).innerHTML = ""; }); return; }
+  var img = $("pvImg");
+  if (p.thumbUrl) { if (img.src !== p.thumbUrl) img.src = p.thumbUrl; } else img.removeAttribute("src");
+  img.onload = function () { marks($("pvOver"), img, p.a, false); }; if (img.complete) marks($("pvOver"), img, p.a, false);
+  $("pvName").textContent = p.rel + (S.sel.size > 1 ? "  (+" + (S.sel.size - 1) + " sélectionnées)" : "");
+  $("pvStars").innerHTML = starsHtml(p.stars);
+  var a = p.a;
+  if (!a) { $("pvScore").innerHTML = "<small>Analyse en cours…</small>"; $("pvBars").innerHTML = ""; $("pvWhy").innerHTML = ""; $("pvExif").innerHTML = ""; return; }
+  if (a.err) { $("pvScore").innerHTML = "<small>" + esc(a.err) + "</small>"; $("pvBars").innerHTML = ""; $("pvWhy").innerHTML = ""; return; }
+  $("pvScore").innerHTML = '<b style="color:' + colOf(p.score) + '">' + p.score + "</b><small>/ 100 — " + (p.status === "P" ? "✔ gardée" : p.status === "X" ? "✖ rejetée" : "à voir") + (p.auto && p.status ? " (auto)" : "") + "</small>";
+  var f = bigFaces(a), h = "";
+  h += bar("Netteté", a.sharp, colOf(a.sharp));
+  if (f.length) { var es = sharpEff(a); h += bar("Netteté des yeux / visage", es, colOf(es)); var ey = eyesScore(a); h += bar("Yeux ouverts", ey, colOf(ey), f.length + " visage" + (f.length > 1 ? "s" : "")); }
+  h += bar("Flou de bougé", a.motion, a.motion >= 60 ? "var(--rej)" : a.motion >= 40 ? "var(--doubt)" : "var(--keep)", a.motion >= 40 ? a.motion : "non");
+  var ex = expoScore(a); h += bar("Exposition", ex, colOf(ex), ex + (a.expo.hi > 2 ? " · blancs brûlés " + a.expo.hi + " %" : "") + (a.expo.lo > 5 ? " · noirs " + a.expo.lo + " %" : ""));
+  $("pvBars").innerHTML = h;
+  var w = p.why || reasons(p);
+  $("pvWhy").innerHTML = w.rej.map(function (t) { return '<div style="color:var(--rej)">✖ ' + esc(t) + "</div>"; }).join("") + w.warn.map(function (t) { return '<div style="color:var(--doubt)">⚠ ' + esc(t) + "</div>"; }).join("") + w.good.map(function (t) { return '<div style="color:var(--keep)">✔ ' + esc(t) + "</div>"; }).join("");
+  var cv = $("pvHist"), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
+  if (a.hist) { var mx = Math.max.apply(null, a.hist.slice(1, 63)) || 1; x.fillStyle = "#9aa3b2"; a.hist.forEach(function (v, i) { var hh = Math.min(1, v / mx) * (cv.height - 4); x.fillRect(i * cv.width / 64, cv.height - hh, cv.width / 64 + 0.5, hh); }); }
+  $("pvExif").innerHTML = exifTxt(a) + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px" + (p.raw ? " (aperçu du RAW)" : "") : "");
+}
+$("pvBtns").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setStatus(b.dataset.st); });
+$("pvStars").addEventListener("click", function (e) { var s = e.target.closest(".star"); if (s) setStars(+s.dataset.s); });
+
+/* ---------------- vue en grand (loupe) ---------------- */
+var full = {cache: new Map(), zoom: false, sc: 1, tx: 0, ty: 0};
+function fullUrl(p) {
+  if (full.cache.has(p.id)) return full.cache.get(p.id);
+  var pr = readBytes(p).then(function (b) { return b ? URL.createObjectURL(new Blob([b], {type: "image/jpeg"})) : p.thumbUrl; });
+  full.cache.set(p.id, pr);
+  if (full.cache.size > 8) { var k = full.cache.keys().next().value; var old = full.cache.get(k); full.cache.delete(k); old.then(function (u) { if (u && u.indexOf("blob:") === 0 && !Object.values(S.byId).some(function (q) { return q.thumbUrl === u; })) URL.revokeObjectURL(u); }); }
+  return pr;
+}
+function openLoupe() { if (S.cur < 0) return; $("loupe").classList.add("show"); showLoupe(); }
+function closeLoupe() { $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
+function fit() {
+  var v = $("lpView"), img = $("lpImg"); if (!img.naturalWidth) return;
+  var s = Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight, 1);
+  full.sc = s; full.tx = (v.clientWidth - img.naturalWidth * s) / 2; full.ty = (v.clientHeight - img.naturalHeight * s) / 2; apply();
+}
+function apply() {
+  var img = $("lpImg"); img.style.transform = "translate(" + full.tx + "px," + full.ty + "px) scale(" + full.sc + ")";
+  $("lpView").classList.toggle("zoom", full.zoom);
+  var o = $("lpOver"), W = img.naturalWidth * full.sc, H = img.naturalHeight * full.sc;
+  o.style.left = full.tx + "px"; o.style.top = full.ty + "px"; o.style.width = W + "px"; o.style.height = H + "px";
+}
+function drawLoupeMarks(p) {
+  var o = $("lpOver"); o.innerHTML = "";
+  if (!$("lpMarks").checked || !p.a || p.a.err) return;
+  var img = $("lpImg"), fake = {clientWidth: img.naturalWidth * full.sc, clientHeight: img.naturalHeight * full.sc, offsetLeft: full.tx, offsetTop: full.ty, naturalWidth: 1};
+  marks(o, fake, p.a, true);
+}
+function showLoupe() {
+  var p = S.byId[S.view[S.cur]]; if (!p) return;
+  $("lpName").textContent = p.rel + "  —  " + (S.cur + 1) + " / " + S.view.length;
+  $("lpStars").innerHTML = starsHtml(p.stars);
+  var img = $("lpImg"), id = p.id;
+  if (img.dataset.id !== id) {
+    full.zoom = false; img.dataset.id = id;
+    if (p.thumbUrl) { img.src = p.thumbUrl; img.onload = function () { if (img.dataset.id === id) { fit(); drawLoupeMarks(p); } }; }
+    fullUrl(p).then(function (u) { if (img.dataset.id !== id || !u) return; img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); }; img.src = u; });
+    var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
+  } else drawLoupeMarks(p);
+  var w = p.why || {rej: [], warn: [], good: []};
+  $("lpInfo").innerHTML = (p.a && !p.a.err ? "<b style='font-size:18px;color:" + colOf(p.score) + "'>" + p.score + "</b> / 100 · " + (p.status === "P" ? "<span style='color:var(--keep)'>✔ gardée</span>" : p.status === "X" ? "<span style='color:var(--rej)'>✖ rejetée</span>" : "à voir") + "<br>" : "") +
+    w.rej.map(function (t) { return "<span style='color:var(--rej)'>✖ " + esc(t) + "</span>"; }).concat(w.warn.map(function (t) { return "<span style='color:var(--doubt)'>⚠ " + esc(t) + "</span>"; }), w.good.map(function (t) { return "<span style='color:var(--keep)'>✔ " + esc(t) + "</span>"; })).join("<br>");
+  // bande de vignettes
+  var st = $("lpStrip"), a = Math.max(0, S.cur - 30), b = Math.min(S.view.length, S.cur + 31), h = "";
+  for (var i = a; i < b; i++) { var q = S.byId[S.view[i]]; h += '<div class="th' + (i === S.cur ? " cur" : "") + (q.status ? " " + q.status : "") + '" data-i="' + i + '">' + (q.thumbUrl ? '<img src="' + q.thumbUrl + '">' : '<span style="color:#555;padding:8px;display:block">⏳</span>') + "</div>"; }
+  st.innerHTML = h; var c = st.querySelector(".cur"); if (c) c.scrollIntoView({inline: "center", block: "nearest"});
+}
+$("lpStrip").addEventListener("click", function (e) { var t = e.target.closest(".th"); if (t) setCur(+t.dataset.i); });
+$("lpBack").onclick = closeLoupe;
+$("lpMarks").onchange = function () { showLoupe(); };
+$("loupe").querySelector("#lpBar").addEventListener("click", function (e) { var b = e.target.closest("button[data-st]"); if (b) setStatus(b.dataset.st); var s = e.target.closest(".star"); if (s) setStars(+s.dataset.s); });
+function zoomAt(cx, cy) {
+  var img = $("lpImg"); if (!img.naturalWidth) return;
+  if (full.zoom) { full.zoom = false; fit(); drawLoupeMarks(S.byId[S.view[S.cur]]); return; }
+  var px = (cx - full.tx) / full.sc, py = (cy - full.ty) / full.sc, v = $("lpView");
+  full.zoom = true; full.sc = 1 / (window.devicePixelRatio || 1); full.tx = v.clientWidth / 2 - px * full.sc; full.ty = v.clientHeight / 2 - py * full.sc; apply(); drawLoupeMarks(S.byId[S.view[S.cur]]);
+}
+$("lpZoom").onclick = function () {
+  var p = S.byId[S.view[S.cur]], img = $("lpImg"), v = $("lpView");
+  if (full.zoom || !p || !p.a) { zoomAt(v.clientWidth / 2, v.clientHeight / 2); return; }
+  // zoom sur les yeux s'il y a un visage, sinon sur la zone la plus nette
+  var f = bigFaces(p.a)[0], z = p.a.zone, fx = f ? f.x + f.w / 2 : z ? z.x + z.w / 2 : 0.5, fy = f ? f.y + f.h * 0.4 : z ? z.y + z.h / 2 : 0.5;
+  zoomAt(full.tx + fx * img.naturalWidth * full.sc, full.ty + fy * img.naturalHeight * full.sc);
+};
+(function () {
+  var v = $("lpView"), drag = null, moved = false;
+  v.addEventListener("mousedown", function (e) { drag = {x: e.clientX, y: e.clientY, tx: full.tx, ty: full.ty}; moved = false; });
+  window.addEventListener("mousemove", function (e) { if (!drag || !full.zoom) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true; full.tx = drag.tx + dx; full.ty = drag.ty + dy; apply(); });
+  window.addEventListener("mouseup", function (e) { if (drag && !moved && e.target.closest && e.target.closest("#lpView")) { var r = v.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top); } drag = null; });
+  v.addEventListener("wheel", function (e) { e.preventDefault(); setCur(S.cur + (e.deltaY > 0 ? 1 : -1)); }, {passive: false});
+  window.addEventListener("resize", function () { if ($("loupe").classList.contains("show") && !full.zoom) { fit(); drawLoupeMarks(S.byId[S.view[S.cur]]); } });
+})();
+
+/* ---------------- comparaison cote a cote ---------------- */
+var cmp = {ids: [], cur: 0, zoom: false, rx: 0.5, ry: 0.5};
+function openCompare() {
+  var ids;
+  if (S.sel.size >= 2) ids = Array.from(S.sel);
+  else { var p = S.byId[S.view[S.cur]]; if (!p) return; ids = p.g >= 0 ? S.groups[p.g].slice() : S.view.slice(S.cur, S.cur + 2); }
+  ids.sort(function (a, b) { return S.byId[b].score - S.byId[a].score; });
+  if (ids.length > 6) { toast("Comparaison des 6 meilleures de la série (" + ids.length + " photos)."); ids = ids.slice(0, 6); }
+  if (ids.length < 2) { toast("Sélectionnez au moins 2 photos (Ctrl + clic), ou une photo d'une série."); return; }
+  cmp.ids = ids; cmp.cur = 0; cmp.zoom = false;
+  $("compare").classList.add("show"); drawCompare(true);
+}
+function closeCompare() { $("compare").classList.remove("show"); refresh(); }
+function drawCompare(rebuild) {
+  var g = $("cpGrid"), n = cmp.ids.length;
+  $("cpTitle").textContent = n + " photos — la meilleure (score) est en premier";
+  if (rebuild || g.children.length !== n) {
+    g.style.gridTemplateColumns = "repeat(" + (n <= 3 ? n : n === 4 ? 2 : 3) + ",1fr)";
+    g.style.gridTemplateRows = n <= 3 ? "1fr" : "1fr 1fr";
+    g.innerHTML = cmp.ids.map(function (id, i) { return '<div class="cp" data-i="' + i + '"><div class="v"><img alt="" draggable="false"><div class="badge"></div></div><div class="h"><span class="nm"></span><button data-st="P" class="keep">✔</button><button data-st="X" class="rej">✖</button></div></div>'; }).join("");
+    cmp.ids.forEach(function (id, i) {
+      var p = S.byId[id], el = g.children[i], img = el.querySelector("img");
+      img.onload = function () { layoutCp(); };
+      if (p.thumbUrl) img.src = p.thumbUrl;
+      fullUrl(p).then(function (u) { if (u) img.src = u; });
+    });
+  }
+  cmp.ids.forEach(function (id, i) {
+    var p = S.byId[id], el = g.children[i], w = p.why || {rej: []};
+    el.className = "cp" + (i === cmp.cur ? " cur" : "") + (p.status ? " " + p.status : "");
+    el.querySelector(".nm").textContent = p.name + (p.stars ? "  " + "★".repeat(p.stars) : "");
+    el.querySelector(".badge").innerHTML = "<b style='color:" + colOf(p.score) + "'>" + p.score + "</b>" + (w.rej.length ? " · <span style='color:var(--rej)'>" + esc(w.rej[0]) + "</span>" : "") + (p.best ? " · <span style='color:var(--gold)'>meilleure</span>" : "");
+  });
+  layoutCp();
+}
+function layoutCp() {
+  Array.prototype.forEach.call($("cpGrid").children, function (el) {
+    var v = el.querySelector(".v"), img = el.querySelector("img"); if (!img.naturalWidth) return;
+    var s = cmp.zoom ? 1 / (window.devicePixelRatio || 1) : Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight);
+    var W = img.naturalWidth * s, H = img.naturalHeight * s, tx, ty;
+    if (cmp.zoom) { tx = v.clientWidth / 2 - cmp.rx * W; ty = v.clientHeight / 2 - cmp.ry * H; } else { tx = (v.clientWidth - W) / 2; ty = (v.clientHeight - H) / 2; }
+    img.style.transform = "translate(" + tx + "px," + ty + "px) scale(" + s + ")";
+    el.style.cursor = cmp.zoom ? "grab" : "zoom-in";
+  });
+}
+(function () {
+  var g = $("cpGrid"), drag = null, moved = false;
+  g.addEventListener("mousedown", function (e) { if (e.target.closest("button")) return; var el = e.target.closest(".cp"); if (!el) return; drag = {x: e.clientX, y: e.clientY, rx: cmp.rx, ry: cmp.ry, el: el}; moved = false; });
+  window.addEventListener("mousemove", function (e) {
+    if (!drag || !cmp.zoom) return; var img = drag.el.querySelector("img"), s = 1 / (window.devicePixelRatio || 1);
+    var dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    cmp.rx = clamp(drag.rx - dx / (img.naturalWidth * s), 0, 1); cmp.ry = clamp(drag.ry - dy / (img.naturalHeight * s), 0, 1); layoutCp();
+  });
+  window.addEventListener("mouseup", function (e) {
+    if (drag && !moved) {
+      var el = drag.el, i = +el.dataset.i, v = el.querySelector(".v"), img = el.querySelector("img"), r = v.getBoundingClientRect();
+      cmp.cur = i;
+      if (!cmp.zoom && img.naturalWidth) {
+        var s = Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight), W = img.naturalWidth * s, H = img.naturalHeight * s;
+        cmp.rx = clamp((e.clientX - r.left - (v.clientWidth - W) / 2) / W, 0, 1); cmp.ry = clamp((e.clientY - r.top - (v.clientHeight - H) / 2) / H, 0, 1); cmp.zoom = true;
+      } else cmp.zoom = false;
+      drawCompare();
+    }
+    drag = null;
+  });
+  g.addEventListener("click", function (e) { var b = e.target.closest("button[data-st]"); if (!b) return; var i = +b.closest(".cp").dataset.i; cmp.cur = i; setStatus(b.dataset.st, [S.byId[cmp.ids[i]]]); });
+  window.addEventListener("resize", function () { if ($("compare").classList.contains("show")) layoutCp(); });
+})();
+$("cpBack").onclick = closeCompare;
+$("cpKeepBest").onclick = function () {
+  var keep = S.byId[cmp.ids[cmp.cur]], others = cmp.ids.filter(function (id, i) { return i !== cmp.cur; }).map(function (id) { return S.byId[id]; });
+  pushUndo([keep].concat(others));
+  keep.status = "P"; keep.auto = false; learnFrom(keep, true);
+  others.forEach(function (p) { p.status = "X"; p.auto = false; learnFrom(p, false); });
+  updLearn(); saveSoon(); drawCompare(); toast("1 gardée, " + others.length + " rejetée" + (others.length > 1 ? "s" : "") + ".");
+};
+
+/* ---------------- export ---------------- */
+function xmpPacket(p) {
+  var label = p.status === "P" ? "Green" : p.status === "X" ? "Red" : "", rating = p.status === "X" ? -1 : p.stars;
+  return '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Regard Pur">\n <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n  <rdf:Description rdf:about=""\n    xmlns:xmp="http://ns.adobe.com/xap/1.0/"\n    xmp:Rating="' + rating + '"' + (label ? '\n    xmp:Label="' + label + '"' : "") + "/>\n </rdf:RDF>\n</x:xmpmeta>\n<?xpacket end=\"w\"?>\n";
+}
+function xmpMerge(old, p) {
+  // un fichier XMP existe deja (Lightroom, DxO…) : on ne change que la note et le libelle
+  var label = p.status === "P" ? "Green" : p.status === "X" ? "Red" : "", rating = String(p.status === "X" ? -1 : p.stars), s = old;
+  function setAttr(name, val) {
+    var re = new RegExp("xmp:" + name + '="[^"]*"'), re2 = new RegExp("<xmp:" + name + ">[^<]*</xmp:" + name + ">");
+    if (re.test(s)) s = val === "" ? s.replace(re, "") : s.replace(re, "xmp:" + name + '="' + val + '"');
+    else if (re2.test(s)) s = val === "" ? s.replace(re2, "") : s.replace(re2, "<xmp:" + name + ">" + val + "</xmp:" + name + ">");
+    else if (val !== "") s = s.replace(/<rdf:Description\b/, '<rdf:Description xmp:' + name + '="' + val + '"');
+  }
+  if (!/xmlns:xmp=/.test(s)) s = s.replace(/<rdf:Description\b/, '<rdf:Description xmlns:xmp="http://ns.adobe.com/xap/1.0/"');
+  setAttr("Rating", rating); setAttr("Label", label);
+  return s;
+}
+function openExport() {
+  var nP = S.photos.filter(function (p) { return p.status === "P"; }).length, nX = S.photos.filter(function (p) { return p.status === "X"; }).length, nS = S.photos.filter(function (p) { return p.stars > 0; }).length;
+  if (!N) { dialog("<h3>📤 Exporter</h3><p>L'export (copie des photos, fichiers XMP) se fait dans la version PC de Regard Pur.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>"); return; }
+  dialog("<h3>📤 Exporter</h3>" +
+    "<label class='opt'><input type='radio' name='eW' value='P' checked><div><b>Les gardées</b> (" + nP + ")</div></label>" +
+    "<label class='opt'><input type='radio' name='eW' value='PT'><div><b>Les gardées et les « à voir »</b> (tout sauf les rejetées)</div></label>" +
+    "<label class='opt'><input type='radio' name='eW' value='S'><div><b>Avec au moins <select id='eS'><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> étoile(s)</b> (" + nS + " avec étoiles)</div></label>" +
+    "<div style='display:flex;gap:8px;align-items:center;margin:10px 0'><select id='eA'><option value='copy'>Copier</option><option value='move'>Déplacer</option></select> dans le sous-dossier <input type='text' id='eD' value='Retenues' style='flex:1'></div>" +
+    "<label class='opt'><input type='checkbox' id='eRej'><div>Ranger aussi les <b>rejetées</b> (" + nX + ") dans le sous-dossier « Rejetées » (rien n'est effacé)</div></label>" +
+    "<label class='opt'><input type='checkbox' id='eX' checked><div><b>Écrire les fichiers XMP</b> à côté de toutes les photos : étoiles, vert = gardée, rouge = rejetée. Lus par <b>Lightroom</b>, <b>Capture One</b>, <b>DxO</b>, <b>Bridge</b>.</div></label>" +
+    "<div class='row'><button data-c='cancel'>Annuler</button><button class='pri' data-c='go'>Exporter</button></div>",
+    function (c) { if (c === "go") doExport(); });
+}
+async function doExport() {
+  var w = document.querySelector("input[name=eW]:checked").value, minS = +$("eS").value, move = $("eA").value === "move", sub = ($("eD").value || "Retenues").replace(/[\\\/:*?"<>|]/g, "_"), rej = $("eRej").checked, xmp = $("eX").checked;
+  var pick = S.photos.filter(function (p) { return w === "P" ? p.status === "P" : w === "PT" ? p.status !== "X" : p.stars >= minS; });
+  var rejs = rej ? S.photos.filter(function (p) { return p.status === "X"; }) : [];
+  closeDialog();
+  var tot = (xmp ? S.photos.length : 0) + pick.length + rejs.length, k = 0, err = 0;
+  S.analysing = true; totalN = tot; doneN = 0; prog(); $("progTxt").textContent = "Export…";
+  function step() { doneN = ++k; prog(); $("progTxt").textContent = "Export " + k + " / " + tot; }
+  if (xmp) for (var i = 0; i < S.photos.length; i++) {
+    var p = S.photos[i], xp = p.path.replace(/\.[^.\\\/]+$/, ".xmp");
+    try { var old = await N.readText(xp); await N.writeText(xp, old && /<rdf:Description/.test(old) ? xmpMerge(old, p) : xmpPacket(p)); } catch (e) { err++; }
+    step();
+  }
+  var dest = join(S.dir, sub);
+  for (i = 0; i < pick.length; i++) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } step(); }
+  for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }
+  S.analysing = false; prog(); saveSoon();
+  dialog("<h3>✔ Export terminé</h3><p>" + pick.length + " photo(s) " + (move ? "déplacée(s)" : "copiée(s)") + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +
+    (xmp ? "<p class='small'>Dans Lightroom : sélectionnez les photos puis « Métadonnées › Lire les métadonnées à partir des fichiers ». Les JPEG gardent leurs notes dans Lightroom uniquement s'ils sont importés après l'export.</p>" : "") +
+    "<div class='row'><button data-c='open'>📂 Ouvrir le dossier</button><button class='pri' data-c='ok'>OK</button></div>",
+    function (c) { if (c === "open") N.openPath(dest); });
+}
+
+/* ---------------- fenetres de dialogue ---------------- */
+var dlgCb = null;
+function dialog(html, cb) { $("dlgBox").innerHTML = html; $("dlg").classList.add("show"); dlgCb = cb || null; }
+function closeDialog() { $("dlg").classList.remove("show"); }
+$("dlg").addEventListener("click", function (e) {
+  if (e.target === $("dlg")) { closeDialog(); return; }
+  var b = e.target.closest("[data-c]"); if (!b || b.tagName === "LABEL") return;
+  var c = b.dataset.c, cb = dlgCb; if (c !== "go") closeDialog(); if (cb) cb(c);
+});
+function help() {
+  dialog("<h3>⌨️ Raccourcis clavier</h3><table>" +
+    [["P", "Garder"], ["X", "Rejeter"], ["U", "Annuler le choix (à voir)"], ["1 … 5", "Étoiles (même chiffre = enlever)"], ["← →", "Photo précédente / suivante"], ["↑ ↓", "Ligne du dessus / dessous (grille)"],
+     ["Entrée", "Vue en grand"], ["Échap", "Revenir à la grille"], ["Z", "Zoom 100 % sur les yeux ou la zone nette"], ["F", "Montrer / cacher visages et zone nette"],
+     ["C", "Comparer (sélection ou série)"], ["Espace", "Ouvrir / fermer la série"], ["G", "Regrouper les séries oui / non"], ["Ctrl + clic", "Sélectionner plusieurs photos"], ["Maj + clic", "Sélectionner une suite"],
+     ["Ctrl + A", "Tout sélectionner"], ["Ctrl + Z", "Annuler la dernière action"]].map(function (r) { return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("") +
+    "</table><p class='small'>Score : netteté mesurée à 100 % (sur les yeux s'il y a un visage), flou de bougé, yeux fermés, exposition. Il apprend de vos choix P / X.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>");
+}
+
+/* ---------------- clavier ---------------- */
+function cols() { var g = $("grid"), c = g.querySelector(".card"); if (!c) return 1; return Math.max(1, Math.round(g.clientWidth / (c.offsetWidth + 10))); }
+document.addEventListener("keydown", function (e) {
+  if ($("dlg").classList.contains("show")) { if (e.key === "Escape") closeDialog(); return; }
+  if (e.target.tagName === "INPUT" && e.target.type === "text" || e.target.tagName === "SELECT") return;
+  if (!S.photos.length) { if (e.key === "Enter" || (e.key === "o" && e.ctrlKey)) openFolder(); return; }
+  var k = e.key, inCmp = $("compare").classList.contains("show"), inLp = $("loupe").classList.contains("show");
+  if (e.ctrlKey && k.toLowerCase() === "z") { undo(); e.preventDefault(); return; }
+  if (e.ctrlKey && k.toLowerCase() === "a") { S.view.forEach(function (id) { S.sel.add(id); }); S.photos.forEach(updCard); showPanel(); e.preventDefault(); return; }
+  if (e.ctrlKey && k.toLowerCase() === "o") { openFolder(); e.preventDefault(); return; }
+  if (inCmp) {
+    if (k === "Escape") closeCompare();
+    else if (k === "ArrowRight" || k === "ArrowDown") { cmp.cur = (cmp.cur + 1) % cmp.ids.length; drawCompare(); }
+    else if (k === "ArrowLeft" || k === "ArrowUp") { cmp.cur = (cmp.cur + cmp.ids.length - 1) % cmp.ids.length; drawCompare(); }
+    else if (/^[pxu]$/i.test(k)) setStatus(k.toLowerCase() === "p" ? "P" : k.toLowerCase() === "x" ? "X" : "", [S.byId[cmp.ids[cmp.cur]]]);
+    else if (/^[0-5]$/.test(k)) setStars(+k, [S.byId[cmp.ids[cmp.cur]]]);
+    else if (k.toLowerCase() === "z") { cmp.zoom = !cmp.zoom; layoutCp(); }
+    else return;
+    e.preventDefault(); return;
+  }
+  switch (k) {
+    case "ArrowRight": setCur(S.cur + 1); break;
+    case "ArrowLeft": setCur(S.cur - 1); break;
+    case "ArrowDown": if (inLp) setCur(S.cur + 1); else setCur(S.cur + cols()); break;
+    case "ArrowUp": if (inLp) setCur(S.cur - 1); else setCur(S.cur - cols()); break;
+    case "Home": setCur(0); break;
+    case "End": setCur(S.view.length - 1); break;
+    case "Enter": if (!inLp) openLoupe(); break;
+    case "Escape": if (inLp) closeLoupe(); else { S.sel.clear(); S.photos.forEach(updCard); showPanel(); } break;
+    case " ": var p = S.byId[S.view[S.cur]]; if (p && p.g >= 0) { S.openGroup = S.openGroup === p.g ? -1 : p.g; refresh(); } break;
+    default:
+      var l = k.toLowerCase();
+      if (l === "p") setStatus("P"); else if (l === "x") setStatus("X"); else if (l === "u") setStatus("");
+      else if (/^[0-5]$/.test(k)) setStars(+k);
+      else if (l === "c") openCompare();
+      else if (l === "z") { if (!inLp) openLoupe(); $("lpZoom").click(); }
+      else if (l === "f") { $("lpMarks").checked = !$("lpMarks").checked; if (inLp) showLoupe(); }
+      else if (l === "g") { $("cGroup").checked = !$("cGroup").checked; S.openGroup = -1; refresh(); }
+      else return;
+  }
+  e.preventDefault();
+});
+
+/* ---------------- boutons ---------------- */
+$("bOpen").onclick = openFolder; $("bOpen2").onclick = openFolder;
+$("bAuto").onclick = function () { if (S.analysing) { toast("Attendez la fin de l'analyse…"); return; } autoCull(); };
+$("bCompare").onclick = openCompare; $("bExport").onclick = openExport; $("bHelp").onclick = help;
+updLearn();
+window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load};
+})();

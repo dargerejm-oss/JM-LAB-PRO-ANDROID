@@ -1,0 +1,31 @@
+# Regard Pur — tri de photos (PC Windows, puis Android)
+
+Version 2.0 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+
+## Ce que fait l'appli
+- Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, PNG, TIFF et RAW (aperçu intégré au RAW).
+- Analyse chaque photo, sans internet :
+  - **netteté réelle**, mesurée à 100 % sur les zones les plus détaillées, et sur les yeux s'il y a un visage ;
+  - **flou de bougé** : la netteté diffère selon la direction ;
+  - **visages, yeux fermés ou mi-clos, sourire** (modèle MediaPipe embarqué) ;
+  - **exposition** : blancs brûlés, noirs bouchés, photo trop sombre ou trop claire ;
+  - **rafales et doublons** regroupés en séries, avec la meilleure photo mise en avant.
+- Score sur 100 qui **apprend de vos choix P / X**.
+- **Tri automatique** avec trois niveaux d'exigence ; vos choix faits à la main ne sont jamais touchés.
+- Grille de vignettes, **vue en grand** avec zoom à 100 % sur les yeux, **comparaison** de 2 à 6 photos avec zoom synchronisé.
+- **Raccourcis** : P, X, U, 1 à 5, flèches, Entrée, Échap, Z, F, C, Espace, G, Ctrl+Z.
+- **Export** : copier ou déplacer les photos retenues, ranger les rejetées (rien n'est effacé), fichiers **XMP** (étoiles, vert = gardée, rouge = rejetée) lus par Lightroom, Capture One, DxO et Bridge.
+- **Session** enregistrée dans le dossier (`.regardpur/`) : en rouvrant le dossier, tout est repris tout de suite.
+
+## Fabrication
+- Code : `app/` (Electron). La fenêtre est dans `app/renderer/` (HTML / JavaScript), la même base servira pour Android.
+- GitHub fabrique `RegardPur.exe` (sans installation) et `RegardPur_Installation.exe`
+  (`.github/workflows/regardpur.yml`) :
+  - essai (branche de travail) : https://github.com/dargerejm-oss/JM-LAB-PRO-ANDROID/releases/download/regardpur-test/RegardPur.exe
+  - version publiée (main) : https://github.com/dargerejm-oss/JM-LAB-PRO-ANDROID/releases/download/regardpur/RegardPur.exe
+- Sur PC pour développer : `cd app && npm install && npm run vendor && npm start`.
+
+## À faire ensuite
+- Android (réutiliser `renderer/`, accès aux photos par la partie Android comme JM LAB PRO).
+- Lien « Retoucher dans JM LAB PRO ».
+- Photos HEIC (iPhone).

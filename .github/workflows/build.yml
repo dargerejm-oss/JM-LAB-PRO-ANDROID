@@ -3,6 +3,7 @@ name: Build APK
 on:
   push:
     branches: [main, master, 'claude/**']
+    paths-ignore: ['projets/**']
   workflow_dispatch:
 
 permissions:
