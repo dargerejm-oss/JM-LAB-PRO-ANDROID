@@ -39,6 +39,9 @@ jobs:
           for f in deblurring_nafnet.onnx realesr-general-x4v3.onnx realesr-general-wdn-x4v3.onnx; do
             curl -fsSL -o modeles/$f https://github.com/${{ github.repository }}/releases/download/regardpur-modeles/$f
           done
+          for f in scunet_color_real_psnr.onnx gfpgan_v14.onnx; do
+            curl -fsSL -o modeles/$f https://github.com/${{ github.repository }}/releases/download/regardpur-modeles/$f || echo "pas encore : $f"
+          done
           ls -la modeles
 
       - name: Embarquer le module visages (hors ligne)
@@ -79,7 +82,6 @@ jobs:
         with:
           tag_name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'regardpur' || 'regardpur-test' }}
           name: ${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'Regard Pur (PC)' || 'Regard Pur TEST (PC)' }}
-          target_commitish: ${{ github.sha }}
           prerelease: ${{ github.ref_name != 'main' && github.ref_name != 'master' }}
           make_latest: 'false'
           body: "Regard Pur pour Windows. RegardPur.zip : a decompresser, puis double-clic sur RegardPur.exe (sans installation). RegardPur_Installation.exe : installe avec un raccourci. Construit le ${{ github.event.head_commit.timestamp }}."

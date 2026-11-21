@@ -1087,11 +1087,11 @@ function rpPreview() {
 }
 var prevWait = {};
 /* ---------------- AMELIORATION IA (NAFNet, Real-ESRGAN) : calcul sur le PC, resultat enregistre a part ---------------- */
-var AI = {ok: false, busy: false};
-var AIK = {naf: "Déflouée par IA", esr: "Restaurée par IA", x2: "Agrandie ×2 par IA"};
+var AI = {ok: false, busy: false, has: {}};
+var AIK = {naf: "Déflouée par IA", esr: "Restaurée par IA", x2: "Agrandie ×2 par IA", scu: "Débruitée par IA", face: "Visages réparés par IA"};
 function aiShow(p) {
   if (!AI.ok) return; $("aiBox").style.display = "";
-  ["aiNaf", "aiEsr", "aiX2"].forEach(function (k) { $(k).disabled = AI.busy; });
+  [["aiNaf", "naf"], ["aiEsr", "esr"], ["aiX2", "esr"], ["aiScu", "scu"], ["aiGfp", "gfp"]].forEach(function (k) { $(k[0]).disabled = AI.busy; $(k[0]).style.display = AI.has[k[1]] ? "" : "none"; });
   if (!AI.busy) $("aiState").textContent = p && p.ai ? "✓ " + AIK[p.ai.kind] + " (vos réglages s'appliquent par-dessus)." : "";
   $("aiOff").style.display = p && p.ai && !AI.busy ? "" : "none";
 }
@@ -1100,17 +1100,18 @@ function aiJoin(jpg, orig) { // remet les informations de prise de vue (EXIF) de
   return new Promise(function (res) { prevWait[key] = function (r) { res(r.joined || jpg); }; w.postMessage({id: key, exifjoin: true, jpg: jpg.buffer, orig: orig ? orig.buffer : null}); });
 }
 async function aiOne(p, kind, nb, of) {
+  if (kind === "face") return aiFace(p, nb, of);
   var orig = await readBytes(p, true); if (!orig) throw new Error("photo illisible");
   var blob;
   if (p.heic) { blob = await new Promise(function (res) { ensurePool(); var w = pool[pool.length - 1], key = "full:ai:" + Date.now(), c = orig.slice(); fullWait[key] = function (bl) { res(bl); }; w.postMessage({id: key, buf: c.buffer, full: true}, [c.buffer]); }); if (!blob) throw new Error("HEIC illisible"); }
   else blob = new Blob([orig]);
   var bm = await createImageBitmap(blob, {imageOrientation: "from-image"}), W = bm.width, H = bm.height, MP = W * H;
-  var model = kind === "naf" ? "naf" : $("aiSoft").value, d, tw, th;
-  if (kind === "naf") { d = Math.min(1, Math.sqrt(8e6 / MP)); }
+  var same = kind === "naf" || kind === "scu", model = same ? kind : $("aiSoft").value, d, tw, th;
+  if (same) { d = Math.min(1, Math.sqrt((kind === "scu" ? 6e6 : 8e6) / MP)); }
   else if (kind === "esr") { d = Math.max(0.25, Math.min(1, Math.sqrt(3e6 / MP))); }
   else { var t = Math.min(2, Math.sqrt(60e6 / MP)); d = Math.max(t / 4, Math.min(1, Math.sqrt(3e6 / MP))); }
   var iw = Math.max(16, Math.round(W * d)), ih = Math.max(16, Math.round(H * d));
-  if (kind === "naf") { tw = iw; th = ih; } else if (kind === "esr") { tw = W; th = H; } else { tw = Math.round(W * Math.min(2, Math.sqrt(60e6 / MP))); th = Math.round(H * tw / W); }
+  if (same) { tw = iw; th = ih; } else if (kind === "esr") { tw = W; th = H; } else { tw = Math.round(W * Math.min(2, Math.sqrt(60e6 / MP))); th = Math.round(H * tw / W); }
   var ci = new OffscreenCanvas(iw, ih), xi = ci.getContext("2d"); xi.imageSmoothingQuality = "high"; xi.drawImage(bm, 0, 0, iw, ih);
   var src = xi.getImageData(0, 0, iw, ih), t0 = Date.now();
   N.onAiProg(function (f, ep) {
@@ -1118,8 +1119,8 @@ async function aiOne(p, kind, nb, of) {
     $("aiState").textContent = "⏳ " + AIK[kind].replace(" par IA", "") + " " + (of > 1 ? "(photo " + nb + " / " + of + ") " : "") + Math.round(f * 100) + " %" + (rest != null ? " — encore ~" + (rest > 90 ? Math.round(rest / 60) + " min" : rest + " s") : "") + " · " + ep;
   });
   var out = await N.aiRun(model, new Uint8Array(src.data.buffer), iw, ih, tw, th);
-  var co = new OffscreenCanvas(kind === "naf" ? W : tw, kind === "naf" ? H : th), xo = co.getContext("2d");
-  if (kind === "naf" && (tw !== W || th !== H)) {
+  var co = new OffscreenCanvas(same ? W : tw, same ? H : th), xo = co.getContext("2d");
+  if (same && (tw !== W || th !== H)) {
     // grande photo : l'IA travaille sur une version reduite, puis on ajoute seulement la difference a l'image pleine taille
     xo.drawImage(bm, 0, 0); var fimg = xo.getImageData(0, 0, W, H), fd = fimg.data;
     var cd = new OffscreenCanvas(tw, th), xd = cd.getContext("2d"), dd = new ImageData(tw, th);
@@ -1130,11 +1131,44 @@ async function aiOne(p, kind, nb, of) {
     xo.putImageData(fimg, 0, 0);
   } else xo.putImageData(new ImageData(new Uint8ClampedArray(out.buffer, out.byteOffset, out.length), tw, th), 0, 0);
   bm.close();
+  await aiSave(p, kind, co, p.heic || p.raw ? null : orig);
+}
+async function aiSave(p, kind, co, orig) {
   var jpg = new Uint8Array(await (await co.convertToBlob({type: "image/jpeg", quality: 0.95})).arrayBuffer());
-  jpg = await aiJoin(jpg, p.heic || p.raw ? null : orig);
+  jpg = await aiJoin(jpg, orig);
   var file = sessPath("ia" + N.sep + String(p.rel || p.name).replace(/[\\\/:*?"<>|]+/g, "_").replace(/\.[^.]+$/, "") + "_" + kind + ".jpg");
   await N.writeBin(file, jpg);
   p.ai = {kind: kind, file: file, w: co.width, h: co.height}; full.cache.delete(p.id);
+}
+/* visages : chaque visage est redresse sur le modele FFHQ (512 px), repare par GFPGAN, puis recolle en fondu */
+var FFHQ = [[192.98138, 239.94708], [318.90277, 240.1936], [256.63416, 314.01935], [201.26117, 371.41043], [313.08905, 371.15118]];
+function simil(src, dst) { // similitude (echelle, rotation, deplacement) au sens des moindres carres
+  var n = src.length, sx = 0, sy = 0, dx = 0, dy = 0, i; for (i = 0; i < n; i++) { sx += src[i][0]; sy += src[i][1]; dx += dst[i][0]; dy += dst[i][1]; } sx /= n; sy /= n; dx /= n; dy /= n;
+  var num1 = 0, num2 = 0, den = 0; for (i = 0; i < n; i++) { var x = src[i][0] - sx, y = src[i][1] - sy, u = dst[i][0] - dx, v = dst[i][1] - dy; num1 += x * u + y * v; num2 += x * v - y * u; den += x * x + y * y; }
+  var a = num1 / den, b = num2 / den; return {a: a, b: b, tx: dx - (a * sx - b * sy), ty: dy - (b * sx + a * sy)};
+}
+async function aiFace(p, nb, of) {
+  var cur = await readBytes(p); if (!cur) throw new Error("photo illisible");
+  var hc = heicOf(p), blob;
+  var f5 = await new Promise(function (res) { ensurePool(); var w = pool[0], key = "f5:" + Date.now(), c = cur.slice(); prevWait[key] = function (r) { res(r.faces5 || []); }; w.postMessage({id: key, buf: c.buffer, heic: hc, faces5: true}, [c.buffer]); });
+  if (!f5.length) throw new Error("aucun visage trouvé sur " + p.name);
+  if (hc) { blob = await new Promise(function (res) { ensurePool(); var w = pool[pool.length - 1], key = "full:ai:" + Date.now(), c = cur.slice(); fullWait[key] = function (bl) { res(bl); }; w.postMessage({id: key, buf: c.buffer, full: true}, [c.buffer]); }); }
+  else blob = new Blob([cur]);
+  var bm = await createImageBitmap(blob, {imageOrientation: "from-image"}), W = bm.width, H = bm.height, co = new OffscreenCanvas(W, H), xo = co.getContext("2d"); xo.drawImage(bm, 0, 0); bm.close();
+  var mk = new OffscreenCanvas(512, 512), xm = mk.getContext("2d"); xm.filter = "blur(26px)"; xm.fillStyle = "#fff"; xm.beginPath(); xm.ellipse(256, 280, 190, 215, 0, 0, Math.PI * 2); xm.fill();
+  var al = +$("aiFace").value || 0.6;
+  for (var i = 0; i < f5.length; i++) {
+    $("aiState").textContent = "⏳ Visage " + (i + 1) + " / " + f5.length + (of > 1 ? " (photo " + nb + " / " + of + ")" : "") + "…";
+    var T = simil(f5[i], FFHQ), ci = new OffscreenCanvas(512, 512), xi = ci.getContext("2d"); xi.imageSmoothingQuality = "high";
+    xi.setTransform(T.a, T.b, -T.b, T.a, T.tx, T.ty); xi.drawImage(co, 0, 0); xi.setTransform(1, 0, 0, 1, 0, 0);
+    var src = xi.getImageData(0, 0, 512, 512), out = await N.aiRun("gfp", new Uint8Array(src.data.buffer), 512, 512, 512, 512);
+    var rc = new OffscreenCanvas(512, 512), xr = rc.getContext("2d"); xr.putImageData(new ImageData(new Uint8ClampedArray(out.buffer, out.byteOffset, out.length), 512, 512), 0, 0);
+    xr.globalCompositeOperation = "destination-in"; xr.drawImage(mk, 0, 0);
+    var det = T.a * T.a + T.b * T.b, A = T.a / det, B = -T.b / det, C = T.b / det, D = T.a / det;
+    xo.save(); xo.imageSmoothingQuality = "high"; xo.globalAlpha = al; xo.setTransform(A, B, C, D, -(A * T.tx + C * T.ty), -(B * T.tx + D * T.ty)); xo.drawImage(rc, 0, 0); xo.restore();
+  }
+  await aiSave(p, "face", co, p.heic || p.raw || p.ai ? null : cur);
+  return f5.length;
 }
 async function aiRun(kind) {
   if (AI.busy || !N) return; var list = fixTargets(); if (!list.length) return;
@@ -1148,7 +1182,9 @@ $("aiNaf").onclick = function () { aiRun("naf"); };
 $("aiEsr").onclick = function () { aiRun("esr"); };
 $("aiX2").onclick = function () { aiRun("x2"); };
 $("aiOff").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p || !p.ai) return; p.ai = null; full.cache.delete(p.id); saveSoon(); aiShow(p); rpPreview(); updCard(p); };
-if (N && N.aiOk) N.aiOk().then(function (v) { AI.ok = !!v; aiShow(S.byId[S.view[S.cur]]); });
+$("aiScu").onclick = function () { aiRun("scu"); };
+$("aiGfp").onclick = function () { aiRun("face"); };
+if (N && N.aiOk) N.aiOk().then(function (v) { AI.has = v || {}; AI.ok = Object.keys(AI.has).some(function (k) { return AI.has[k]; }); aiShow(S.byId[S.view[S.cur]]); });
 
 function dbText(i) {
   var t = {LEGER: "flou léger : renforcement", MOYEN: "flou de mise au point moyen", FORT: "flou de mise au point fort", BOUGE: "bougé (direction " + i.ang + "°)", IRRECUPERABLE: "flou très fort : amélioration limitée"}[i.cat] || i.cat;

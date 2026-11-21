@@ -546,6 +546,20 @@ self.onmessage = function (e) {
     }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n, db: DBI}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
     return;
   }
+  if (m.faces5) { // points des visages pour la reparation des visages par IA
+    queue = queue.then(async function () {
+      var lm = await initFaces(); if (!lm) return [];
+      var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"}), W = bm.width, H = bm.height;
+      var r = detectFaces(lm, bm, W, H); bm.close();
+      var avg = function (pts, ids) { var x = 0, y = 0; ids.forEach(function (i) { x += pts[i].x; y += pts[i].y; }); return [x / ids.length * W, y / ids.length * H]; };
+      return r.faceLandmarks.map(function (pts) {
+        var e = [avg(pts, [468, 469, 470, 471, 472]), avg(pts, [473, 474, 475, 476, 477])].sort(function (a, b) { return a[0] - b[0]; });
+        var mo = [[pts[61].x * W, pts[61].y * H], [pts[291].x * W, pts[291].y * H]].sort(function (a, b) { return a[0] - b[0]; });
+        return [e[0], e[1], [pts[1].x * W, pts[1].y * H], mo[0], mo[1]];
+      }).filter(function (f) { return Math.hypot(f[1][0] - f[0][0], f[1][1] - f[0][1]) >= 18; });
+    }).then(function (f) { self.postMessage({id: m.id, faces5: f}); }, function (err) { self.postMessage({id: m.id, faces5: [], err: String(err && err.message || err)}); });
+    return;
+  }
   if (m.exifjoin) { // JPEG produit par l'IA : on y remet les informations de prise de vue de l'original
     var ej = new Uint8Array(m.jpg), ex2 = m.orig ? exifOf(new Uint8Array(m.orig)) : null;
     if (ex2) { var rj = new Uint8Array(ej.length + ex2.length); rj.set(ej.subarray(0, 2), 0); rj.set(ex2, 2); rj.set(ej.subarray(2), 2 + ex2.length); ej = rj; }

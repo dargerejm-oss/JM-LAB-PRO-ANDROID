@@ -2,15 +2,17 @@
 // L'image est traitee par morceaux qui se chevauchent, puis recollee. Carte graphique (DirectML) si possible, sinon processeur.
 const path = require('path'), fs = require('fs');
 let ort = null, DIR = null;
-const S = {}, FILES = {naf: 'deblurring_nafnet.onnx', esr: 'realesr-general-x4v3.onnx', esrd: 'realesr-general-wdn-x4v3.onnx'};
+const S = {}, FILES = {naf: 'deblurring_nafnet.onnx', esr: 'realesr-general-x4v3.onnx', esrd: 'realesr-general-wdn-x4v3.onnx', scu: 'scunet_color_real_psnr.onnx', gfp: 'gfpgan_v14.onnx'};
 // NAFNet : morceaux de 512 (384 minimum), multiples de 16 (4 reductions) ; ordre des couleurs BGR (modele OpenCV)
 // Real-ESRGAN : morceaux de 192, sortie x4
-const CFG = {naf: {tile: 512, ov: 32, scale: 1, mult: 16, min: 384, bgr: true}, esr: {tile: 192, ov: 12, scale: 4, mult: 1, min: 0, bgr: false}, esrd: {tile: 192, ov: 12, scale: 4, mult: 1, min: 0, bgr: false}};
+const CFG = {naf: {tile: 512, ov: 32, scale: 1, mult: 16, min: 384, bgr: true}, esr: {tile: 192, ov: 12, scale: 4, mult: 1, min: 0, bgr: false}, esrd: {tile: 192, ov: 12, scale: 4, mult: 1, min: 0, bgr: false},
+  scu: {tile: 224, ov: 16, scale: 1, mult: 1, min: 256, bgr: false}, gfp: {tile: 512, ov: 0, scale: 1, mult: 1, min: 512, bgr: false, pm1: true}};
+// SCUNet : morceaux fixes de 256 (224 + marges) ; GFPGAN : un visage aligne de 512, valeurs de -1 a 1
 
 function init(app) {
   DIR = app.isPackaged ? path.join(process.resourcesPath, 'modeles') : path.join(__dirname, 'modeles');
 }
-function available() { return !!DIR && Object.values(FILES).every(f => fs.existsSync(path.join(DIR, f))); }
+function available() { if (!DIR) return {}; const r = {}; Object.keys(FILES).forEach(k => { r[k] = fs.existsSync(path.join(DIR, FILES[k])); }); return r; }
 async function session(m) {
   if (S[m]) return S[m];
   if (!ort) ort = require('onnxruntime-node');
@@ -35,8 +37,9 @@ async function run(m, rgba, w, h, tw, th, prog) {
     const n = iw * ih, inp = new Float32Array(3 * n);
     for (let y = 0; y < ih; y++) { const sy = refl(iy0 + y, h); for (let x = 0; x < iw; x++) {
       const k = (sy * w + refl(ix0 + x, w)) * 4, o = y * iw + x;
-      if (C.bgr) { inp[o] = rgba[k + 2] / 255; inp[n + o] = rgba[k + 1] / 255; inp[2 * n + o] = rgba[k] / 255; }
-      else { inp[o] = rgba[k] / 255; inp[n + o] = rgba[k + 1] / 255; inp[2 * n + o] = rgba[k + 2] / 255; }
+      const a = C.pm1 ? 127.5 : 255, b = C.pm1 ? 1 : 0;
+      if (C.bgr) { inp[o] = rgba[k + 2] / a - b; inp[n + o] = rgba[k + 1] / a - b; inp[2 * n + o] = rgba[k] / a - b; }
+      else { inp[o] = rgba[k] / a - b; inp[n + o] = rgba[k + 1] / a - b; inp[2 * n + o] = rgba[k + 2] / a - b; }
     } }
     const r = await s.run({[s.inputNames[0]]: new ort.Tensor('float32', inp, [1, 3, ih, iw])}), out = r[s.outputNames[0]].data;
     const ow = iw * sc, on = ow * ih * sc, cR = C.bgr ? 2 : 0, cB = C.bgr ? 0 : 2;
@@ -47,6 +50,7 @@ async function run(m, rgba, w, h, tw, th, prog) {
     } }
     done++; if (prog) prog(done / tot, ep);
   }
+  if (C.pm1) for (let i = 0; i < acc.length; i++) acc[i] = (acc[i] + (cnt[(i / 3) | 0] || 1)) / 2; // -1..1 -> 0..1
   const res = new Uint8Array(tw * th * 4);
   for (let i = 0; i < tw * th; i++) { const c = cnt[i] || 1; res[i * 4] = Math.max(0, Math.min(255, Math.round(acc[i * 3] / c * 255))); res[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(acc[i * 3 + 1] / c * 255))); res[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(acc[i * 3 + 2] / c * 255))); res[i * 4 + 3] = 255; }
   return res;
