@@ -4,8 +4,8 @@
 // ne ressemble plus a l'original, la deconvolution est annulee et remplacee par un renforcement leger).
 // Calcul sur une version reduite, puis transfert du « delta de detail » a la pleine resolution.
 var DEBLUR = (function () {
-  var GA = -1.3859, GB = -6.2439, MA = -0.8489, MB = -0.8360, GCAP = 6, MCAP = 45, GKX = 0.05, MKX = 0.09, RESID = 3.0, WORK = 1000;
-  var cache = null;
+  var GA = -1.3859, GB = -6.2439, MA = -0.8489, MB = -0.8360, GCAP = 6, MCAP = 45, GKX = 0.05, MKX = 0.09, RESID = 3.0, WORK = 1400;
+  var cache = null, MO = null;
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function lapVar(Y, w, h) {
     var s = 0, s2 = 0, n = 0;
@@ -26,47 +26,58 @@ var DEBLUR = (function () {
     }
     return o;
   }
-  // FFT radix 2 en place
-  function fft1(re, im, off, stride, n, inv) {
-    for (var i = 1, j = 0; i < n; i++) { var bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
-      if (i < j) { var a = off + i * stride, b = off + j * stride, t = re[a]; re[a] = re[b]; re[b] = t; t = im[a]; im[a] = im[b]; im[b] = t; } }
-    for (var len = 2; len <= n; len <<= 1) {
-      var ang = (inv ? 2 : -2) * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
-      for (i = 0; i < n; i += len) { var cr = 1, ci = 0;
-        for (var k = 0; k < h; k++) { var p = off + (i + k) * stride, q = p + h * stride, xr = re[q] * cr - im[q] * ci, xi = re[q] * ci + im[q] * cr;
-          re[q] = re[p] - xr; im[q] = im[p] - xi; re[p] += xr; im[p] += xi; var nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr; } }
+  // FFT rapide : tables precalculees, lignes contigues, transposition entre les deux passes
+  var TB = {};
+  function tables(n) {
+    if (TB[n]) return TB[n];
+    var rev = new Uint32Array(n), bits = Math.round(Math.log2(n)), c = new Float64Array(n / 2), s = new Float64Array(n / 2);
+    for (var i = 0; i < n; i++) { var r = 0, v = i; for (var b = 0; b < bits; b++) { r = (r << 1) | (v & 1); v >>= 1; } rev[i] = r; }
+    for (i = 0; i < n / 2; i++) { c[i] = Math.cos(2 * Math.PI * i / n); s[i] = Math.sin(2 * Math.PI * i / n); }
+    return (TB[n] = {rev: rev, c: c, s: s});
+  }
+  function rows(re, im, W, H, inv) {
+    var T = tables(W), rev = T.rev, C = T.c, Sn = T.s, sg = inv ? 1 : -1;
+    for (var y = 0; y < H; y++) {
+      var o = y * W;
+      for (var i = 0; i < W; i++) { var j = rev[i]; if (i < j) { var a = o + i, b = o + j, t = re[a]; re[a] = re[b]; re[b] = t; t = im[a]; im[a] = im[b]; im[b] = t; } }
+      for (var len = 2; len <= W; len <<= 1) {
+        var h = len >> 1, st = W / len;
+        for (i = 0; i < W; i += len) for (var k = 0; k < h; k++) {
+          var cr = C[k * st], ci = sg * Sn[k * st], p = o + i + k, q = p + h, xr = re[q] * cr - im[q] * ci, xi = re[q] * ci + im[q] * cr;
+          re[q] = re[p] - xr; im[q] = im[p] - xi; re[p] += xr; im[p] += xi;
+        }
+      }
     }
   }
-  function fft2(re, im, W, H, inv) {
-    for (var y = 0; y < H; y++) fft1(re, im, y * W, 1, W, inv);
-    for (var x = 0; x < W; x++) fft1(re, im, x, W, H, inv);
-    if (inv) { var s = 1 / (W * H); for (var i = 0; i < re.length; i++) { re[i] *= s; im[i] *= s; } }
-  }
+  function transp(a, W, H) { var o = new Float64Array(W * H); for (var y = 0; y < H; y++) { var r = y * W; for (var x = 0; x < W; x++) o[x * H + y] = a[r + x]; } return o; }
+  function fwd(re, im, W, H) { rows(re, im, W, H, false); var R = transp(re, W, H), I = transp(im, W, H); rows(R, I, H, W, false); return [R, I]; }
+  function inv(R, I, W, H) { rows(R, I, H, W, true); var re = transp(R, H, W), im = transp(I, H, W); rows(re, im, W, H, true); var s = 1 / (W * H); for (var i = 0; i < re.length; i++) re[i] *= s; return re; }
   function p2(n) { var p = 1; while (p < n) p <<= 1; return p; }
-  function gaussPsf(sig) { var sz = Math.max(5, 2 * Math.round(3 * sig) + 1); if (!(sz & 1)) sz++; var k = new Float32Array(sz * sz), c = sz >> 1, s = 0;
+  function gaussPsf(sig) { var sz = Math.max(5, 2 * Math.round(3 * sig) + 1); if (!(sz & 1)) sz++; var k = new Float64Array(sz * sz), c = sz >> 1, s = 0;
     for (var y = 0; y < sz; y++) for (var x = 0; x < sz; x++) { var v = Math.exp(-((x - c) * (x - c) + (y - c) * (y - c)) / (2 * sig * sig)); k[y * sz + x] = v; s += v; }
     for (var i = 0; i < k.length; i++) k[i] /= s; return {k: k, n: sz}; }
-  function motionPsf(len, deg) { len = Math.max(3, Math.round(len)); var sz = len + 4; if (!(sz & 1)) sz++; var k = new Float32Array(sz * sz), c = sz >> 1, a = deg * Math.PI / 180, s = 0;
+  function motionPsf(len, deg) { len = Math.max(3, Math.round(len)); var sz = len + 4; if (!(sz & 1)) sz++; var k = new Float64Array(sz * sz), c = sz >> 1, a = deg * Math.PI / 180, s = 0;
     for (var i = 0; i < len * 4; i++) { var t = -len / 2 + len * i / (len * 4 - 1), x = Math.round(c + t * Math.cos(a)), y = Math.round(c + t * Math.sin(a)); if (x >= 0 && x < sz && y >= 0 && y < sz) k[y * sz + x] = 1; }
     for (i = 0; i < k.length; i++) s += k[i]; if (!s) { k[c * sz + c] = 1; s = 1; } for (i = 0; i < k.length; i++) k[i] /= s; return {k: k, n: sz}; }
   function refl(i, n) { var p = 2 * (n - 1) || 1; i = ((i % p) + p) % p; return i < n ? i : p - i; }
-  // Wiener : renvoie la luminance deflouee + la fonction pour reflouer (filet de securite)
+  // Wiener : l'image (partie reelle) et le noyau (partie imaginaire) passent dans une seule FFT
   function wiener(Y, w, h, psf, k) {
-    var pad = psf.n * 2, W = p2(w + 2 * pad), H = p2(h + 2 * pad), re = new Float32Array(W * H), im = new Float32Array(W * H);
-    for (var y = 0; y < H; y++) { var sy = refl(y - pad, h); for (var x = 0; x < W; x++) re[y * W + x] = Y[sy * w + refl(x - pad, w)]; }
-    var pr = new Float32Array(W * H), pi = new Float32Array(W * H), c = psf.n >> 1;
-    for (y = 0; y < psf.n; y++) for (x = 0; x < psf.n; x++) pr[((y - c + H) % H) * W + ((x - c + W) % W)] = psf.k[y * psf.n + x];
-    fft2(re, im, W, H, false); fft2(pr, pi, W, H, false);
-    for (var i = 0; i < re.length; i++) { var a = pr[i], b = pi[i], d = a * a + b * b + k, fr = re[i], fi = im[i]; re[i] = (a * fr + b * fi) / d; im[i] = (a * fi - b * fr) / d; }
-    fft2(re, im, W, H, true);
-    var o = new Float32Array(w * h); for (y = 0; y < h; y++) for (x = 0; x < w; x++) o[y * w + x] = clamp(re[(y + pad) * W + x + pad], 0, 255);
-    return {out: o, reblur: function (Z) {
-      var zr = new Float32Array(W * H), zi = new Float32Array(W * H);
-      for (var y = 0; y < H; y++) { var sy = refl(y - pad, h); for (var x = 0; x < W; x++) zr[y * W + x] = Z[sy * w + refl(x - pad, w)]; }
-      fft2(zr, zi, W, H, false);
-      for (var i = 0; i < zr.length; i++) { var a = pr[i], b = pi[i], fr = zr[i], fi = zi[i]; zr[i] = a * fr - b * fi; zi[i] = a * fi + b * fr; }
-      fft2(zr, zi, W, H, true);
-      var r = new Float32Array(w * h); for (y = 0; y < h; y++) for (x = 0; x < w; x++) r[y * w + x] = clamp(zr[(y + pad) * W + x + pad], 0, 255); return r; }};
+    var pad = psf.n, W = p2(w + 2 * pad), H = p2(h + 2 * pad), N = W * H, re = new Float64Array(N), im = new Float64Array(N), c = psf.n >> 1, x, y;
+    for (y = 0; y < H; y++) { var sy = refl(y - pad, h) * w, ry = y * W; for (x = 0; x < W; x++) re[ry + x] = Y[sy + refl(x - pad, w)]; }
+    for (y = 0; y < psf.n; y++) for (x = 0; x < psf.n; x++) im[((y - c + H) % H) * W + ((x - c + W) % W)] = psf.k[y * psf.n + x];
+    var Z = fwd(re, im, W, H), ZR = Z[0], ZI = Z[1];
+    var PR = new Float64Array(N), PI = new Float64Array(N), OR = new Float64Array(N), OI = new Float64Array(N);
+    for (var u = 0; u < W; u++) { var nu = (W - u) % W; for (var v = 0; v < H; v++) { var a1 = u * H + v, a2 = nu * H + (H - v) % H, zr = ZR[a1], zi = ZI[a1], mr = ZR[a2], mi = -ZI[a2];
+      var fr = (zr + mr) / 2, fi = (zi + mi) / 2, pr = (zi - mi) / 2, pi = -(zr - mr) / 2; PR[a1] = pr; PI[a1] = pi;
+      var d = pr * pr + pi * pi + k; OR[a1] = (pr * fr + pi * fi) / d; OI[a1] = (pr * fi - pi * fr) / d; } }
+    var out = inv(OR, OI, W, H), o = new Float32Array(w * h);
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) o[y * w + x] = clamp(out[(y + pad) * W + x + pad], 0, 255);
+    return {out: o, reblur: function (Zp) {
+      var zr = new Float64Array(N), zi = new Float64Array(N), x, y;
+      for (y = 0; y < H; y++) { var sy = refl(y - pad, h) * w, ry = y * W; for (x = 0; x < W; x++) zr[ry + x] = Zp[sy + refl(x - pad, w)]; }
+      var F = fwd(zr, zi, W, H), R = F[0], I = F[1];
+      for (var i = 0; i < N; i++) { var a = PR[i], b = PI[i], fr = R[i], fi = I[i]; R[i] = a * fr - b * fi; I[i] = a * fi + b * fr; }
+      var q = inv(R, I, W, H), r = new Float32Array(w * h); for (y = 0; y < h; y++) for (x = 0; x < w; x++) r[y * w + x] = clamp(q[(y + pad) * W + x + pad], 0, 255); return r; }};
   }
   function blur(Y, w, h, r) { // flou de boite separable, deux passes (approche gaussienne)
     var a = new Float32Array(Y), b = new Float32Array(w * h);
@@ -90,7 +101,7 @@ var DEBLUR = (function () {
     var jxx = 0, jyy = 0, jxy = 0;
     for (var y = 1; y < sh - 1; y++) for (var x = 1; x < sw - 1; x++) { var i = y * sw + x, gx = G[i + 1] - G[i - 1], gy = G[i + sw] - G[i - sw]; jxx += gx * gx; jyy += gy * gy; jxy += gx * gy; }
     var tr = jxx + jyy, dt = Math.sqrt((jxx - jyy) * (jxx - jyy) + 4 * jxy * jxy), l1 = (tr + dt) / 2, l2 = Math.max(1e-6, (tr - dt) / 2);
-    var dir = l1 / l2, ang = 0.5 * Math.atan2(2 * jxy, jxx - jyy) * 180 / Math.PI + 90, bouge = dir > 1.6;
+    var dir = l1 / l2, ang = 0.5 * Math.atan2(2 * jxy, jxx - jyy) * 180 / Math.PI + 90, bouge = MO != null ? MO > 50 : dir > 3;
     var cat = score >= 110 ? "NET" : score >= 55 ? "LEGER" : score >= 22 ? (bouge ? "BOUGE" : "MOYEN") : score >= 9 ? (bouge ? "BOUGE" : "FORT") : "IRRECUPERABLE";
     if (cat !== "NET") { // nettete des 10 % de blocs les plus nets
       var B = 16, vs = [];
@@ -103,6 +114,7 @@ var DEBLUR = (function () {
     return {cat: cat, score: score, bouge: bouge, ang: ang, dir: dir};
   }
   function correct(Y, w, h, D) {
+    MO = D.mo == null ? null : +D.mo;
     var it = clamp((D.amt || 0) / 100, 0, 1), dn = D.dn == null ? 0.35 : D.dn, C = classify(Y, w, h), cat = C.cat;
     if (D.kind === "optique") cat = C.score >= 55 ? "LEGER" : C.score >= 22 ? "MOYEN" : "FORT";
     else if (D.kind === "bouge") cat = C.score >= 110 ? "LEGER" : "BOUGE";
