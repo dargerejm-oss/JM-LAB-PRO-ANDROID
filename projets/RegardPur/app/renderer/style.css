@@ -171,3 +171,13 @@ input[type=range]{accent-color:var(--gold);width:100%}
 #rpBusy{color:var(--gold);font-size:12px;min-height:16px}
 #lpRet.on{background:var(--gold);color:#111;border-color:var(--gold);font-weight:700}
 #lpName{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* correcteur */
+#lpPaint{position:absolute;pointer-events:none}
+#lpView.heal{cursor:crosshair}
+#lpHeal.on{background:var(--gold);color:#111;border-color:var(--gold);font-weight:700}
+#healBar{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;display:none;align-items:center;gap:10px;background:#000d;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12px;z-index:4;max-width:90%}
+#healBar span{color:var(--mut)}
+#healBar label{display:flex;align-items:center;gap:6px}
+#healBar input{width:90px}
+#healBar i{color:var(--gold);font-style:normal}

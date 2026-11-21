@@ -222,7 +222,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -238,7 +238,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -805,25 +805,68 @@ function rpDraw() {
     "<div class='note'>" + (p.ret ? "✔ Cette photo est retouchée (appliqué à l'export)." : "Aperçu seulement : touchez « Appliquer à » pour garder la retouche.") + "</div>";
 }
 function rpPreview() {
-  var p = S.byId[S.view[S.cur]]; if (!p || !rp.open) return;
-  var eff = rpEff(rp.cur), id = p.id;
+  var p = S.byId[S.view[S.cur]]; if (!p) return;
+  var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id;
   clearTimeout(rp.t);
   rp.t = setTimeout(function () {
-    if (!eff) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
+    if (!eff && !heals.length) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
     var busy = $("rpBusy"); if (busy) busy.textContent = "⏳ Calcul de l'aperçu…";
     var my = ++rp.busy;
     readBytes(p).then(function (b) {
       if (!b) return; ensurePool(); var w = pool[0], key = "prev:" + id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
       prevWait[key] = function (r) {
         if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
-        if (busy) busy.textContent = r.prev ? (r.faces ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
+        if (busy) busy.textContent = r.prev ? (r.faces || !eff ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
+        var hb = $("healMsg"); if (hb) hb.textContent = "";
         if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
       };
-      w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff}, [c.buffer]);
+      w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff, heals: heals}, [c.buffer]);
     });
   }, 300);
 }
 var prevWait = {};
+
+/* ---------------- CORRECTEUR au pinceau (meme moteur que JM LAB PRO) ---------------- */
+var heal = {on: false, size: 18, pts: null};
+function healToggle() {
+  heal.on = !heal.on; $("lpHeal").classList.toggle("on", heal.on); $("healBar").style.display = heal.on ? "flex" : "none"; $("lpView").classList.toggle("heal", heal.on);
+  healDrawAll();
+}
+function healCanvas() {
+  var cv = $("lpPaint"), img = $("lpImg"), W = Math.round(img.naturalWidth * full.sc), H = Math.round(img.naturalHeight * full.sc);
+  cv.style.left = full.tx + "px"; cv.style.top = full.ty + "px"; if (cv.width !== W || cv.height !== H) { cv.width = Math.max(1, W); cv.height = Math.max(1, H); }
+  return cv;
+}
+function healDrawAll() {
+  var cv = healCanvas(), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
+  if (!heal.on) return;
+  var p = S.byId[S.view[S.cur]], mn = Math.min(cv.width, cv.height);
+  x.strokeStyle = x.fillStyle = "rgba(255,60,60,0.35)"; x.lineCap = x.lineJoin = "round";
+  ((p && p.heals) || []).concat(heal.pts ? [{pts: heal.pts, r: heal.r}] : []).forEach(function (st) {
+    x.lineWidth = st.r * mn * 2; x.beginPath();
+    st.pts.forEach(function (q, i) { var X = q[0] * cv.width, Y = q[1] * cv.height; if (i) x.lineTo(X, Y); else x.moveTo(X, Y); });
+    if (st.pts.length === 1) { x.arc(st.pts[0][0] * cv.width, st.pts[0][1] * cv.height, st.r * mn, 0, 7); x.fill(); } else x.stroke();
+  });
+}
+function healPt(e) { var r = $("lpView").getBoundingClientRect(), img = $("lpImg"); return [(e.clientX - r.left - full.tx) / (img.naturalWidth * full.sc), (e.clientY - r.top - full.ty) / (img.naturalHeight * full.sc)]; }
+(function () {
+  var v = $("lpView");
+  v.addEventListener("mousedown", function (e) {
+    if (!heal.on || e.button !== 0) return; e.stopImmediatePropagation(); e.preventDefault();
+    var img = $("lpImg"); heal.r = heal.size / Math.min(img.naturalWidth * full.sc, img.naturalHeight * full.sc); heal.pts = [healPt(e)]; healDrawAll();
+  }, true);
+  window.addEventListener("mousemove", function (e) { if (!heal.pts) return; heal.pts.push(healPt(e)); healDrawAll(); });
+  window.addEventListener("mouseup", function (e) {
+    if (!heal.pts) return; e.stopImmediatePropagation();
+    var p = S.byId[S.view[S.cur]]; if (p) { p.heals = (p.heals || []).concat([{pts: heal.pts.filter(function (q, i) { return i % 2 === 0 || i === heal.pts.length - 1; }), r: heal.r}]); saveSoon(); $("healMsg").textContent = "⏳ Reconstruction de la zone…"; rpPreview(); }
+    heal.pts = null; healDrawAll();
+  }, true);
+  v.addEventListener("contextmenu", function (e) { if (heal.on) e.preventDefault(); });
+})();
+$("lpHeal").onclick = healToggle;
+$("healSize").addEventListener("input", function () { heal.size = +this.value; });
+$("healUndo").onclick = function () { var p = S.byId[S.view[S.cur]]; if (p && p.heals && p.heals.length) { p.heals.pop(); if (!p.heals.length) p.heals = null; saveSoon(); healDrawAll(); rpPreview(); } };
+$("healClear").onclick = function () { var p = S.byId[S.view[S.cur]]; if (p && p.heals) { p.heals = null; saveSoon(); healDrawAll(); rpPreview(); } };
 function rpToggle() {
   rp.open = !rp.open; $("rpPanel").classList.toggle("show", rp.open); $("loupe").classList.toggle("rp", rp.open); $("lpRet").classList.toggle("on", rp.open);
   rp.cur = null; if (rp.open) { rpDraw(); rpPreview(); } else { var p = S.byId[S.view[S.cur]]; if (p) fullUrl(p).then(function (u) { $("lpImg").src = u; }); }
@@ -873,7 +916,7 @@ function fullUrl(p) {
   return pr;
 }
 function openLoupe() { if (S.cur < 0) return; $("loupe").classList.add("show"); showLoupe(); }
-function closeLoupe() { if (rp.open) rpToggle(); $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
+function closeLoupe() { if (rp.open) rpToggle(); if (heal.on) healToggle(); $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
 function fit() {
   var v = $("lpView"), img = $("lpImg"); if (!img.naturalWidth) return;
   var s = Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight, 1);
@@ -884,6 +927,7 @@ function apply() {
   $("lpView").classList.toggle("zoom", full.zoom);
   var o = $("lpOver"), W = img.naturalWidth * full.sc, H = img.naturalHeight * full.sc, wm = $("lpWarm");
   wm.style.left = full.tx + "px"; wm.style.top = full.ty + "px"; wm.style.width = W + "px"; wm.style.height = H + "px";
+  if (heal.on) healDrawAll();
   o.style.left = full.tx + "px"; o.style.top = full.ty + "px"; o.style.width = W + "px"; o.style.height = H + "px";
 }
 function drawLoupeMarks(p) {
@@ -901,10 +945,10 @@ function showLoupe() {
     full.zoom = false; img.dataset.id = id;
     if (p.thumbUrl) { img.src = p.thumbUrl; img.onload = function () { if (img.dataset.id === id) { fit(); drawLoupeMarks(p); } }; }
     img.dataset.full = "";
-    fullUrl(p).then(function (u) { if (img.dataset.id !== id || !u) return; img.onload = function () { img.dataset.full = id; if (!full.zoom) fit(); drawLoupeMarks(p); }; img.src = u; });
+    fullUrl(p).then(function (u) { if (img.dataset.id !== id || !u) return; img.onload = function () { img.dataset.full = id; if (!full.zoom) fit(); drawLoupeMarks(p); healDrawAll(); }; img.src = u; if (p.heals || p.ret) rpPreview(); });
     var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
   } else drawLoupeMarks(p);
-  drawFaces($("lpFaces"), p); adjShow(p);
+  drawFaces($("lpFaces"), p); adjShow(p); healDrawAll();
   if (rp.open && $("rpPanel").dataset.for !== p.id) { $("rpPanel").dataset.for = p.id; rp.cur = null; rpDraw(); rpPreview(); }
   var w = p.why || {rej: [], warn: [], good: []};
   $("lpInfo").innerHTML = (p.a && !p.a.err ? "<b style='font-size:18px;color:" + colOf(p.score) + "'>" + p.score + "</b> / 100 · " + (p.status === "P" ? "<span style='color:var(--keep)'>✔ gardée</span>" : p.status === "X" ? "<span style='color:var(--rej)'>✖ rejetée</span>" : "à voir") + "<br>" : "") +
@@ -1083,6 +1127,7 @@ function styleFor(p, base) {
   if (o.profile === "cat") o.profile = cat.prof;
   if (REND.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
   if (p.ret) o.ret = rpEff(p.ret);
+  if (p.heals) o.heals = p.heals;
   var ad = p.adj || adjBias(p);
   if (ad) { o.v = o.v || {}; o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100) / 0.85 * 0.85; o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   return o;
@@ -1129,7 +1174,7 @@ async function doExport() {
   }
   var dest = join(S.dir, sub);
   for (i = 0; i < pick.length; i++) {
-    var st2 = style ? styleFor(pick[i], style) : (pick[i].ret ? {jm: false, ret: rpEff(pick[i].ret), q: 92} : null);
+    var st2 = style ? styleFor(pick[i], style) : (pick[i].ret || pick[i].heals ? {jm: false, ret: rpEff(pick[i].ret), heals: pick[i].heals, q: 92} : null);
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
@@ -1318,5 +1363,5 @@ $("bAuto").onclick = function () { if (S.analysing) { toast("Attendez la fin de 
 $("bImport").onclick = openImport; $("bCompare").onclick = openCompare; $("bExport").onclick = openExport; $("bHelp").onclick = help; $("bStats").onclick = stats;
 try { if (!localStorage.getItem("rp_intro")) setTimeout(function () { guide(0); }, 400); } catch (e) {}
 updLearn();
-window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load};
+window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load}; window.__rp_full = function () { return full; };
 })();

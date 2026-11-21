@@ -41,6 +41,8 @@ et Playwright, ou le vrai programme avec `xvfb-run` + `_electron` (dialogue de d
 Le dépôt est public : l'utilisateur a refusé un dépôt privé séparé pour Regard Pur (ne pas le reproposer).
 Fait jusqu'à 2.11 (voir LISEZMOI) : tri, personnes, œil artistique (NIMA), composition, rendu JM LAB PRO à l'export,
 catégories (idées de « Vrai Regard » sans doublon), retouche rapide apprise, Retouche portrait.
-Suite décidée avec l'utilisateur, dans l'ordre : correcteur / suppression d'objets (porter le PatchMatch de JM LAB PRO),
+Suite décidée avec l'utilisateur, dans l'ordre : correcteur au pinceau (fait), puis RÉORGANISATION DE L'INTERFACE
+(onglets TRIER · RETOUCHER · EXPORTER, vraies icônes SVG au lieu des émojis, mode Simple / Expert, grille allégée pour
+les gros dossiers + temps restant, export simplifié avec options avancées repliées, sections repliables, bulles d'aide « ? »),
 « garder les N meilleures », ciel + recadrage auto, style appris depuis Lightroom (XMP), vrais RAW, version anglaise,
 puis EN DERNIER mode d'emploi PDF + aide intégrée en FRANÇAIS ET ANGLAIS. PAS de version Android pour le moment.

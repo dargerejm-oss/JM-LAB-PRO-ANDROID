@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.11 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.12 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
@@ -27,6 +27,7 @@ Version 2.11 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémo
 - **Catégories de séance** (2.9, idées reprises de « Vrai Regard » sans doublon) : Auto (devinée photo par photo, la nuit confirmée par l'heure / ISO / pose) ou mariage, portrait, famille, contre-jour, plage, paysage, nuit. Le tri en tient compte (nuit sombre, contre-jour et plage clairs, robe blanche) ; à l'export : correction des tons vers les cibles de la catégorie (remplace l'exposition auto ProLab pour ne pas corriger deux fois), profil JM LAB PRO conseillé, **peau protégée**, **horizon redressé**, nommage `categorie_client_001.jpg`, **mémoire des réglages par client**.
 - **Retouche rapide** dans la vue en grand (☀ exposition, 🌡 chaleur) et **apprentissage de vos retouches** par catégorie et par client (idée « leçons » de Vrai Regard) : appliquées à l'export aux photos non retouchées.
 - **💄 Retouche portrait** (2.11, vue en grand) : préréglages Naturel, Éclat, Glamour, Mariage, Homme, Enfant + intensité ; peau (lissage qui garde le grain et les contours), acné, taches, rousseur, cernes, rides du sourire et du front, blanc des yeux, iris, dents, lèvres, éclat du visage, fond (flou, assombri, désaturé) ; aperçu avant / après ; appliquer à la photo, la personne, la série ou toutes ; mémorisé par catégorie et client ; faite à l'export en pleine résolution. Points du visage MediaPipe + séparation « selfie multiclass » (sans internet).
+- **🩹 Correcteur** (2.12, vue en grand) : on peint sur une tache ou un objet, la zone est reconstruite avec la matière voisine (même moteur que JM LAB PRO, extrait de `jmfx2.js`) ; annuler, tout effacer, taille ; fait à l'export en pleine résolution.
 - **Session** enregistrée dans le dossier (`.regardpur/`) : en rouvrant le dossier, tout est repris tout de suite.
 
 ## Fabrication
