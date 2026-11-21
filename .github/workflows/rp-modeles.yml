@@ -1,4 +1,5 @@
 name: Regard Pur - modeles IA
+# (relance manuelle possible depuis l onglet Actions)
 # prepare les modeles d'IA locale (format ONNX) et les depose dans la publication « regardpur-modeles »
 on:
   workflow_dispatch:
