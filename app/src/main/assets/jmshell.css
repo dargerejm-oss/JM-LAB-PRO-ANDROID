@@ -205,3 +205,6 @@ body[data-tab=exp] .scroll-content>.mt-5{display:none!important}
 /* appui long sur la photo : pas de menu ni de selection */
 .fixed-top,.fixed-top *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 #jxEye{font-size:22px!important}
+/* comparaison : plus de curseur sur la photo, appui long (ou 👁) pour voir l avant */
+#divider{display:none!important}
+#filteredCanvas{clip-path:none!important}
