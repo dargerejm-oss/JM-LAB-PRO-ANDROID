@@ -48,6 +48,19 @@ jobs:
               print(f, [(i.name, i.shape, i.type) for i in s.get_inputs()], [(o.name, o.shape) for o in s.get_outputs()])
           PY
           ls -la m
+      - name: Versions allegees (demi-precision) pour reduire le telechargement
+        continue-on-error: true
+        run: |
+          pip install onnxconverter-common
+          python - <<'PY'
+          import onnx, glob, os
+          from onnxconverter_common import float16
+          for f in ['m/gfpgan_v14.onnx', 'm/scunet_color_real_psnr.onnx', 'm/deblurring_nafnet.onnx']:
+              if not os.path.exists(f): continue
+              m = onnx.load(f)
+              m16 = float16.convert_float_to_float16(m, keep_io_types=True)
+              out = f.replace('.onnx', '_fp16.onnx'); onnx.save(m16, out); print(out, os.path.getsize(out))
+          PY
       - name: Publication regardpur-modeles
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
