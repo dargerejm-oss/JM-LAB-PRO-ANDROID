@@ -313,7 +313,7 @@ function colorSig(img) {
 }
 
 async function analyse(msg) {
-  var out = {id: msg.id, v: 4};
+  var out = {id: msg.id, v: 5};
   var blob = new Blob([msg.buf], {type: "image/jpeg"});
   // informations de prise de vue
   try {
@@ -425,7 +425,24 @@ async function analyse(msg) {
           var fl = 0, fn = 0; for (var fy = Math.floor((miny + bh * 0.25) * ah); fy < (miny + bh * 0.8) * ah; fy += 2) for (var fx = Math.floor((minx + bw * 0.2) * aw); fx < (minx + bw * 0.8) * aw; fx += 2) { if (fy >= 0 && fy < ah && fx >= 0 && fx < aw) { fl += g[fy * aw + fx]; fn++; } }
           var nose = pts[1], eyeMid = (le.x + re.x) / 2, eyeD = Math.max(1, Math.hypot(re.x - le.x, re.y - le.y));
           var yaw = Math.round((nose.x * W - eyeMid) / eyeD * 100) / 100;
-          out.faces.push({yaw: yaw, px: px, lum: fn ? Math.round(fl / fn) : null, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
+          // lunettes (repris de TRI_YEUX_LUNETTES_PRO) : part de pixels tres sombres dans la zone des yeux elargie a la monture
+          var gl = null, tint = false;
+          try {
+            var ids = [159, 145, 133, 33, 386, 374, 362, 263], gx = ids.map(function (i) { return pts[i].x; }), gy = ids.map(function (i) { return pts[i].y; });
+            var lx = Math.max.apply(null, gx) - Math.min.apply(null, gx), ly = Math.max.apply(null, gy) - Math.min.apply(null, gy);
+            var zx0 = Math.max(0, Math.floor((Math.min.apply(null, gx) - 0.12 * lx) * aw)), zx1 = Math.min(aw, Math.ceil((Math.max.apply(null, gx) + 0.12 * lx) * aw));
+            var zy0 = Math.max(0, Math.floor((Math.min.apply(null, gy) - 1.2 * ly) * ah)), zy1 = Math.min(ah, Math.ceil((Math.max.apply(null, gy) + 1.2 * ly) * ah));
+            if (zx1 - zx0 >= 8 && zy1 - zy0 >= 8) {
+              var gmn = 255, gmx = 0, zz, zy, zxx; for (zy = zy0; zy < zy1; zy++) for (zxx = zx0; zxx < zx1; zxx++) { zz = g[zy * aw + zxx]; if (zz < gmn) gmn = zz; if (zz > gmx) gmx = zz; }
+              if (gmx - gmn >= 1) { var dk = 0, tt = 0; for (zy = zy0; zy < zy1; zy++) for (zxx = zx0; zxx < zx1; zxx++) { tt++; if ((g[zy * aw + zxx] - gmn) / (gmx - gmn) * 255 < 60) dk++; } gl = Math.round(dk / tt * 100) / 100; }
+              // verres teintes : l'interieur des yeux bien plus sombre que les joues
+              var lum = function (q, r) { var cx = Math.round(q.x * aw), cy = Math.round(q.y * ah), sm = 0, nn = 0; for (var yy = cy - r; yy <= cy + r; yy++) for (var xx = cx - r; xx <= cx + r; xx++) if (xx >= 0 && yy >= 0 && xx < aw && yy < ah) { sm += g[yy * aw + xx]; nn++; } return nn ? sm / nn : 0; };
+              var rr = Math.max(1, Math.round(lx * aw * 0.04)), eyeL = (lum(pts[230], rr) + lum(pts[450], rr)) / 2; // peau juste sous l'oeil, derriere le verre
+              var chk = (lum(pts[50], rr * 2) + lum(pts[280], rr * 2)) / 2;
+              tint = gl != null && gl >= 0.25 && chk > 40 && eyeL < chk * 0.45;
+            }
+          } catch (e) {}
+          out.faces.push({glasses: gl, tinted: tint, yaw: yaw, px: px, lum: fn ? Math.round(fl / fn) : null, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
             closed: blinkMin > 0.5, half: !(blinkMin > 0.5) && blink > 0.45, smile: Math.round(smile * 100) / 100,
             eyeSharp: eCre != null ? (es ? Math.min(toScore(es.v), eCre) : eCre) : (es ? toScore(es.v) : null), eyeBlur: ecb != null ? Math.round(ecb * 1000) / 1000 : null, eyeRatio: es ? toScore(es.v) : null, faceSharp: fs2 ? (fCre != null ? Math.min(toScore(fs2.v), fCre) : toScore(fs2.v)) : fCre});
         });

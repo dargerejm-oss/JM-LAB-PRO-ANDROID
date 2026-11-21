@@ -6,7 +6,7 @@ var N = window.RPNative || null;               // partie PC (absente dans un sim
 var RAWX = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|x3f|3fr|iiq|rwl|mrw|kdc|erf)$/i;
 var IMGX = /\.(jpe?g|png|webp|bmp|gif|tiff?|heic|heif|hif)$/i, HEICX = /\.(heic|heif|hif)$/i;
 
-var AVER = 4; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
+var AVER = 5; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
 var S = {
   photos: [], byId: {}, view: [], cur: -1, sel: new Set(), filter: "all", dir: null, groups: [], openGroup: -1,
   undo: [], analysing: false, saveT: 0
@@ -55,6 +55,8 @@ function bigFaces(a) {
   return (a && a.faces || []).filter(function (f) { return f.w > 0.035; }).map(function (x) {
     // yeux fermes / mi-clos selon votre seuil appris (« Pas d'accord »)
     if (x.blinkMin != null) { x.closed = x.blinkMin > CALT.blink; x.half = !x.closed && x.blink > CALT.blink - 0.05; }
+    // derriere des verres teintes, l'etat des yeux n'est pas lisible : on ne devine pas (TRI_YEUX_LUNETTES_PRO)
+    if (x.tinted) { x.closed = false; x.half = false; x.unread = true; }
     return x;
   });
 }
@@ -198,11 +200,13 @@ function reasons(p) {
   if (f.length && ov.eyes === "fermes") rej.push("Yeux fermés (votre avis)");
   else if (f.length && ov.eyes === "ouverts") good.push("Yeux ouverts (votre avis)");
   else if (f.length) {
-    var cl = f.filter(function (x) { return x.closed; }).length, hf = f.filter(function (x) { return x.half; }).length;
+    var cl = f.filter(function (x) { return x.closed; }).length, hf = f.filter(function (x) { return x.half; }).length, gls = f.filter(function (x) { return x.glasses != null && x.glasses >= 0.25; }).length, ur = f.filter(function (x) { return x.unread; }).length;
+    if (ur) warn.push("Verres teintés : yeux non lisibles" + (f.length > 1 ? " (" + ur + " sur " + f.length + ")" : ""));
+    else if (gls) warn.push("Lunettes" + (f.length > 1 ? " (" + gls + " sur " + f.length + ")" : "") + " : vérifiez les reflets");
     if (cl === f.length) rej.push(f.length > 1 ? "Yeux fermés (tout le monde)" : "Yeux fermés");
     else if (cl) (k >= 1 ? rej : warn).push("Yeux fermés (" + cl + " sur " + f.length + ")");
     else if (hf) warn.push("Yeux mi-clos");
-    else good.push(f.length > 1 ? f.length + " visages, yeux ouverts" : "Yeux ouverts");
+    else if (ur < f.length) good.push(f.length > 1 ? f.length + " visages, yeux ouverts" : "Yeux ouverts");
     if (avg(f.map(function (x) { return x.smile; })) > 0.55) good.push("Sourire");
   }
   // portrait : si le visage est bien expose, un fond tres clair ou tres sombre est un choix, pas une erreur
@@ -657,6 +661,7 @@ var ISSUES = [
   ["blur", "Floues", function (p) { return has(p, /Flou|flous/); }],
   ["motion", "Flou de bougé", function (p) { return has(p, /bougé/i); }],
   ["eyes", "Yeux fermés / mi-clos", function (p) { return has(p, /Yeux fermés|mi-clos/); }],
+  ["glasses", "Lunettes / verres teintés", function (p) { return has(p, /Lunettes|Verres teintés/); }],
   ["expo", "Exposition ratée", function (p) { return has(p, /exposée|sombre|brûlés/i); }],
   ["compo", "Composition (bord, tête, horizon)", function (p) { return has(p, /coupé|tête|Horizon/); }],
   ["qual", "Qualité d'image (bruit, pixels, compression, définition)", function (p) { return has(p, /Pixelisée|agrandie|Compression|bruit|Bruit|bruitée|définition/); }],
