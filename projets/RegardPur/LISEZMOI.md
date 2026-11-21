@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.3 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.4 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -50,6 +50,10 @@ Version 3.3 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 
 ## Réglages complets (3.3, étape Retoucher)
 - Profil (selon le type de photo ou au choix), ProLab auto, intensité, 13 curseurs (moteur JM LAB PRO), courbe à points (mode Expert), ✨ Auto (ProLab + catégorie + peau + habitudes apprises), copier / coller, appliquer à la sélection / série / personne / gardées. Aperçu = même calcul que l'export (`renderStyle`). Stocké par photo dans `p.dev`.
+
+## Outils de JM LAB PRO + glisser (3.4)
+- Balance des blancs (pipette), Détails, Contraste des tons, HDR, Théâtral, Éclat glamour : extraits de `jmfx2.js` (`JMLOOKS` dans `jmlab_core.js`), mêmes résultats que l'appli.
+- Régler en glissant sur la photo (comme Snapseed) : ↕ choisir le réglage, ↔ le doser, valeur affichée en grand.
 
 ## Fabrication
 - Code : `app/` (Electron). La fenêtre est dans `app/renderer/` (HTML / JavaScript), la même base servira pour Android.

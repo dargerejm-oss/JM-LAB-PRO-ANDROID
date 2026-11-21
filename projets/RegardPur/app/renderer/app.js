@@ -854,11 +854,13 @@ function devShow(p) {
   $("dvProf").value = d.profile || "cat"; $("dvDose").value = d.dose; $("dvDoseV").textContent = d.dose; $("dvPro").checked = d.pro !== false;
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-dv]"), function (r) { var v = +(d.v[r.dataset.dv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
   curveDraw(d.curve);
+  var lk = d.looks || {};
+  Array.prototype.forEach.call(document.querySelectorAll("#rtTop [data-lk]"), function (r) { var k = r.dataset.lk.split("."), v = +((lk[k[0]] || {})[k[1]] || 0); r.value = v; if (r.tagName === "INPUT") r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
 }
 /* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
 function devStyle(p) {
   if (!p.dev && !p.adj && !p.ret && !p.heals) return null;
-  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, q: 92, jm: !!(p.dev || p.adj)};
+  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
@@ -868,11 +870,13 @@ function devStyle(p) {
 function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
 $("rtTop").addEventListener("input", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (t.dataset.lk) { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; if (t.tagName === "INPUT") t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); return; }
   if (t.dataset.dv) { devGet(p).v[t.dataset.dv] = +t.value; t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); }
   else if (t.id === "dvDose") { devGet(p).dose = +t.value; $("dvDoseV").textContent = t.value; devChanged(p); }
 });
 $("rtTop").addEventListener("change", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (t.dataset.lk && t.tagName === "SELECT") { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; devChanged(p); return; }
   if (t.id === "dvProf") { devGet(p).profile = t.value; devChanged(p); }
   else if (t.id === "dvPro") { devGet(p).pro = t.checked; devChanged(p); }
 });
@@ -899,6 +903,47 @@ $("rtTop").addEventListener("click", function (e) {
   DEVCLIP = {dev: p.dev ? JSON.parse(JSON.stringify(p.dev)) : null, adj: p.adj ? JSON.parse(JSON.stringify(p.adj)) : null};
   devPasteTo(list); toast("Réglages appliqués à " + list.length + " autre" + (list.length > 1 ? "s" : "") + " photo" + (list.length > 1 ? "s" : "") + ".");
 });
+$("lkPip").onclick = function () { var on = !$("lkPip").classList.contains("on"); $("lkPip").classList.toggle("on", on); $("lpView").classList.toggle("pip", on); if (on) toast("Cliquez sur une zone qui devrait être blanche ou grise."); };
+$("lpView").addEventListener("mousedown", function (e) {
+  if (!$("lkPip").classList.contains("on") || e.button !== 0) return; e.stopImmediatePropagation(); e.preventDefault();
+  var p = S.byId[S.view[S.cur]], img = $("lpImg"), r = $("lpView").getBoundingClientRect(); if (!p || !img.naturalWidth) return;
+  var fx = (e.clientX - r.left - full.tx) / (img.naturalWidth * full.sc), fy = (e.clientY - r.top - full.ty) / (img.naturalHeight * full.sc);
+  fullUrl(p).then(function (u) { var im = new Image(); im.onload = function () {
+    var c = document.createElement("canvas"), sz = 9; c.width = c.height = sz; var x = c.getContext("2d"), cx = fx * im.naturalWidth, cy = fy * im.naturalHeight; x.drawImage(im, cx - 4, cy - 4, sz, sz, 0, 0, sz, sz);
+    var dd = x.getImageData(0, 0, sz, sz).data, R = 0, G = 0, B = 0; for (var i = 0; i < dd.length; i += 4) { R += dd[i]; G += dd[i + 1]; B += dd[i + 2]; }
+    // meme calcul que la pipette de JM LAB PRO
+    var KT = 0.5, KM = 0.4; R = Math.max(1, R); G = Math.max(1, G); B = Math.max(1, B);
+    var t = Math.max(-100, Math.min(100, Math.round(100 * Math.log2(B / R) / (2 * KT)))), ti = Math.max(-100, Math.min(100, Math.round(100 * Math.log2(G / Math.sqrt(R * B)) / (1.5 * KM))));
+    var d = devGet(p); d.looks = d.looks || {}; d.looks.wb = {t: t, ti: ti}; devShow(p); devChanged(p);
+    $("lkPip").classList.remove("on"); $("lpView").classList.remove("pip"); toast("Balance des blancs réglée : température " + t + ", teinte " + ti + ".");
+  }; im.src = u; });
+}, true);
+/* ---------------- REGLER EN GLISSANT SUR LA PHOTO (comme Snapseed / Retouches de JM LAB PRO) ----------------
+   glisser de haut en bas : choisir le reglage ; de gauche a droite : le doser */
+var TUNE = [["Luminosité", "#lpEv"], ["Contraste", "[data-dv=Contraste]"], ["Ambiance", "[data-dv=Clarte]"], ["Saturation", "[data-dv=Vibrance]"], ["Hautes lumières", "[data-dv='Hautes SANS GRIS']"],
+  ["Ombres", "[data-dv=Ombres]"], ["Chaleur", "#lpWb"], ["Teinte", "[data-dv=Teinte]"], ["Blancs", "[data-dv=Blanc]"], ["Noirs", "[data-dv=Noir]"], ["Voile", "[data-dv=Dehaze]"],
+  ["Vignette", "[data-dv=Vignette]"], ["Structure", "[data-lk='details.s']"], ["Netteté", "[data-lk='details.n']"]];
+var tune = {i: 0, st: null};
+function tuneEl(i) { return document.querySelector("#rtTop " + TUNE[i][1]); }
+function tuneTxt(i) { var r = tuneEl(i), v = +r.value; if (TUNE[i][1] === "#lpEv") return (v > 0 ? "+" : "") + (v / 10).toFixed(1).replace(".", ","); return (v > 0 ? "+" : "") + v; }
+function tuneHud(mode) {
+  var h = $("tuneHud"); h.className = mode ? "show " + mode : "";
+  if (mode === "list") $("tuneList").innerHTML = TUNE.map(function (t, i) { return "<div" + (i === tune.i ? " class='on'" : "") + "><span>" + t[0] + "</span><span>" + tuneTxt(i) + "</span></div>"; }).join("");
+  if (mode === "adj") $("tuneVal").textContent = TUNE[tune.i][0] + "  " + tuneTxt(tune.i);
+}
+$("lpView").addEventListener("mousedown", function (e) {
+  if (!$("loupe").classList.contains("rmode") || !$("tuneOn").checked || heal.on || $("lkPip").classList.contains("on") || e.button !== 0 || full.zoom) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  var r = tuneEl(tune.i); tune.st = {x: e.clientX, y: e.clientY, mode: "", i0: tune.i, v0: +r.value};
+}, true);
+window.addEventListener("mousemove", function (e) {
+  if (!tune.st) return; var dx = e.clientX - tune.st.x, dy = e.clientY - tune.st.y;
+  if (!tune.st.mode) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) tune.st.mode = "list"; else if (Math.abs(dx) > 6) { tune.st.mode = "adj"; tune.st.v0 = +tuneEl(tune.i).value; } else return; }
+  if (tune.st.mode === "list") { tune.i = Math.max(0, Math.min(TUNE.length - 1, tune.st.i0 + Math.round(dy / 28))); tuneHud("list"); }
+  else { var r = tuneEl(tune.i), mn = +r.min, mx = +r.max, nv = Math.max(mn, Math.min(mx, Math.round(tune.st.v0 + dx / 600 * (mx - mn)))); if (+r.value !== nv) { r.value = nv; r.dispatchEvent(new Event("input", {bubbles: true})); } tuneHud("adj"); }
+});
+window.addEventListener("mouseup", function () { if (!tune.st) return; tune.st = null; setTimeout(function () { tuneHud(""); }, 700); });
+
 /* courbe : points a tirer */
 var CRV = {pts: null, drag: -1};
 function crvLut(pts) { pts = pts.slice().sort(function (a, b) { return a[0] - b[0]; }); var L = []; for (var v = 0; v < 256; v++) { var k = 0; while (k < pts.length - 2 && v > pts[k + 1][0]) k++; var a = pts[k], b = pts[k + 1], t = Math.max(0, Math.min(1, (v - a[0]) / Math.max(1, b[0] - a[0]))), t2 = t * t * (3 - 2 * t); L.push(a[1] + (b[1] - a[1]) * (t * 0.5 + t2 * 0.5)); } return L; }

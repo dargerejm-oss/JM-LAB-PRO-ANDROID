@@ -18,8 +18,15 @@ const h0 = fx2.indexOf('function rng(seed)'), h1 = fx2.indexOf('function healAll
 if (h0 < 0 || h1 < 0) throw new Error('correcteur JM LAB PRO introuvable');
 const heal = 'var JMHEAL = (function () {\nfunction cvs(w, h) { return new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }\n' +
   fx2.slice(h0, fx2.indexOf('\n', h1)) + '\nreturn healAll;\n})();\n';
+// outils creatifs : details, theatral, eclat glamour, balance des blancs, contraste des tons, HDR (+ courbes RVB)
+const l0 = fx2.indexOf('var LD = {'), hx = fx2.indexOf('function hdrApply(');
+if (l0 < 0 || hx < 0) throw new Error('outils JM LAB PRO introuvables');
+let k2 = fx2.indexOf('{', hx), d2 = 0; for (; k2 < fx2.length; k2++) { const ch = fx2[k2]; if (ch === '{') d2++; else if (ch === '}') { d2--; if (d2 === 0) { k2++; break; } } }
+const c0 = fx2.indexOf('function lut(pts)'), c1 = fx2.indexOf('/* ---------- rotation / recadrage');
+const looks = 'var JMLOOKS = (function () {\nfunction cvs(w, h) { return new OffscreenCanvas(Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); }\n' +
+  fx2.slice(c0, c1) + '\n' + fx2.slice(l0, k2) + '\nreturn {looks: looks, lookOn: lookOn, applyCurves: applyCurves, wbFromColor: wbFromColor};\n})();\n';
 const out = '/* genere par tools/jmlab_core.js depuis JM LAB PRO (index.html, jmwork.js, jmfx2.js) : ne pas modifier a la main */\n' +
-  'var JMRUN = (function () {\n' + core + '\n' + lit('HEAD') + lit('LOOP') + '}}\nreturn run;\n})();\n' + heal;
+  'var JMRUN = (function () {\n' + core + '\n' + lit('HEAD') + lit('LOOP') + '}}\nreturn run;\n})();\n' + heal + looks;
 fs.mkdirSync(path.join(__dirname, '..', 'renderer', 'vendor'), {recursive: true});
 fs.writeFileSync(path.join(__dirname, '..', 'renderer', 'vendor', 'jmlab_core.js'), out);
 console.log('moteur JM LAB PRO :', out.length, 'caracteres (rendu + correcteur)');

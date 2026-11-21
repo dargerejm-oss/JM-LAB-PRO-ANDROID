@@ -469,6 +469,8 @@ function renderStyle(c, S) {
     }
     x.putImageData(id, 0, y);
   }
+  // outils de JM LAB PRO : details, theatral, eclat glamour, balance des blancs, contraste des tons, HDR
+  if (S.looks && JMLOOKS.lookOn(S.looks)) { var lk = JMLOOKS.looks(c, S.looks); if (lk !== c) x.drawImage(lk, 0, 0); }
   // courbe (monotone, sans rebond) appliquee a la fin, sur les trois couleurs
   if (S.curve && S.curve.length >= 2) {
     var CL = curveLut(S.curve);

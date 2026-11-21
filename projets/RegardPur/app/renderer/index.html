@@ -136,7 +136,7 @@
     <button id="lpZoom" data-tip="Zoom 100 % sur les yeux ou la zone nette (Z)"><svg class="ic"><use href="#i-zoom"/></svg>100 % <kbd>Z</kbd></button>
     <button id="lpRet" style="display:none"></button>
   </div>
-  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas>
+  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas><div id="tuneHud"><div id="tuneList"></div><div id="tuneVal"></div></div>
     <div id="healBar"><b>🩹 Correcteur</b><span>Peignez sur ce qu'il faut enlever (tache, fil, panneau…). Z : zoom, clic droit glissé : se déplacer.</span>
       <label>Taille <input type="range" id="healSize" min="4" max="80" value="18"></label><button id="healUndo">↶ Annuler</button><button id="healClear">Tout effacer</button><i id="healMsg"></i></div></div>
   <div id="lpInfo"></div>
@@ -148,6 +148,7 @@
       <label class="sel full">Profil <select id="dvProf"></select></label>
       <div class="rl"><span>Intensité</span><input type="range" id="dvDose" min="0" max="100" value="65"><b id="dvDoseV">65</b></div>
       <label class="ck expert"><input type="checkbox" id="dvPro" checked> ProLab automatique (exposition corrigée)</label>
+      <label class="ck"><input type="checkbox" id="tuneOn" checked> Glisser sur la photo : ↕ choisir le réglage, ↔ le doser</label>
       <h5>Lumière</h5>
       <div class="rl"><span><svg class="ic"><use href="#i-sun"/></svg>Exposition</span><input type="range" id="lpEv" min="-20" max="20" value="0"><b id="lpEvV">0</b></div>
       <div class="rl"><span>Contraste</span><input type="range" data-dv="Contraste" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Hautes lumières</span><input type="range" data-dv="Hautes SANS GRIS" min="-100" max="0" value="0"><b>0</b></div><div class="rl"><span>Ombres</span><input type="range" data-dv="Ombres" min="0" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Blancs</span><input type="range" data-dv="Blanc" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Noirs</span><input type="range" data-dv="Noir" min="-100" max="100" value="0"><b>0</b></div>
@@ -156,6 +157,20 @@
       <div class="rl expert"><span>Teinte</span><input type="range" data-dv="Teinte" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Vibrance</span><input type="range" data-dv="Vibrance" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Saturation</span><input type="range" data-dv="Saturation" min="-100" max="100" value="0"><b>0</b></div>
       <h5>Détail et effets</h5>
       <div class="rl"><span>Clarté</span><input type="range" data-dv="Clarte" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Voile (dehaze)</span><input type="range" data-dv="Dehaze" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Vignette</span><input type="range" data-dv="Vignette" min="-100" max="100" value="0"><b>0</b></div>
+      <details class="tools" open><summary>Outils de JM LAB PRO</summary>
+        <h6>Balance des blancs <button id="lkPip" class="mini" data-tip="Pipette : cliquez sur une zone qui devrait être blanche ou grise">Pipette</button></h6>
+        <div class="rl"><span>Température</span><input type="range" data-lk="wb.t" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Teinte</span><input type="range" data-lk="wb.ti" min="-100" max="100" value="0"><b>0</b></div>
+        <h6>Détails</h6>
+        <div class="rl"><span>Structure</span><input type="range" data-lk="details.s" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Netteté</span><input type="range" data-lk="details.n" min="0" max="100" value="0"><b>0</b></div>
+        <h6>Contraste des tons</h6>
+        <div class="rl"><span>Hautes lumières</span><input type="range" data-lk="tone.hi" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Tons moyens</span><input type="range" data-lk="tone.mid" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Ombres</span><input type="range" data-lk="tone.lo" min="-100" max="100" value="0"><b>0</b></div>
+        <h6>HDR</h6>
+        <div class="rl"><span>Style</span><select data-lk="hdr.st" style="grid-column:span 2"><option value="0">Nature</option><option value="1">Personnes</option><option value="2">Fin</option><option value="3">Fort</option></select></div><div class="rl"><span>Force</span><input type="range" data-lk="hdr.f" min="0" max="100" value="0"><b>0</b></div><div class="rl"><span>Luminosité</span><input type="range" data-lk="hdr.b" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Saturation</span><input type="range" data-lk="hdr.sat" min="-100" max="100" value="0"><b>0</b></div>
+        <h6>Théâtral</h6>
+        <div class="rl"><span>Style</span><select data-lk="drama.st" style="grid-column:span 2"><option value="0">Clair 1</option><option value="1">Clair 2</option><option value="2">Sombre 1</option><option value="3">Sombre 2</option></select></div><div class="rl"><span>Force</span><input type="range" data-lk="drama.f" min="0" max="100" value="0"><b>0</b></div><div class="rl"><span>Saturation</span><input type="range" data-lk="drama.sat" min="-100" max="100" value="0"><b>0</b></div>
+        <h6>Éclat glamour</h6>
+        <div class="rl"><span>Éclat</span><input type="range" data-lk="glow.g" min="0" max="100" value="0"><b>0</b></div><div class="rl"><span>Saturation</span><input type="range" data-lk="glow.sat" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Chaleur</span><input type="range" data-lk="glow.w" min="-100" max="100" value="0"><b>0</b></div>
+      </details>
       <div class="expert"><h5>Courbe <i class="tip" data-tip="Cliquez pour ajouter un point, glissez pour le déplacer, double-clic pour l'enlever.">?</i></h5><canvas id="dvCurve" width="290" height="170"></canvas><button id="dvCurve0" style="width:100%;margin-top:4px">Courbe droite</button></div>
       <h5>Appliquer ces réglages à</h5>
       <div class="apply"><button data-sync="sel">La sélection</button><button data-sync="serie">Cette série</button><button data-sync="person">Cette personne</button><button data-sync="keep">Toutes les gardées</button></div>
