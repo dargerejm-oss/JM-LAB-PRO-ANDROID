@@ -284,9 +284,9 @@ function curves(){
     mat:[[0,34],[70,72],[190,200],[255,238]], ombres:[[0,0],[60,88],[160,182],[255,255]], dense:[[0,0],[100,80],[200,190],[255,255]]
   };
   show('<div class="jmsTitle">📈 ' + T("COURBES", "CURVES") + '</div>' +
-   '<canvas id="x2Pv" class="x2C"></canvas>' +
+   '<canvas id="x2Pv" class="x2C" style="width:auto;max-width:100%;max-height:22vh;margin:0 auto"></canvas>' +
    '<div class="x2Row" id="x2Ch"><button data-a="ch" data-c="m" class="on">RVB</button><button data-a="ch" data-c="r" style="color:#ff8a80">R</button><button data-a="ch" data-c="g" style="color:#9be79b">V</button><button data-a="ch" data-c="b" style="color:#90b4ff">B</button></div>' +
-   '<canvas id="x2Cu" class="x2C" style="aspect-ratio:1;max-width:340px;margin:0 auto;background:#111"></canvas>' +
+   '<canvas id="x2Cu" class="x2C" style="aspect-ratio:1;width:min(100%,42vh);margin:0 auto;background:#111"></canvas>' +
    '<div class="x2Hint">' + T("Touche la courbe pour ajouter un point, fais-le glisser. Glisse un point hors du carré pour l'enlever.", "Tap the curve to add a point and drag it. Drag a point out of the square to remove it.") + '</div>' +
    '<div class="x2Row"><button data-a="pre" data-p="lin">' + T("Neutre", "Neutral") + '</button><button data-a="pre" data-p="s1">' + T("S douce", "Soft S") + '</button><button data-a="pre" data-p="s2">' + T("S forte", "Strong S") + '</button></div>' +
    '<div class="x2Row"><button data-a="pre" data-p="mat">' + T("Mat (film)", "Matte (film)") + '</button><button data-a="pre" data-p="ombres">' + T("Ombres +", "Shadows +") + '</button><button data-a="pre" data-p="dense">' + T("Dense", "Dense") + '</button></div>' +
@@ -297,25 +297,29 @@ function curves(){
   var hist = new Uint32Array(256), bd = base.getContext("2d").getImageData(0, 0, sz[0], sz[1]).data;
   for(var i = 0; i < bd.length; i += 4) hist[(0.2126*bd[i] + 0.7152*bd[i+1] + 0.0722*bd[i+2]) | 0]++;
   var hm = 1; for(var i = 2; i < 254; i++) hm = Math.max(hm, hist[i]);
-  cu.width = cu.height = 600; var K = 600 / 255;
+  /* marge autour de la courbe pour que les points du bout soient entiers et faciles a attraper */
+  cu.width = cu.height = 600; var P = 40, A = 600 - 2 * P, K = A / 255;
+  function X(v){ return P + v * K; } function Y(v){ return P + A - v * K; }
   var COL = {m:"#fff", r:"#ff5252", g:"#4CAF50", b:"#448AFF"};
   function drawPrev(){ var x = pv.getContext("2d"); x.drawImage(base, 0, 0); applyCurves(x, pv.width, pv.height, s); }
+  function line(x, L){ x.beginPath(); for(var i = 0; i < 256; i++){ if(i) x.lineTo(X(i), Y(L[i])); else x.moveTo(X(0), Y(L[0])); } x.stroke(); }
   function drawCurve(){
     var x = cu.getContext("2d"); x.clearRect(0, 0, 600, 600);
-    x.fillStyle = "rgba(255,255,255,.12)"; for(var i = 0; i < 256; i++){ var hh = Math.min(1, hist[i] / hm) * 600; x.fillRect(i * K, 600 - hh, K + 0.5, hh); }
-    x.strokeStyle = "rgba(255,255,255,.15)"; x.lineWidth = 1; for(var g = 1; g < 4; g++){ x.beginPath(); x.moveTo(g * 150, 0); x.lineTo(g * 150, 600); x.moveTo(0, g * 150); x.lineTo(600, g * 150); x.stroke(); }
-    x.strokeStyle = "rgba(255,255,255,.25)"; x.beginPath(); x.moveTo(0, 600); x.lineTo(600, 0); x.stroke();
-    ["m","r","g","b"].forEach(function(k){ if(k === ch || isLin(s.curve[k])) return; var L = lut(s.curve[k]); x.strokeStyle = COL[k] + "66"; x.lineWidth = 2; x.beginPath(); for(var i = 0; i < 256; i++){ var yy = 600 - L[i] * K; if(i) x.lineTo(i * K, yy); else x.moveTo(0, yy); } x.stroke(); });
-    var L = lut(s.curve[ch]); x.strokeStyle = COL[ch]; x.lineWidth = 4; x.beginPath(); for(var i = 0; i < 256; i++){ var yy = 600 - L[i] * K; if(i) x.lineTo(i * K, yy); else x.moveTo(0, yy); } x.stroke();
-    s.curve[ch].forEach(function(p, i){ x.fillStyle = i === sel ? "#FFD600" : COL[ch]; x.beginPath(); x.arc(p[0] * K, 600 - p[1] * K, 14, 0, 7); x.fill(); x.strokeStyle = "#000"; x.lineWidth = 2; x.stroke(); });
+    x.fillStyle = "rgba(255,255,255,.12)"; for(var i = 0; i < 256; i++){ var hh = Math.min(1, hist[i] / hm) * A; x.fillRect(X(i), P + A - hh, K + 0.5, hh); }
+    x.strokeStyle = "rgba(255,255,255,.35)"; x.lineWidth = 2; x.strokeRect(P, P, A, A);
+    x.strokeStyle = "rgba(255,255,255,.15)"; x.lineWidth = 1; for(var g = 1; g < 4; g++){ x.beginPath(); x.moveTo(P + g * A / 4, P); x.lineTo(P + g * A / 4, P + A); x.moveTo(P, P + g * A / 4); x.lineTo(P + A, P + g * A / 4); x.stroke(); }
+    x.strokeStyle = "rgba(255,255,255,.25)"; x.beginPath(); x.moveTo(X(0), Y(0)); x.lineTo(X(255), Y(255)); x.stroke();
+    ["m","r","g","b"].forEach(function(k){ if(k === ch || isLin(s.curve[k])) return; x.strokeStyle = COL[k] + "66"; x.lineWidth = 2; line(x, lut(s.curve[k])); });
+    x.strokeStyle = COL[ch]; x.lineWidth = 4; line(x, lut(s.curve[ch]));
+    s.curve[ch].forEach(function(p, i){ x.fillStyle = i === sel ? "#FFD600" : COL[ch]; x.beginPath(); x.arc(X(p[0]), Y(p[1]), 16, 0, 7); x.fill(); x.strokeStyle = "#000"; x.lineWidth = 2; x.stroke(); });
   }
   function redraw(){ drawCurve(); drawPrev(); }
   var drag = -1, pend = 0;
-  function cp(e){ var p = pos(cu, e); return [p.x * 255, (1 - p.y) * 255, p]; }
+  function cp(e){ var p = pos(cu, e), fx = (p.x * 600 - P) / A, fy = (p.y * 600 - P) / A; return [fx * 255, (1 - fy) * 255, {x:fx, y:fy}]; }
   cu.onpointerdown = function(e){
     cu.setPointerCapture(e.pointerId); var q = cp(e), pts = s.curve[ch], best = -1, bd2 = 1e9;
     pts.forEach(function(p, i){ var d = Math.hypot(p[0] - q[0], p[1] - q[1]); if(d < bd2){ bd2 = d; best = i; } });
-    if(bd2 < 18) drag = best;
+    if(bd2 < 24) drag = best;
     else { pts.push([Math.round(Math.max(1, Math.min(254, q[0]))), Math.round(Math.max(0, Math.min(255, q[1])))]); pts.sort(function(a, b){ return a[0] - b[0]; }); drag = pts.findIndex(function(p){ return Math.abs(p[0] - q[0]) < 1.5; }); }
     sel = drag; redraw();
   };
