@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.0.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.0.2 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.

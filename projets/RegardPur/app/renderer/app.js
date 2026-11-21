@@ -60,7 +60,8 @@ function expoScore(a) {
 function eyeRaw(a) { var f = bigFaces(a); if (!f.length) return null; return Math.max.apply(null, f.map(function (x) { return x.eyeSharp != null ? x.eyeSharp : (x.faceSharp != null ? x.faceSharp : 0); })); }
 function sharpEff(a) {
   var e = eyeRaw(a);
-  return Math.round(e == null ? a.sharp : Math.min(100, Math.max(e * 1.45, a.sharp * 0.6)));
+  // avec un visage, c'est la nettete des yeux qui compte (pas un detail net ailleurs, comme une fourrure ou le fond)
+  return Math.round(e == null ? a.sharp : Math.min(100, e * 1.45));
 }
 function eyesScore(a) { var f = bigFaces(a); return f.length ? avg(f.map(function (x) { return x.closed ? 0 : x.half ? 50 : 100; })) : null; }
 var NF = 8;
