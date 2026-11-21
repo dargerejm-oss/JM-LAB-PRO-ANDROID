@@ -1,5 +1,8 @@
 # Consignes pour Claude — JM LAB PRO
 
+> **RÈGLE N° 1 : ÉCRIRE UNIQUEMENT EN FRANÇAIS.** Toutes les réponses ET tous les messages pendant le travail
+> (« je vérifie… », « je teste… », « je publie… ») doivent être en français, sans exception. Ne jamais passer à l'anglais.
+
 ## Langue
 - **Toujours répondre en français**, dans tous les messages, y compris les messages intermédiaires pendant le travail (« je vérifie… », « je publie… »).
 - Les textes de l'appli restent en français ; la version anglaise est automatique (fichier `app/src/main/assets/jmlang.js`).
