@@ -48,6 +48,11 @@ les gros dossiers + temps restant, export simplifié avec options avancées repl
 « garder les N meilleures », ciel + recadrage auto, style appris depuis Lightroom (XMP), vrais RAW, version anglaise,
 puis EN DERNIER mode d'emploi PDF + aide intégrée en FRANÇAIS ET ANGLAIS. PAS de version Android pour le moment.
 
+### Regard Pur — PAS DE VERSIONS INTERMÉDIAIRES (demande de l'utilisateur)
+Ne plus fabriquer/publier de version de test à chaque étape : envoyer le travail avec « [skip ci] » dans le message de commit
+(sauf les modèles : `.github/rp_modeles` / rp-modeles.yml). Fabriquer une version seulement quand tout est fini ou quand il la demande.
+Fait après 3.6 : 3.7 = IA locale (ai.js, onnxruntime-node) NAFNet + Real-ESRGAN ; SCUNet (bruit) et GFPGAN (visages) codés, à tester.
+
 ### Regard Pur — à faire ensuite (validé par l'utilisateur)
 1. Déflouter plus rapide (FFT optimisée, bougé via a.motion au lieu du tenseur : l'horizon trompe la détection).
 2. IA locale façon Topaz (accord donné) : Real-ESRGAN (dépixeliser/agrandir) + NAFNet (déflouter), puis SCUNet (bruit), GFPGAN (visages, en option avec avant/après).
