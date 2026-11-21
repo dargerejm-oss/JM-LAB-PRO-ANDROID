@@ -285,3 +285,8 @@ body.tab-exporter #side,body.tab-exporter #panel{display:none}
 #tuneVal{position:absolute;left:50%;top:18px;transform:translateX(-50%);background:#000c;border-radius:20px;padding:8px 18px;font-size:18px;font-weight:700;color:#fff;display:none}
 #tuneHud.adj #tuneVal{display:block}
 #rpSide{overflow-x:hidden}
+
+#rtTop .chan{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:4px}
+#rtTop .chan button{padding:3px 2px;font-size:11px}
+#rtTop .chan button.on{border-color:var(--gold);background:#2a2410}
+#rtTop .dbInfo{font-size:11px;color:var(--mut,#9a9a9a);margin:2px 0 6px;min-height:0}

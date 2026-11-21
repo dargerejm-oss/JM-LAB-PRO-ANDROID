@@ -418,8 +418,12 @@ function exifOf(buf) {
 }
 /* rendu « JM LAB PRO » d'une image (en place) : correction de categorie, profil + ProLab + curseurs, peau protegee, courbe.
    Utilise a l'export (pleine resolution) ET pour l'apercu de l'etape Retoucher : meme resultat. */
+var DBI = null;
 function renderStyle(c, S) {
   if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; }
+  // defloutage (CORRECTION FLOU PRO) : avant les reglages de tons, sur les pixels d'origine
+  DBI = null;
+  if (S.deblur && S.deblur.amt > 0) { if (typeof DEBLUR === "undefined") importScripts("deblur.js"); try { DBI = DEBLUR.apply(c, S.deblur); } catch (e) { self.postMessage({log: "defloutage : " + e.message}); } }
   var W = c.width, H = c.height, x = c.getContext("2d", {willReadFrequently: true});
   // exposition automatique ProLab : meme mesure que l'appli (image reduite a 256 px, un point sur 16)
   var aw = Math.min(256, W), ah = Math.min(256, H), ac = canvas(aw, ah), ax = ac.getContext("2d", {willReadFrequently: true}); ax.drawImage(c, 0, 0, aw, ah);
@@ -472,11 +476,17 @@ function renderStyle(c, S) {
   // outils de JM LAB PRO : details, theatral, eclat glamour, balance des blancs, contraste des tons, HDR
   if (S.looks && JMLOOKS.lookOn(S.looks)) { var lk = JMLOOKS.looks(c, S.looks); if (lk !== c) x.drawImage(lk, 0, 0); }
   // courbe (monotone, sans rebond) appliquee a la fin, sur les trois couleurs
-  if (S.curve && S.curve.length >= 2) {
-    var CL = curveLut(S.curve);
+  // niveaux (point noir, tons moyens, point blanc) puis courbe generale et courbes rouge / vert / bleu
+  var LV = null, lv = S.levels;
+  if (lv && (lv.b || lv.w || lv.g)) { LV = new Uint8ClampedArray(256); var b0 = (lv.b || 0) * 1.2, w0 = 255 - (lv.w || 0) * 1.2, gm = Math.pow(2, -(lv.g || 0) / 100); for (var u = 0; u < 256; u++) LV[u] = 255 * Math.pow(Math.max(0, Math.min(1, (u - b0) / Math.max(1, w0 - b0))), gm); }
+  var CM = S.curve && S.curve.length >= 2 ? curveLut(S.curve) : null, CC = S.curves || {};
+  var CR = CC.r ? curveLut(CC.r) : null, CG = CC.g ? curveLut(CC.g) : null, CB = CC.b ? curveLut(CC.b) : null;
+  if (LV || CM || CR || CG || CB) {
+    var TR = new Uint8ClampedArray(256), TG = new Uint8ClampedArray(256), TB = new Uint8ClampedArray(256);
+    for (u = 0; u < 256; u++) { var v0 = LV ? LV[u] : u; v0 = CM ? CM[v0] : v0; TR[u] = CR ? CR[v0] : v0; TG[u] = CG ? CG[v0] : v0; TB[u] = CB ? CB[v0] : v0; }
     for (y = 0; y < H; y += band) {
       var bh2 = Math.min(band, H - y), id2 = x.getImageData(0, y, W, bh2), q = id2.data;
-      for (i = 0; i < q.length; i += 4) { q[i] = CL[q[i]]; q[i + 1] = CL[q[i + 1]]; q[i + 2] = CL[q[i + 2]]; }
+      for (i = 0; i < q.length; i += 4) { q[i] = TR[q[i]]; q[i + 1] = TG[q[i + 1]]; q[i + 2] = TB[q[i + 2]]; }
       x.putImageData(id2, 0, y);
     }
   }
@@ -529,11 +539,11 @@ self.onmessage = function (e) {
       var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
       var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)), cv = canvas(bm.width * k2, bm.height * k2); cv.getContext("2d").drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
       if (m.heals && m.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(cv, m.heals); }
-      if (m.style) renderStyle(cv, m.style);
+      DBI = null; if (m.style) renderStyle(cv, m.style);
       var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;
       if (m.style && m.style.tilt) { var th = m.style.tilt * Math.PI / 180, W2 = cv.width, H2 = cv.height, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W2 * cs + H2 * sn) / W2, (W2 * sn + H2 * cs) / H2), c3 = canvas(W2, H2), x3 = c3.getContext("2d"); x3.imageSmoothingQuality = "high"; x3.translate(W2 / 2, H2 / 2); x3.rotate(-th); x3.scale(kz, kz); x3.drawImage(cv, -W2 / 2, -H2 / 2); cv = c3; }
       return {b: await cv.convertToBlob({type: "image/jpeg", quality: 0.9}), n: n};
-    }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
+    }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n, db: DBI}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
     return;
   }
   if (m.full) { // image en grand pour une photo HEIC

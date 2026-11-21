@@ -853,7 +853,9 @@ function devShow(p) {
   var d = p.dev || DEV_DEF();
   $("dvProf").value = d.profile || "cat"; $("dvDose").value = d.dose; $("dvDoseV").textContent = d.dose; $("dvPro").checked = d.pro !== false;
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-dv]"), function (r) { var v = +(d.v[r.dataset.dv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
-  curveDraw(d.curve);
+  curveDraw(CRV.ch === "m" ? d.curve : (d.curves || {})[CRV.ch]);
+  var db = d.deblur || {}; $("dbAmt").value = db.amt || 0; $("dbAmt").nextElementSibling.textContent = db.amt || 0; $("dbKind").value = db.kind || "auto"; if (!(db.amt > 0)) $("dbInfo").textContent = "";
+  Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-lv]"), function (r) { var v = +((d.levels || {})[r.dataset.lv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 && r.dataset.lv === "g" ? "+" + v : v; });
   $("dvFixed").textContent = d.fix && d.fix.length ? "🩺 Corrigé : " + d.fix.join(", ") : "";
   var lk = d.looks || {};
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop [data-lk]"), function (r) { var k = r.dataset.lk.split("."), v = +((lk[k[0]] || {})[k[1]] || 0); r.value = v; if (r.tagName === "INPUT") r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
@@ -861,7 +863,7 @@ function devShow(p) {
 /* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
 function devStyle(p) {
   if (!p.dev && !p.adj && !p.ret && !p.heals) return null;
-  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
+  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, deblur: d.deblur && d.deblur.amt > 0 ? d.deblur : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
@@ -872,6 +874,8 @@ function devStyle(p) {
 function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
 $("rtTop").addEventListener("input", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (t.id === "dbAmt" || t.id === "dbKind") { var dd = devGet(p); dd.deblur = dd.deblur || {}; if (t.id === "dbAmt") { dd.deblur.amt = +t.value; t.nextElementSibling.textContent = t.value; } else dd.deblur.kind = t.value; devChanged(p); return; }
+  if (t.dataset.lv) { var dl = devGet(p); dl.levels = dl.levels || {}; dl.levels[t.dataset.lv] = +t.value; t.nextElementSibling.textContent = t.value; devChanged(p); return; }
   if (t.dataset.lk) { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; if (t.tagName === "INPUT") t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); return; }
   if (t.dataset.dv) { devGet(p).v[t.dataset.dv] = +t.value; t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); }
   else if (t.id === "dvDose") { devGet(p).dose = +t.value; $("dvDoseV").textContent = t.value; devChanged(p); }
@@ -924,7 +928,7 @@ $("lpView").addEventListener("mousedown", function (e) {
    glisser de haut en bas : choisir le reglage ; de gauche a droite : le doser */
 var TUNE = [["Luminosité", "#lpEv"], ["Contraste", "[data-dv=Contraste]"], ["Ambiance", "[data-dv=Clarte]"], ["Saturation", "[data-dv=Vibrance]"], ["Hautes lumières", "[data-dv='Hautes SANS GRIS']"],
   ["Ombres", "[data-dv=Ombres]"], ["Chaleur", "#lpWb"], ["Teinte", "[data-dv=Teinte]"], ["Blancs", "[data-dv=Blanc]"], ["Noirs", "[data-dv=Noir]"], ["Voile", "[data-dv=Dehaze]"],
-  ["Vignette", "[data-dv=Vignette]"], ["Structure", "[data-lk='details.s']"], ["Netteté", "[data-lk='details.n']"]];
+  ["Vignette", "[data-dv=Vignette]"], ["Structure", "[data-lk='details.s']"], ["Netteté", "[data-lk='details.n']"], ["Déflouter", "#dbAmt"]];
 var tune = {i: 0, st: null};
 function tuneEl(i) { return document.querySelector("#rtTop " + TUNE[i][1]); }
 function tuneTxt(i) { var r = tuneEl(i), v = +r.value; if (TUNE[i][1] === "#lpEv") return (v > 0 ? "+" : "") + (v / 10).toFixed(1).replace(".", ","); return (v > 0 ? "+" : "") + v; }
@@ -961,7 +965,8 @@ function fixPhoto(p) {
   }
   // leger flou : nettete et structure (un flou fort ne se rattrape pas)
   var er = eyeRaw(a), sh = er != null ? er : a.sharp;
-  if (sh < 55) { var k = sh < 15 ? 1 : (55 - sh) / 40; L.details = {s: Math.round(15 + 20 * k), n: Math.round(35 + 45 * k)}; done.push("netteté +" + L.details.n + (sh < 15 ? " (flou fort : amélioration limitée)" : "")); }
+  if (sh < 55) { var k = sh < 15 ? 1 : (55 - sh) / 40; d.deblur = {amt: Math.round(50 + 30 * k), kind: a.motion > 50 ? "bouge" : "auto"};
+    L.details = {s: Math.round(8 + 10 * k), n: Math.round(10 + 15 * k)}; done.push((a.motion > 50 ? "bougé" : "flou") + " corrigé" + (sh < 15 ? " (flou fort : amélioration limitée)" : "")); }
   // bruit : lissage leger
   if (a.noiseView != null && a.noiseView > 5) { L.details = L.details || {s: 0, n: 0}; L.details.s = Math.min(L.details.s, -Math.round(Math.min(60, (a.noiseView - 4) * 8))); done.push("grain lissé"); }
   // dominante de couleur chaude ou froide (orange / bleu) seulement : une photo verte (vegetation) n'est pas une dominante
@@ -987,7 +992,7 @@ $("bFix").onclick = function () { fixRun(fixTargets()); };
 $("dvFix").onclick = function () { fixRun(fixTargets()); };
 
 /* courbe : points a tirer */
-var CRV = {pts: null, drag: -1};
+var CRV = {pts: null, drag: -1, ch: "m"};
 function crvLut(pts) { pts = pts.slice().sort(function (a, b) { return a[0] - b[0]; }); var L = []; for (var v = 0; v < 256; v++) { var k = 0; while (k < pts.length - 2 && v > pts[k + 1][0]) k++; var a = pts[k], b = pts[k + 1], t = Math.max(0, Math.min(1, (v - a[0]) / Math.max(1, b[0] - a[0]))), t2 = t * t * (3 - 2 * t); L.push(a[1] + (b[1] - a[1]) * (t * 0.5 + t2 * 0.5)); } return L; }
 function curveDraw(pts) {
   var cv = $("dvCurve"); if (!cv) return; var x = cv.getContext("2d"), W = cv.width, H = cv.height;
@@ -995,7 +1000,7 @@ function curveDraw(pts) {
   x.fillStyle = "#000"; x.fillRect(0, 0, W, H); x.strokeStyle = "#222"; x.lineWidth = 1;
   for (var i = 1; i < 4; i++) { x.beginPath(); x.moveTo(W * i / 4, 0); x.lineTo(W * i / 4, H); x.moveTo(0, H * i / 4); x.lineTo(W, H * i / 4); x.stroke(); }
   var p = S.byId[S.view[S.cur]]; if (p && p.a && p.a.hist) { var mx = Math.max.apply(null, p.a.hist.slice(1, 63)) || 1; x.fillStyle = "#2a2f38"; p.a.hist.forEach(function (v, k) { var hh = Math.min(1, v / mx) * H; x.fillRect(k * W / 64, H - hh, W / 64 + 0.5, hh); }); }
-  var L = crvLut(CRV.pts); x.strokeStyle = "#d4af37"; x.lineWidth = 2; x.beginPath();
+  var L = crvLut(CRV.pts); x.strokeStyle = {m: "#d4af37", r: "#ff6b6b", g: "#5fd068", b: "#5aa2ff"}[CRV.ch || "m"]; x.lineWidth = 2; x.beginPath();
   for (var v = 0; v < 256; v++) { var X = v / 255 * W, Y = H - L[v] / 255 * H; if (v) x.lineTo(X, Y); else x.moveTo(X, Y); } x.stroke();
   x.fillStyle = "#fff"; CRV.pts.forEach(function (q) { x.beginPath(); x.arc(q[0] / 255 * W, H - q[1] / 255 * H, 4, 0, 7); x.fill(); });
 }
@@ -1003,11 +1008,18 @@ function curveDraw(pts) {
   var cv = $("dvCurve");
   function pos(e) { var r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(255, (e.clientX - r.left) / r.width * 255)), Math.max(0, Math.min(255, (1 - (e.clientY - r.top) / r.height) * 255))]; }
   function near(q) { var best = -1, bd = 14; CRV.pts.forEach(function (o, i) { var d = Math.hypot(o[0] - q[0], o[1] - q[1]); if (d < bd) { bd = d; best = i; } }); return best; }
-  function commit() { var p = S.byId[S.view[S.cur]]; if (!p) return; var pts = CRV.pts.slice().sort(function (a, b) { return a[0] - b[0]; }).map(function (q) { return [Math.round(q[0]), Math.round(q[1])]; }); devGet(p).curve = pts.length === 2 && pts[0][0] === 0 && pts[0][1] === 0 && pts[1][0] === 255 && pts[1][1] === 255 ? null : pts; devChanged(p); }
+  function commit() { var p = S.byId[S.view[S.cur]]; if (!p) return; var pts = CRV.pts.slice().sort(function (a, b) { return a[0] - b[0]; }).map(function (q) { return [Math.round(q[0]), Math.round(q[1])]; }); var lin = pts.length === 2 && pts[0][0] === 0 && pts[0][1] === 0 && pts[1][0] === 255 && pts[1][1] === 255, d = devGet(p);
+    if (CRV.ch === "m") d.curve = lin ? null : pts; else { d.curves = d.curves || {}; d.curves[CRV.ch] = lin ? null : pts; }
+    devChanged(p); }
   cv.addEventListener("mousedown", function (e) { var q = pos(e), i = near(q); if (i < 0) { CRV.pts.push(q); i = CRV.pts.length - 1; } CRV.drag = i; curveDraw(CRV.pts); });
   window.addEventListener("mousemove", function (e) { if (CRV.drag < 0) return; var q = pos(e), pt = CRV.pts[CRV.drag], end = CRV.drag < 2 && (pt[0] === 0 || pt[0] === 255); CRV.pts[CRV.drag] = end ? [pt[0], q[1]] : q; curveDraw(CRV.pts); });
   window.addEventListener("mouseup", function () { if (CRV.drag < 0) return; CRV.drag = -1; commit(); });
   cv.addEventListener("dblclick", function (e) { var i = near(pos(e)); if (i > 1) { CRV.pts.splice(i, 1); curveDraw(CRV.pts); commit(); } });
+  document.querySelector("#rtTop .chan").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-ch]"); if (!b) return; CRV.ch = b.dataset.ch;
+    Array.prototype.forEach.call(document.querySelectorAll("#rtTop .chan button"), function (x) { x.classList.toggle("on", x === b); });
+    var p = S.byId[S.view[S.cur]], d = p && p.dev || {}; curveDraw(CRV.ch === "m" ? d.curve : (d.curves || {})[CRV.ch]);
+  });
   $("dvCurve0").onclick = function () { CRV.pts = [[0, 0], [255, 255]]; curveDraw(CRV.pts); commit(); };
 })();
 
@@ -1062,6 +1074,7 @@ function rpPreview() {
         if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
         if (busy) busy.textContent = r.prev ? (r.faces || !eff ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
         var hb = $("healMsg"); if (hb) hb.textContent = "";
+        var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
         if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
       };
       w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff, heals: heals, style: dst}, [c.buffer]);
@@ -1069,6 +1082,10 @@ function rpPreview() {
   }, 300);
 }
 var prevWait = {};
+function dbText(i) {
+  var t = {LEGER: "flou léger : renforcement", MOYEN: "flou de mise au point moyen", FORT: "flou de mise au point fort", BOUGE: "bougé (direction " + i.ang + "°)", IRRECUPERABLE: "flou très fort : amélioration limitée"}[i.cat] || i.cat;
+  return "Détecté : " + t + (i.safe ? " — correction prudente (la déconvolution aurait abîmé la photo)" : "") + ".";
+}
 
 /* ---------------- CORRECTEUR au pinceau (meme moteur que JM LAB PRO) ---------------- */
 var heal = {on: false, size: 18, pts: null};

@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.5 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.6 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -71,3 +71,9 @@ Version 3.5 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - Lien « Retoucher dans JM LAB PRO ».
 - Netteté des yeux réglée sur de vraies photos (2.4). Reste à vérifier : HEIC, yeux fermés, photos 24 Mpx d'appareil.
 - Mode d'emploi.
+
+### 3.6
+- Retoucher : **Niveaux** (point noir, tons moyens, point blanc) et **courbes par couleur** (Toutes, Rouge, Vert, Bleu).
+- **Déflouter** (repris de CORRECTION FLOU PRO) : mesure du flou, déconvolution de Wiener (mise au point ou bougé),
+  débruitage doux, renforcement sans halo, et filet de sécurité qui annule une correction qui abîmerait la photo.
+  Utilisé aussi par « Corriger les problèmes ». Disponible dans la liste « glisser gauche-droite ».
