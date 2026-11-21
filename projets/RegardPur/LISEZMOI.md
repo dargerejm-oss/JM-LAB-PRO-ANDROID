@@ -108,3 +108,11 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - VISIONNEUSE_ENREGISTRE : rotation [ et ] (appliquée à l'export), Suppr = corbeille, S = copie rapide (Maj+S : autre dossier).
 - ARCHIVAGE_TRI_PRO : carte SD proposée à l'import, lieux GPS en option (OpenStreetMap, internet), contrôle avant tirage
   (dpi effectifs de 10×15 à 50×75, visage coupé par le recadrage). Analyse version 5.
+- Outils adaptés au type de photo : bloc « Pour ce type de photo » (portrait, mariage, famille, contre-jour, plage, paysage,
+  nuit) avec recettes en un clic ; « Mon style » en tête si un style a été appris.
+- « Garder les N meilleures » (vue affichée ou chaque séance, une par série, doublons comptés une fois, le reste « À voir » ou rejeté).
+- Ciel (assombrir, bleu, relief, ciel repéré tout seul) et recadrage auto (tiers, visages entiers, d'origine / 3:2 / 4:5 / carré / 16:9).
+- Style appris : Lightroom (.xmp et JPEG exportés, réglages crs:) ; DxO (.dop) préparé, à confirmer avec des fichiers d'exemple.
+- Vrais RAW : développement LibRaw (libraw-wasm, données du capteur, balance des blancs de l'appareil, hautes lumières
+  récupérées) dans Retoucher et à l'export, gardé dans .regardpur/raw ; RAW sans aperçu intégré analysés quand même.
+  Les pages sont « isolées » (en-têtes COOP/COEP) pour que LibRaw puisse utiliser plusieurs cœurs.

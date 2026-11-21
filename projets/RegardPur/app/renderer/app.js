@@ -38,9 +38,34 @@ function rawPreview(buf) {
   }
   return best && best.len > 20000 ? buf.subarray(best.start, best.start + best.len) : null;
 }
+/* vrais RAW : developpement complet avec LibRaw (donnees du capteur, balance des blancs de l'appareil, hautes lumieres
+   recuperees) au lieu du petit apercu JPEG cache dans le fichier ; fait une fois, garde dans .regardpur/raw */
+var LIBRAW = null, RAWQ = Promise.resolve();
+function rawEnsure(p) {
+  if (!N || !p.raw || p.rawDev) return Promise.resolve(false);
+  RAWQ = RAWQ.then(async function () {
+    if (p.rawDev) return false;
+    var el = $("aiState"), msg = "⏳ Développement du RAW (" + p.name + ")…"; toast(msg, 3000);
+    if (!LIBRAW) LIBRAW = (await import("./vendor/libraw/index.js")).default;
+    var b = await N.read(p.path, false), raw = new LIBRAW();
+    try {
+      await raw.open(b, {useCameraWb: true, outputBps: 8, userQual: 3, highlight: 2, outputColor: 1});
+      var im = await raw.imageData(), W = im.width, H = im.height, d = im.data, c = new OffscreenCanvas(W, H), x = c.getContext("2d"), id = x.createImageData(W, H), o = id.data;
+      for (var i = 0, j = 0; i < W * H; i++, j += 3) { o[i * 4] = d[j]; o[i * 4 + 1] = d[j + 1]; o[i * 4 + 2] = d[j + 2]; o[i * 4 + 3] = 255; }
+      x.putImageData(id, 0, 0);
+      var jpg = new Uint8Array(await (await c.convertToBlob({type: "image/jpeg", quality: 0.95})).arrayBuffer());
+      var f = sessPath("raw" + N.sep + String(p.rel || p.name).replace(/[\\\/:*?"<>|]+/g, "_").replace(/\.[^.]+$/, "") + ".jpg");
+      await N.writeBin(f, jpg); p.rawDev = f; full.cache.delete(p.id); saveSoon();
+      toast("RAW développé : " + p.name + " (" + W + " × " + H + ")", 2500); return true;
+    } catch (e) { toast("RAW non développé (" + (e.message || e) + ") : l'aperçu de l'appareil est utilisé.", 4000); return false; }
+    finally { try { raw.close && raw.close(); } catch (e2) {} }
+  });
+  return RAWQ;
+}
 function heicOf(p) { return !!p.heic && !p.ai; }
 async function readBytes(p, orig) {
   if (N && p.ai && !orig) { var bi = await N.read(p.ai.file, false); if (bi) return bi; }
+  if (N && p.raw && p.rawDev) { try { var br = await N.read(p.rawDev, false); if (br) return br; } catch (e) { p.rawDev = null; } }
   if (N) return await N.read(p.path, p.raw);
   var b = new Uint8Array(await p.file.arrayBuffer());
   return p.raw ? rawPreview(b) : b;
@@ -393,7 +418,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; p.rot = o.rot || 0; p.qc = o.qc || null; p.place = o.place || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; p.rot = o.rot || 0; p.qc = o.qc || null; p.place = o.place || null; p.rawDev = o.rawDev || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -409,7 +434,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined, place: p.place || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined, place: p.place || undefined, rawDev: p.rawDev || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -460,7 +485,7 @@ function pump() {
     while (w.inflight < 2 && queue.length) {
       var p = queue.shift(); w.inflight++;
       (function (p, w) {
-        readBytes(p, true).then(function (buf) {
+        readBytes(p, true).then(function (buf) { return !buf && p.raw && N ? rawEnsure(p).then(function () { return readBytes(p, true); }) : buf; }).then(function (buf) {
           if (rid !== runId) { w.inflight--; return; }
           if (!buf) { w.inflight--; done(p, {err: "Aperçu introuvable dans ce RAW"}); return; }
           var copy = buf.buffer.byteLength === buf.byteLength ? buf : buf.slice();
@@ -1639,6 +1664,7 @@ function drawLoupeMarks(p) {
 }
 function showLoupe() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (p.raw && !p.rawDev && S.tab === "retoucher" && N) { rawEnsure(p).then(function (ok) { if (ok && S.byId[S.view[S.cur]] === p) { $("lpImg").dataset.id = ""; showLoupe(); } }); }
   if (AB.on) { AB.id = null; abLoad(); }
   $("lpName").textContent = p.rel + "  —  " + (S.cur + 1) + " / " + S.view.length;
   $("lpStars").innerHTML = starsHtml(p.stars);
@@ -1892,6 +1918,7 @@ async function doExport() {
   var dest = join(S.dir, sub);
   for (i = 0; i < pick.length; i++) {
     var st2 = style ? styleFor(pick[i], style) : devStyle(pick[i]);
+    if (st2 && pick[i].raw && !pick[i].rawDev) { $("progTxt").textContent = "Développement RAW " + (i + 1) + " / " + pick.length; await rawEnsure(pick[i]); }
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;

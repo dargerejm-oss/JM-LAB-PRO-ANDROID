@@ -8,6 +8,9 @@ for (const f of ['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision
   fs.copyFileSync(path.join(MP, 'wasm', f), path.join(V, 'wasm', f));
 fs.copyFileSync(path.join(R, 'node_modules', 'libheif-js', 'libheif-wasm', 'libheif-bundle.js'), path.join(V, 'libheif-bundle.js'));
 fs.copyFileSync(path.join(R, 'node_modules', 'exifr', 'dist', 'full.umd.js'), path.join(V, 'exifr.js'));
+// LibRaw (developpement des vrais RAW)
+fs.mkdirSync(path.join(V, 'libraw'), {recursive: true});
+for (const f of ['index.js', 'worker.js', 'libraw.js', 'libraw.wasm']) fs.copyFileSync(path.join(R, 'node_modules', 'libraw-wasm', 'dist', f), path.join(V, 'libraw', f));
 // reconnaissance des personnes (face-api, modele inclus dans le paquet)
 const FA = path.join(R, 'node_modules', '@vladmandic', 'face-api');
 fs.mkdirSync(path.join(V, 'faceapi'), {recursive: true});

@@ -27,7 +27,7 @@ app.whenReady().then(() => {
   protocol.handle('app', async (req) => {
     const u = new URL(req.url), f = path.normalize(path.join(ROOT, decodeURIComponent(u.pathname)));
     if (!f.startsWith(ROOT)) return new Response('interdit', {status: 403});
-    try { const b = await fsp.readFile(f); return new Response(b, {headers: {'content-type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream'}}); }
+    try { const b = await fsp.readFile(f); return new Response(b, {headers: {'content-type': MIME[path.extname(f).toLowerCase()] || 'application/octet-stream', 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Cross-Origin-Resource-Policy': 'same-origin'}}); }
     catch (e) { return new Response('introuvable', {status: 404}); }
   });
   createWindow();
