@@ -1,8 +1,8 @@
-/* JM LAB PRO - COURBES, RECADRAGE LIBRE, EFFETS FILM, CORRECTEUR
+/* JM LAB PRO - COURBES, RECADRAGE LIBRE, EFFETS FILM
    Branche dans le rendu des effets (jmfx.js) :
-   - avant les effets : correcteur (photo seule), courbes, rotation / recadrage (photo seule)
+   - avant les effets : courbes, rotation / recadrage (photo seule)
    - apres les effets : effets film (halo, fuite de lumiere, poussiere, bords, date)
-   Les courbes et les effets film s'appliquent aussi au lot ; recadrage et correcteur seulement a la photo ouverte. */
+   Les courbes et les effets film s'appliquent aussi au lot ; recadrage seulement a la photo ouverte. */
 (function(){
 "use strict";
 var EN = window.__jmsLang === "en";
@@ -18,14 +18,13 @@ function get(){ try{ var o = JSON.parse(localStorage.getItem(KEY) || "{}"); var 
 function put(o){ try{ localStorage.setItem(KEY, JSON.stringify(o)); }catch(e){} }
 /* propres a la photo ouverte (remis a zero a chaque nouvelle photo) */
 var geo = {r90:0, flip:false, rot:0, crop:null};   /* crop = {x,y,w,h} en fractions */
-var spots = [];                                     /* correcteur : {x,y,r} en fractions */
-document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple){ geo = {r90:0, flip:false, rot:0, crop:null}; spots = []; bar(); } }, true);
+document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple){ geo = {r90:0, flip:false, rot:0, crop:null}; bar(); } }, true);
 
 function isLin(p){ return p.length === 2 && p[0][0] === 0 && p[0][1] === 0 && p[1][0] === 255 && p[1][1] === 255; }
 function curveOn(s){ return !(isLin(s.curve.m) && isLin(s.curve.r) && isLin(s.curve.g) && isLin(s.curve.b)); }
 function geoOn(){ return !!(geo.r90 || geo.flip || geo.rot || geo.crop); }
 function filmOn(s){ return !!(s.halo || s.leak || s.dust || s.border || s.date); }
-function active(Q){ var s = get(); return curveOn(s) || filmOn(s) || !!(Q && Q.single && (geoOn() || spots.length)); }
+function active(Q){ var s = get(); return curveOn(s) || filmOn(s) || !!(Q && Q.single && geoOn()); }
 function summary(){
   var s = get(), a = [];
   if(curveOn(s)) a.push(T("courbes", "curves"));
@@ -72,68 +71,6 @@ function applyCurves(ctx, w, h, s){
 }
 
 /* ---------- correcteur : chaque point est remplace par la zone voisine la plus ressemblante ---------- */
-function heal(c, list){
-  var x = c.getContext("2d"), W = c.width, H = c.height, mn = Math.min(W, H);
-  list.forEach(function(sp, si){
-    var r = Math.max(2.5, sp.r * mn), rm = r * 1.15, R = Math.ceil(r * 1.45) + 2, size = 2 * R + 1;
-    var cx = Math.round(sp.x * W), cy = Math.round(sp.y * H);
-    /* zone a reparer trop pres du bord : on rapproche la fenetre de travail */
-    var tx = Math.max(0, Math.min(W - size, cx - R)), ty = Math.max(0, Math.min(H - size, cy - R));
-    if(size > W || size > H) return;
-    var ox = cx - tx, oy = cy - ty;                     /* centre du point dans la fenetre */
-    var T = x.getImageData(tx, ty, size, size).data;
-    /* anneau de comparaison autour du point */
-    var ring = [];
-    for(var yy = 0; yy < size; yy++) for(var xx = 0; xx < size; xx++){ var d = Math.hypot(xx - ox, yy - oy); if(d >= rm && d <= R) ring.push(yy * size + xx); }
-    if(ring.length < 8) return;
-    var tm = [0,0,0]; ring.forEach(function(k){ tm[0] += T[k*4]; tm[1] += T[k*4+1]; tm[2] += T[k*4+2]; }); tm = tm.map(function(v){ return v / ring.length; });
-    /* recherche de la zone source la plus ressemblante (structure + couleur), hors des autres points */
-    var best = null, bestE = Infinity, step = ring.length > 600 ? 3 : 1;
-    for(var a = 0; a < 24; a++) for(var di = 0; di < 4; di++){
-      var dist = [2.1, 2.6, 3.2, 4.0][di] * r, ang = a * Math.PI / 12;
-      var sx = Math.round(tx + Math.cos(ang) * dist), sy = Math.round(ty + Math.sin(ang) * dist);
-      if(sx < 0 || sy < 0 || sx + size > W || sy + size > H) continue;
-      var scx = sx + ox, scy = sy + oy, clash = false;
-      for(var o = 0; o < list.length; o++){ if(o === si) continue; var q = list[o]; if(Math.hypot(scx - q.x * W, scy - q.y * H) < r * 1.2 + q.r * mn) { clash = true; break; } }
-      if(clash) continue;
-      var Sd = x.getImageData(sx, sy, size, size).data, sm = [0,0,0];
-      for(var k = 0; k < ring.length; k += step){ var p = ring[k] * 4; sm[0] += Sd[p]; sm[1] += Sd[p+1]; sm[2] += Sd[p+2]; }
-      var n = Math.ceil(ring.length / step); sm = sm.map(function(v){ return v / n; });
-      var e = 0;
-      for(var k = 0; k < ring.length; k += step){ var p = ring[k] * 4; for(var ch = 0; ch < 3; ch++){ var q2 = (Sd[p+ch] - sm[ch]) - (T[p+ch] - tm[ch]); e += q2 * q2; } }
-      e = e / n + 0.15 * ((sm[0]-tm[0])*(sm[0]-tm[0]) + (sm[1]-tm[1])*(sm[1]-tm[1]) + (sm[2]-tm[2])*(sm[2]-tm[2])) + dist * 0.02;
-      if(e < bestE){ bestE = e; best = Sd; }
-    }
-    if(!best) return;
-    /* fondu sans raccord (Poisson) : sortie = source + correction douce qui rejoint exactement le bord */
-    var f = Math.max(1, Math.ceil(size / 72)), n2 = Math.ceil(size / f), inside = new Uint8Array(n2 * n2), hv = [new Float32Array(n2*n2), new Float32Array(n2*n2), new Float32Array(n2*n2)];
-    for(var gy = 0; gy < n2; gy++) for(var gx = 0; gx < n2; gx++){
-      var g = gy * n2 + gx, pcx = (gx + 0.5) * f, pcy = (gy + 0.5) * f;
-      if(Math.hypot(pcx - ox, pcy - oy) < rm) { inside[g] = 1; continue; }
-      var acc = [0,0,0], cnt = 0;
-      for(var yy = gy * f; yy < Math.min(size, (gy + 1) * f); yy++) for(var xx = gx * f; xx < Math.min(size, (gx + 1) * f); xx++){ var p = (yy * size + xx) * 4; for(var ch = 0; ch < 3; ch++) acc[ch] += T[p+ch] - best[p+ch]; cnt++; }
-      for(var ch = 0; ch < 3; ch++) hv[ch][g] = cnt ? acc[ch] / cnt : 0;
-    }
-    var avg = [0,0,0], nb = 0; for(var g = 0; g < n2 * n2; g++) if(!inside[g]){ for(var ch = 0; ch < 3; ch++) avg[ch] += hv[ch][g]; nb++; }
-    for(var g = 0; g < n2 * n2; g++) if(inside[g]) for(var ch = 0; ch < 3; ch++) hv[ch][g] = avg[ch] / Math.max(1, nb);
-    for(var it = 0; it < n2 * 4; it++) for(var g = 0; g < n2 * n2; g++){
-      if(!inside[g]) continue; var gx = g % n2, gy = (g / n2) | 0;
-      for(var ch = 0; ch < 3; ch++){ var h = hv[ch]; var v = (h[g - 1] + h[g + 1] + h[g - n2] + h[g + n2]) / 4; h[g] = h[g] + 1.85 * (v - h[g]); }
-    }
-    function hAt(ch, px, py){
-      var fx = Math.max(0, Math.min(n2 - 1.001, px / f - 0.5)), fy = Math.max(0, Math.min(n2 - 1.001, py / f - 0.5)), x0 = fx | 0, y0 = fy | 0, ax = fx - x0, ay = fy - y0, h = hv[ch];
-      return (h[y0*n2+x0] * (1-ax) + h[y0*n2+x0+1] * ax) * (1-ay) + (h[(y0+1)*n2+x0] * (1-ax) + h[(y0+1)*n2+x0+1] * ax) * ay;
-    }
-    var out = x.getImageData(tx, ty, size, size), O = out.data;
-    for(var yy = 0; yy < size; yy++) for(var xx = 0; xx < size; xx++){
-      var d = Math.hypot(xx - ox, yy - oy); if(d >= rm) continue;
-      var al = Math.min(1, (rm - d) / Math.max(1.5, r * 0.12)), p = (yy * size + xx) * 4;
-      for(var ch = 0; ch < 3; ch++){ var v = best[p+ch] + hAt(ch, xx, yy); O[p+ch] = T[p+ch] * (1 - al) + v * al; }
-    }
-    x.putImageData(out, tx, ty);
-  });
-}
-
 /* ---------- rotation / recadrage ---------- */
 function geometry(src, g){
   var w = src.width, h = src.height, q = ((g.r90 % 4) + 4) % 4, W = q % 2 ? h : w, H = q % 2 ? w : h;
@@ -212,7 +149,6 @@ function film(c, s, Q){
 async function pre(bmp, Q){
   var s = get(), single = Q && Q.single, c = null;
   function base(){ if(!c){ c = cvs(bmp.width, bmp.height); c.getContext("2d").drawImage(bmp, 0, 0); } return c; }
-  if(single && spots.length) heal(base(), spots);
   if(curveOn(s)){ var b = base(); applyCurves(b.getContext("2d"), b.width, b.height, s); }
   if(single && geoOn()) c = geometry(c || bmp, geo);
   return c || bmp;
@@ -252,12 +188,16 @@ function needPhoto(){ var p = photo(); if(!p) alert(T("Ouvre d'abord une image (
 /* ---------- fenetre commune ---------- */
 var css = document.createElement("style");
 css.textContent =
-"#jx2Bar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 10px}" +
+"#jx2Bar{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 0 10px}" +
 "#jx2Bar button{border:0;border-radius:14px;padding:10px 2px;font-weight:900;font-size:11px;color:#fff;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 3px 8px #0007}" +
 "#jx2Bar button .i{font-size:22px;line-height:1}#jx2Bar button.on{outline:3px solid #FFB300;outline-offset:1px}" +
 "#jx2Bar .b1{background:#6D4C41}#jx2Bar .b2{background:#00897B}#jx2Bar .b3{background:#C62828}#jx2Bar .b4{background:#5E35B1}" +
 "body:not([data-tab=reg]) #jx2Bar{display:none!important}" +
 "#jx2O{z-index:3370}#jx2O .jmsBoxG{max-width:440px}" +
+"#jx2O.full{padding:0}#jx2O.full .jmsBoxG{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:8px 10px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}" +
+".x2Top{display:flex;align-items:center;gap:8px;flex:none}.x2Top .jmsTitle{flex:1;margin:0;text-align:left}.x2Top button{border:0;border-radius:12px;padding:10px 16px;font-weight:900;font-size:15px;color:#fff;background:#2E9E3F}" +
+".x2PvW{flex:1 1 0;min-height:50px;display:flex;align-items:center;justify-content:center;overflow:hidden;margin:6px 0}" +
+".x2Chips{display:flex;gap:6px;overflow-x:auto;flex:none;padding:6px 0 2px}.x2Chips button{flex:none;border:0;border-radius:18px;padding:9px 12px;font-weight:900;font-size:12px;background:#3a3a3a;color:#fff;white-space:nowrap}" +
 ".x2C{width:100%;display:block;border-radius:10px;touch-action:none;background:#000}" +
 ".x2Row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.x2Row button{flex:1;min-width:60px;border:0;border-radius:10px;padding:10px 4px;font-weight:900;font-size:12px;background:#3a3a3a;color:#fff}.x2Row button.on{background:#1E88E5;outline:3px solid #FFB300}" +
 "#x2Lp button{min-width:0;font-size:16px;padding:8px 0}" +
@@ -267,8 +207,8 @@ document.head.appendChild(css);
 var ov = document.createElement("div"); ov.id = "jx2O"; ov.className = "jmsOvl";
 ov.innerHTML = '<div class="jmsBoxG" id="jx2B"></div>'; document.body.appendChild(ov);
 var box = $("jx2B"), HH = {};
-function show(h){ box.innerHTML = h; ov.classList.add("show"); box.scrollTop = 0; }
-function hide(){ ov.classList.remove("show"); bar(); }
+function show(h, full){ box.innerHTML = h; ov.classList.toggle("full", !!full); ov.classList.add("show"); box.scrollTop = 0; }
+function hide(){ ov.classList.remove("show"); ov.classList.remove("full"); bar(); }
 ov.addEventListener("click", function(e){ var b = e.target.closest("[data-a]"); if(b && HH[b.dataset.a]) HH[b.dataset.a](b); });
 var oldBack = window.__jmsBack2; window.__jmsBack2 = function(){ if(ov.classList.contains("show")){ hide(); return true; } return oldBack ? oldBack() : false; };
 function slider(id, label, v, mn, mx, st, unit){ return '<label class="x2Lb">' + label + ' : <b id="' + id + 'v">' + v + '</b>' + (unit || "") + '</label><input type="range" id="' + id + '" min="' + mn + '" max="' + mx + '" step="' + (st || 1) + '" value="' + v + '" style="width:100%">'; }
@@ -283,15 +223,12 @@ function curves(){
     lin:[[0,0],[255,255]], s1:[[0,0],[64,52],[192,206],[255,255]], s2:[[0,0],[64,40],[192,220],[255,255]],
     mat:[[0,34],[70,72],[190,200],[255,238]], ombres:[[0,0],[60,88],[160,182],[255,255]], dense:[[0,0],[100,80],[200,190],[255,255]]
   };
-  show('<div class="jmsTitle">📈 ' + T("COURBES", "CURVES") + '</div>' +
-   '<canvas id="x2Pv" class="x2C" style="width:auto;max-width:100%;max-height:22vh;margin:0 auto"></canvas>' +
-   '<div class="x2Row" id="x2Ch"><button data-a="ch" data-c="m" class="on">RVB</button><button data-a="ch" data-c="r" style="color:#ff8a80">R</button><button data-a="ch" data-c="g" style="color:#9be79b">V</button><button data-a="ch" data-c="b" style="color:#90b4ff">B</button></div>' +
-   '<canvas id="x2Cu" class="x2C" style="aspect-ratio:1;width:min(100%,42vh);margin:0 auto;background:#111"></canvas>' +
-   '<div class="x2Hint">' + T("Touche la courbe pour ajouter un point, fais-le glisser. Glisse un point hors du carré pour l'enlever.", "Tap the curve to add a point and drag it. Drag a point out of the square to remove it.") + '</div>' +
-   '<div class="x2Row"><button data-a="pre" data-p="lin">' + T("Neutre", "Neutral") + '</button><button data-a="pre" data-p="s1">' + T("S douce", "Soft S") + '</button><button data-a="pre" data-p="s2">' + T("S forte", "Strong S") + '</button></div>' +
-   '<div class="x2Row"><button data-a="pre" data-p="mat">' + T("Mat (film)", "Matte (film)") + '</button><button data-a="pre" data-p="ombres">' + T("Ombres +", "Shadows +") + '</button><button data-a="pre" data-p="dense">' + T("Dense", "Dense") + '</button></div>' +
-   '<button class="jmsBtn close" data-a="reset">' + T("TOUT REMETTRE À ZÉRO", "RESET ALL") + '</button>' +
-   '<button class="jmsBtn go" data-a="ok">✔ ' + T("TERMINÉ", "DONE") + '</button>');
+  show('<div class="x2Top"><div class="jmsTitle">📈 ' + T("COURBES", "CURVES") + '</div><button data-a="ok">✔ OK</button></div>' +
+   '<div class="x2PvW" id="x2PvW"><canvas id="x2Pv" style="display:block;border-radius:8px"></canvas></div>' +
+   '<div class="x2Row" id="x2Ch" style="margin:0 0 6px;flex:none"><button data-a="ch" data-c="m" class="on">RVB</button><button data-a="ch" data-c="r" style="color:#ff8a80">R</button><button data-a="ch" data-c="g" style="color:#9be79b">V</button><button data-a="ch" data-c="b" style="color:#90b4ff">B</button></div>' +
+   '<canvas id="x2Cu" style="display:block;flex:none;margin:0 auto;background:#111;border-radius:10px;touch-action:none"></canvas>' +
+   '<div class="x2Chips"><button data-a="pre" data-p="s1">' + T("S douce", "Soft S") + '</button><button data-a="pre" data-p="s2">' + T("S forte", "Strong S") + '</button><button data-a="pre" data-p="mat">' + T("Mat (film)", "Matte (film)") + '</button><button data-a="pre" data-p="ombres">' + T("Ombres +", "Shadows +") + '</button><button data-a="pre" data-p="dense">' + T("Dense", "Dense") + '</button><button data-a="pre" data-p="lin">' + T("Neutre", "Neutral") + '</button><button data-a="reset" style="background:#6b2b2b">' + T("Tout à zéro", "Reset all") + '</button></div>' +
+   '<div class="x2Hint" style="flex:none;margin:4px 0 0">' + T("Touche la courbe pour ajouter un point. Glisse un point hors du carré pour l'enlever.", "Tap the curve to add a point. Drag a point out of the square to remove it.") + '</div>', true);
   var pv = $("x2Pv"), cu = $("x2Cu"), sz = fitCanvas(pv, ph.width, ph.height, 700), base = cvs(sz[0], sz[1]);
   base.getContext("2d").drawImage(ph, 0, 0, sz[0], sz[1]);
   var hist = new Uint32Array(256), bd = base.getContext("2d").getImageData(0, 0, sz[0], sz[1]).data;
@@ -299,6 +236,14 @@ function curves(){
   var hm = 1; for(var i = 2; i < 254; i++) hm = Math.max(hm, hist[i]);
   /* marge autour de la courbe pour que les points du bout soient entiers et faciles a attraper */
   cu.width = cu.height = 600; var P = 40, A = 600 - 2 * P, K = A / 255;
+  function layout(){
+    if(!document.body.contains(cu)) { window.removeEventListener("resize", layout); return; }
+    var cs = Math.floor(Math.min(box.clientWidth - 20, window.innerHeight * 0.46));
+    cu.style.width = cu.style.height = cs + "px";
+    var w = $("x2PvW"), k = Math.min(w.clientWidth / pv.width, w.clientHeight / pv.height);
+    pv.style.width = Math.floor(pv.width * k) + "px"; pv.style.height = Math.floor(pv.height * k) + "px";
+  }
+  window.addEventListener("resize", layout); setTimeout(layout, 0); requestAnimationFrame(layout);
   function X(v){ return P + v * K; } function Y(v){ return P + A - v * K; }
   var COL = {m:"#fff", r:"#ff5252", g:"#4CAF50", b:"#448AFF"};
   function drawPrev(){ var x = pv.getContext("2d"); x.drawImage(base, 0, 0); applyCurves(x, pv.width, pv.height, s); }
@@ -404,49 +349,6 @@ function crop(){
   rebuild();
 }
 
-/* ================= CORRECTEUR ================= */
-function healer(){
-  var ph = needPhoto(); if(!ph) return;
-  var list = spots.slice(), size = 0.025;
-  show('<div class="jmsTitle">🩹 ' + T("CORRECTEUR", "HEALING") + '</div>' +
-   '<canvas id="x2He" class="x2C"></canvas>' +
-   '<div class="x2Hint">' + T("Touche une tache, un bouton ou une poussière : elle est remplacée par la zone voisine. Pour être précis, écarte deux doigts sur l'image pour zoomer.", "Tap a spot, blemish or dust: it is replaced by the nearby area. Spread two fingers on the image to zoom for precision.") + '</div>' +
-   slider("x2Sz", T("Taille du correcteur", "Healing size"), 25, 5, 80, 1, "") +
-   '<div class="x2Row"><button data-a="zm">🔍 ' + T("Zoom ×1", "Zoom ×1") + '</button><button data-a="undo">↩️ ' + T("Annuler", "Undo") + '</button><button data-a="clr">' + T("Tout effacer", "Clear all") + '</button></div>' +
-   '<button class="jmsBtn go" data-a="ok">✔ ' + T("TERMINÉ (appliqué à l'enregistrement)", "DONE (applied when saving)") + '</button>' +
-   '<button class="jmsBtn close" data-a="cancel">' + T("ANNULER", "CANCEL") + '</button>');
-  var c = $("x2He"), sz = fitCanvas(c, ph.width, ph.height, 1000), W = sz[0], H = sz[1], base = cvs(W, H), work = cvs(W, H);
-  base.getContext("2d").drawImage(ph, 0, 0, W, H);
-  var zoom = 1, zx = 0.5, zy = 0.5;
-  function view(){ var vw = 1 / zoom, vh = 1 / zoom; return {x:Math.max(0, Math.min(1 - vw, zx - vw / 2)), y:Math.max(0, Math.min(1 - vh, zy - vh / 2)), w:vw, h:vh}; }
-  function render(){
-    work.getContext("2d").drawImage(base, 0, 0); heal(work, list);
-    var v = view(), x = c.getContext("2d");
-    x.drawImage(work, v.x * W, v.y * H, v.w * W, v.h * H, 0, 0, W, H);
-    x.strokeStyle = "rgba(255,214,0,.7)"; x.lineWidth = 2;
-    list.forEach(function(s){ var px = (s.x - v.x) / v.w * W, py = (s.y - v.y) / v.h * H; x.beginPath(); x.arc(px, py, s.r * Math.min(W, H) * zoom, 0, 7); x.stroke(); });
-  }
-  var pts = {}, pinch = null, moved = false;
-  c.onpointerdown = function(e){ c.setPointerCapture(e.pointerId); pts[e.pointerId] = pos(c, e); moved = false; var k = Object.keys(pts); if(k.length === 2){ var a = pts[k[0]], b = pts[k[1]]; pinch = {d:Math.hypot(a.x - b.x, a.y - b.y), z:zoom}; } };
-  c.onpointermove = function(e){
-    if(!pts[e.pointerId]) return; var p = pos(c, e), prev = pts[e.pointerId]; pts[e.pointerId] = p; var k = Object.keys(pts);
-    if(k.length === 2 && pinch){ var a = pts[k[0]], b = pts[k[1]]; zoom = Math.max(1, Math.min(6, pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(0.01, pinch.d))); moved = true; upd(); render(); }
-    else if(k.length === 1 && zoom > 1 && Math.hypot(p.x - prev.x, p.y - prev.y) > 0.004){ var v = view(); zx -= (p.x - prev.x) * v.w; zy -= (p.y - prev.y) * v.h; moved = true; render(); }
-  };
-  c.onpointerup = function(e){
-    var p = pts[e.pointerId]; delete pts[e.pointerId];
-    if(Object.keys(pts).length === 0){ if(!moved && !pinch && p){ var v = view(); list.push({x:v.x + p.x * v.w, y:v.y + p.y * v.h, r:size / zoom}); render(); } pinch = null; }
-  };
-  function upd(){ var b = box.querySelector('[data-a="zm"]'); if(b) b.textContent = "🔍 Zoom ×" + (Math.round(zoom * 10) / 10); }
-  $("x2Sz").oninput = function(){ size = this.value / 1000; $("x2Szv").textContent = this.value; };
-  HH.zm = function(){ zoom = zoom >= 4 ? 1 : zoom * 2; upd(); render(); };
-  HH.undo = function(){ list.pop(); render(); };
-  HH.clr = function(){ list = []; render(); };
-  HH.ok = function(){ spots = list; hide(); if(spots.length) note("🩹 " + spots.length + T(" correction(s) appliquée(s) à l'enregistrement de cette photo", " fix(es) applied when this photo is saved")); };
-  HH.cancel = hide;
-  render();
-}
-
 /* ================= EFFETS FILM ================= */
 function filmScreen(){
   var s = get(), ph = photo();
@@ -464,7 +366,6 @@ function filmScreen(){
   if(pc){ var sz = fitCanvas(pc, ph.width, ph.height, 700); base = cvs(sz[0], sz[1]); base.getContext("2d").drawImage(ph, 0, 0, sz[0], sz[1]); }
   function prev(){
     if(!pc) return; var c = cvs(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0);
-    if(spots.length) heal(c, spots);
     if(curveOn(s)) applyCurves(c.getContext("2d"), c.width, c.height, s);
     if(geoOn()) c = geometry(c, geo);
     var o = film(c, s, {}); var sz2 = fitCanvas(pc, o.width, o.height, 700); pc.getContext("2d").drawImage(o, 0, 0, sz2[0], sz2[1]);
@@ -494,16 +395,14 @@ function bar(){
     b = document.createElement("div"); b.id = "jx2Bar";
     b.innerHTML = '<button class="b1" data-t="crop"><span class="i">✂️</span>' + T("RECADRER", "CROP") + '</button>' +
       '<button class="b2" data-t="curves"><span class="i">📈</span>' + T("COURBES", "CURVES") + '</button>' +
-      '<button class="b3" data-t="heal"><span class="i">🩹</span>' + T("CORRECTEUR", "HEAL") + '</button>' +
       '<button class="b4" data-t="film"><span class="i">🎞️</span>' + T("EFFETS FILM", "FILM FX") + '</button>';
-    b.onclick = function(e){ var t = e.target.closest("button"); if(!t) return; ({crop:crop, curves:curves, heal:healer, film:filmScreen})[t.dataset.t](); };
+    b.onclick = function(e){ var t = e.target.closest("button"); if(!t) return; ({crop:crop, curves:curves, film:filmScreen})[t.dataset.t](); };
   }
   var anchor = $("jxFav") && $("jxFav").parentNode === c.parentNode ? $("jxFav") : c;
   if(b.nextSibling !== anchor || b.parentNode !== anchor.parentNode) anchor.parentNode.insertBefore(b, anchor);
   var s = get();
   b.querySelector('[data-t="crop"]').classList.toggle("on", geoOn());
   b.querySelector('[data-t="curves"]').classList.toggle("on", curveOn(s));
-  b.querySelector('[data-t="heal"]').classList.toggle("on", spots.length > 0);
   b.querySelector('[data-t="film"]').classList.toggle("on", filmOn(s));
 }
 setInterval(bar, 700); setTimeout(bar, 300);
