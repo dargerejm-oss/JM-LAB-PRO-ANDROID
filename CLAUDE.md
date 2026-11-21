@@ -39,4 +39,8 @@ dans `projets/RegardPur/LISEZMOI.md`. Le .exe est fabriqué par `.github/workflo
 `regardpur`, jamais « latest » pour ne pas casser le lien de JM LAB PRO). Tests : servir `renderer/` (python3 -m http.server)
 et Playwright, ou le vrai programme avec `xvfb-run` + `_electron` (dialogue de dossier remplacé dans le test).
 Le dépôt est public : l'utilisateur a refusé un dépôt privé séparé pour Regard Pur (ne pas le reproposer).
-Suite : vérifier yeux fermés / HEIC / 24 Mpx sur vraies photos, mode d'emploi, Android, lien vers JM LAB PRO.
+Fait jusqu'à 2.11 (voir LISEZMOI) : tri, personnes, œil artistique (NIMA), composition, rendu JM LAB PRO à l'export,
+catégories (idées de « Vrai Regard » sans doublon), retouche rapide apprise, Retouche portrait.
+Suite décidée avec l'utilisateur, dans l'ordre : correcteur / suppression d'objets (porter le PatchMatch de JM LAB PRO),
+« garder les N meilleures », ciel + recadrage auto, style appris depuis Lightroom (XMP), vrais RAW, version anglaise,
+puis EN DERNIER mode d'emploi PDF + aide intégrée en FRANÇAIS ET ANGLAIS. PAS de version Android pour le moment.
