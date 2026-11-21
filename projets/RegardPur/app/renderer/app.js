@@ -62,7 +62,9 @@ function sharpEff(a) {
   return Math.round(e == null ? a.sharp : Math.min(100, Math.max(e * 1.45, a.sharp * 0.6)));
 }
 function eyesScore(a) { var f = bigFaces(a); return f.length ? avg(f.map(function (x) { return x.closed ? 0 : x.half ? 50 : 100; })) : null; }
-function feat(a) { var e = eyesScore(a), f = bigFaces(a); return [1, sharpEff(a) / 100, expoScore(a) / 100, e == null ? 0.7 : e / 100, f.length ? avg(f.map(function (x) { return x.smile; })) : 0, (a.motion || 0) / 100, f.length ? 1 : 0]; }
+var NF = 8;
+function aesScore(a) { return a.aes == null ? null : clamp(Math.round((a.aes - 3.0) / (5.5 - 3.0) * 100), 0, 100); }
+function feat(a) { var e = eyesScore(a), f = bigFaces(a), ae = aesScore(a); return [1, sharpEff(a) / 100, expoScore(a) / 100, e == null ? 0.7 : e / 100, f.length ? avg(f.map(function (x) { return x.smile; })) : 0, (a.motion || 0) / 100, f.length ? 1 : 0, ae == null ? 0.5 : ae / 100]; }
 function baseScore(a) {
   var se = sharpEff(a), ex = expoScore(a), e = eyesScore(a), f = bigFaces(a), s;
   if (e == null) s = 0.72 * se + 0.28 * ex;
@@ -70,27 +72,30 @@ function baseScore(a) {
   if (a.motion > 40) s -= (a.motion - 40) * 0.35;
   // une photo floue ou mal exposee ne peut pas avoir une bonne note, meme si le reste va bien
   s = Math.min(s, se + 25, ex + 25);
+  // oeil artistique : lumiere, couleurs, composition (modele NIMA, sur le PC)
+  var ae = aesScore(a); if (ae != null) s = s * 0.8 + Math.min(ae, s + 20) * 0.2;
   return clamp(Math.round(s), 0, 100);
 }
 /* apprentissage : le score s'adapte a vos choix P / X (regression logistique simple) */
-var L = (function () { try { return JSON.parse(localStorage.getItem("rp_learn")) || null; } catch (e) { return null; } })() || {w: [0, 0, 0, 0, 0, 0, 0], ex: [], n: 0};
+var L = (function () { try { return JSON.parse(localStorage.getItem("rp_learn")) || null; } catch (e) { return null; } })() || {w: [], ex: [], n: 0};
+if (!L.ex.length || L.ex[0].x.length !== NF) { L.ex = (L.ex || []).filter(function (o) { return o.x.length === NF; }); L.w = []; }
 function sig(z) { return 1 / (1 + Math.exp(-z)); }
 function learnFrom(p, keep) {
   if (!p.a || p.a.err) return;
   L.ex.push({x: feat(p.a), y: keep ? 1 : 0}); if (L.ex.length > 800) L.ex.shift(); L.n++;
-  var w = [0, 0, 0, 0, 0, 0, 0];
+  var w = new Array(NF).fill(0);
   for (var it = 0; it < 200; it++) {
-    var g = [0, 0, 0, 0, 0, 0, 0];
-    L.ex.forEach(function (o) { var z = 0; for (var i = 0; i < 7; i++) z += w[i] * o.x[i]; var d = sig(z) - o.y; for (i = 0; i < 7; i++) g[i] += d * o.x[i]; });
-    for (var i = 0; i < 7; i++) w[i] -= 0.5 * (g[i] / L.ex.length + 0.01 * w[i]);
+    var g = new Array(NF).fill(0);
+    L.ex.forEach(function (o) { var z = 0; for (var i = 0; i < NF; i++) z += w[i] * o.x[i]; var d = sig(z) - o.y; for (i = 0; i < NF; i++) g[i] += d * o.x[i]; });
+    for (var i = 0; i < NF; i++) w[i] -= 0.5 * (g[i] / L.ex.length + 0.01 * w[i]);
   }
   L.w = w; try { localStorage.setItem("rp_learn", JSON.stringify(L)); } catch (e) {}
 }
 function score(p) {
   if (!p.a || p.a.err) return 0;
   var b = baseScore(p.a), keeps = L.ex.filter(function (o) { return o.y; }).length;
-  if (L.ex.length < 15 || keeps < 3 || keeps > L.ex.length - 3) return b;
-  var x = feat(p.a), z = 0; for (var i = 0; i < 7; i++) z += L.w[i] * x[i];
+  if (L.ex.length < 15 || keeps < 3 || keeps > L.ex.length - 3 || L.w.length !== NF) return b;
+  var x = feat(p.a), z = 0; for (var i = 0; i < NF; i++) z += L.w[i] * x[i];
   var al = Math.min(0.4, L.ex.length / 150);
   return clamp(Math.round(b * (1 - al) + sig(z) * 100 * al), 0, 100);
 }
@@ -118,6 +123,7 @@ function reasons(p) {
   var fl = f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }), faceOk = fl.length && avg(fl) >= 55 && avg(fl) <= 225;
   if (a.expo.hi > TH.hi[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très clair" : "Très surexposée"); else if (a.expo.hi > 4) warn.push("Blancs brûlés (" + a.expo.hi + " %)");
   if (a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très sombre" : "Très sombre"); else if (a.expo.mean < 62 && !faceOk) warn.push("Sombre");
+  var ae = aesScore(a); if (ae != null && ae >= 72) good.push("Belle image (œil artistique)");
   var g = p.g >= 0 ? S.groups[p.g] : null;
   if (g) {
     if (p.best) good.push("Meilleure de la série (" + g.length + " photos)");
@@ -186,6 +192,8 @@ async function load(dir, items, label) {
   ["bAuto", "bCompare", "bExport"].forEach(function (b) { $(b).disabled = false; });
   rescore(); buildPersons(); buildCards(); refresh(); updLearn();
   var todo = S.photos.filter(function (p) { return !p.a; });
+  // session reprise : note artistique des photos qui n'en ont pas encore (vignettes chargees petit a petit)
+  S.photos.filter(function (p) { return p.a && !p.a.err && p.a.aes == null; }).forEach(function (p, i) { setTimeout(function () { if (p.thumbUrl) queueNima(p); else loadThumb(p); }, 50 + i * 5); });
   if (todo.length) { quickThumbs(todo); analyse(todo); } else toast("Session reprise : " + items.length + " photos déjà analysées.");
 }
 function saveSoon() {
@@ -272,7 +280,7 @@ function done(p, r) {
   }
   delete r.id;
   (r.faces || []).forEach(function (f) { if (f.px) { if (f.w > 0.035) descQueue.push({p: p, f: f, px: f.px}); delete f.px; } });
-  p.a = r; p.score = score(p); p.why = reasons(p); runDesc();
+  p.a = r; p.score = score(p); p.why = reasons(p); runDesc(); queueNima(p);
   doneN++; prog(); updCard(p);
   if (S.view[S.cur] === p.id) showPanel();
   if (doneN >= totalN) { S.analysing = false; prog(); rescore(); refresh(); saveSoon(); toast("Analyse terminée : " + totalN + " photos. Touchez <b>✨ Tri automatique</b> ou triez vous-même (P / X)."); }
@@ -287,15 +295,18 @@ function prog() {
 var io = new IntersectionObserver(function (es) {
   es.forEach(function (en) {
     if (!en.isIntersecting) return;
-    var p = S.byId[en.target.dataset.id]; if (!p || p.thumbUrl || p.loadingT || !N || !S.dir) return;
+    var p = S.byId[en.target.dataset.id]; if (p) loadThumb(p);
+  });
+}, {root: $("grid"), rootMargin: "400px"});
+function loadThumb(p) {
+    if (!p || p.thumbUrl || p.loadingT || !N || !S.dir) return;
     p.loadingT = true;
     N.read(sessPath(join("vignettes", strHash(p.id) + ".jpg")), false).then(function (b) {
       p.loadingT = false;
-      if (b && b.length) { p.thumbUrl = URL.createObjectURL(new Blob([b], {type: "image/jpeg"})); updCard(p); if (S.view[S.cur] === p.id) showPanel(); }
+      if (b && b.length) { p.thumbUrl = URL.createObjectURL(new Blob([b], {type: "image/jpeg"})); updCard(p); if (S.view[S.cur] === p.id) showPanel(); queueNima(p); }
       else if (p.a) { p.a = null; analyse([p]); }
     }, function () { p.loadingT = false; if (p.a) { p.a = null; analyse([p]); } });
-  });
-}, {root: $("grid"), rootMargin: "400px"});
+}
 
 /* ---------------- personnes : reconnaissance des visages (face-api, sans internet) ---------------- */
 var descQueue = [], descBusy = false, faNet = null, PERS = [], persNames = {};
@@ -312,6 +323,57 @@ function loadFaceNet() {
   })();
   return faNet;
 }
+/* ---------------- oeil artistique (NIMA MobileNet, idealo, licence Apache 2.0) ---------------- */
+var nimaQueue = [], nimaBusy = false, nimaNet = null;
+function loadNima() {
+  if (nimaNet) return nimaNet;
+  nimaNet = (async function () {
+    try {
+      var fa = await loadFaceNet(); if (!fa) return null; var tf = fa.tf;
+      var man = await (await fetch("vendor/nima/nima.json")).json(), buf = new Float32Array(await (await fetch("vendor/nima/nima.bin")).arrayBuffer()), W = {};
+      man.forEach(function (m) { var n = m.s.reduce(function (a, b) { return a * b; }, 1); W[m.n] = tf.tensor(buf.subarray(m.o, m.o + n), m.s); });
+      return {tf: tf, W: W};
+    } catch (e) { console.log("oeil artistique indisponible : " + e.message); return null; }
+  })();
+  return nimaNet;
+}
+var NSTR = [1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1];
+function nimaScore(net, c) {
+  var tf = net.tf, W = net.W;
+  return tf.tidy(function () {
+    var x = tf.browser.fromPixels(c).toFloat().div(127.5).sub(1).expandDims(0);
+    x = tf.pad(x, [[0, 0], [0, 1], [0, 1], [0, 0]]);
+    x = tf.relu6(tf.conv2d(x, W["conv1.w"], 2, "valid").add(W["conv1.b"]));
+    for (var i = 1; i <= 13; i++) {
+      var st = NSTR[i - 1];
+      if (st === 2) x = tf.pad(x, [[0, 0], [0, 1], [0, 1], [0, 0]]);
+      x = tf.relu6(tf.depthwiseConv2d(x, W["dw" + i + ".w"], st, st === 2 ? "valid" : "same").add(W["dw" + i + ".b"]));
+      x = tf.relu6(tf.conv2d(x, W["pw" + i + ".w"], 1, "same").add(W["pw" + i + ".b"]));
+    }
+    var p = tf.softmax(tf.matMul(x.mean([1, 2]), W["dense.w"]).add(W["dense.b"])).dataSync(), m = 0;
+    for (var k = 0; k < 10; k++) m += (k + 1) * p[k];
+    return m;
+  });
+}
+function queueNima(p) { if (p.a && !p.a.err && p.a.aes == null && p.thumbUrl && nimaQueue.indexOf(p) < 0) { nimaQueue.push(p); runNima(); } }
+async function runNima() {
+  if (nimaBusy || !nimaQueue.length) return;
+  nimaBusy = true;
+  var net = await loadNima(), c = document.createElement("canvas"); c.width = c.height = 224; var x = c.getContext("2d"), n = 0;
+  while (net && nimaQueue.length) {
+    var p = nimaQueue.shift();
+    try {
+      var im = new Image(); im.src = p.thumbUrl; await im.decode();
+      x.drawImage(im, 0, 0, 224, 224);
+      p.a.aes = Math.round(nimaScore(net, c) * 100) / 100; p.score = score(p); p.why = reasons(p); updCard(p);
+      if (S.view[S.cur] === p.id) showPanel();
+    } catch (e) {}
+    if (++n % 8 === 0) await new Promise(function (r) { setTimeout(r, 0); });
+  }
+  nimaBusy = false;
+  if (n) { rescore(); refresh(false); saveSoon(); }
+}
+
 async function runDesc() {
   if (descBusy || !descQueue.length) return;
   descBusy = true;
@@ -577,6 +639,7 @@ function showPanel() {
   h += bar("Netteté", a.sharp, colOf(a.sharp));
   if (f.length) { var es = sharpEff(a); h += bar("Netteté des yeux / visage", es, colOf(es)); var ey = eyesScore(a); h += bar("Yeux ouverts", ey, colOf(ey), f.length + " visage" + (f.length > 1 ? "s" : "")); }
   h += bar("Flou de bougé", a.motion, a.motion >= 60 ? "var(--rej)" : a.motion >= 40 ? "var(--doubt)" : "var(--keep)", a.motion >= 40 ? a.motion : "non");
+  var ae = aesScore(a); h += ae == null ? bar("Œil artistique", 0, "var(--bg3)", "en cours…") : bar("Œil artistique (lumière, couleurs, composition)", ae, colOf(ae), (a.aes).toFixed(1) + " / 10");
   var ex = expoScore(a); h += bar("Exposition", ex, colOf(ex), ex + (a.expo.hi > 2 ? " · blancs brûlés " + a.expo.hi + " %" : "") + (a.expo.lo > 5 ? " · noirs " + a.expo.lo + " %" : ""));
   $("pvBars").innerHTML = h;
   var w = p.why || reasons(p);
