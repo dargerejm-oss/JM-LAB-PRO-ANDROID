@@ -100,7 +100,7 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - « Corriger les problèmes » utilise l'IA si utile, dans l'ordre bruit → flou → pixels/compression → visages (option),
   mesure avant / après (annule une correction qui n'améliore pas), et ne propose plus d'office ce que vous annulez souvent.
 
-### Après 3.8 (pas encore publié : la prochaine version regroupera tout)
+### 3.9
 - Correction : la vérification avant / après ne rejette plus le débruitage par IA à tort.
 - Avant / Après : ligne à glisser sur la photo (touche B). Déflouter (IA) seulement les personnes (fond flou gardé).
 - TRI_YEUX_LUNETTES_PRO : lunettes repérées (« vérifiez les reflets ») ; verres teintés = yeux non lisibles (pas de rejet).
@@ -116,3 +116,4 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - Vrais RAW : développement LibRaw (libraw-wasm, données du capteur, balance des blancs de l'appareil, hautes lumières
   récupérées) dans Retoucher et à l'export, gardé dans .regardpur/raw ; RAW sans aperçu intégré analysés quand même.
   Les pages sont « isolées » (en-têtes COOP/COEP) pour que LibRaw puisse utiliser plusieurs cœurs.
+- DxO : lecture des vrais fichiers .dop (réglages de base + modifiés, courbe des tons, Smart Lighting, contrôle sélectif des tons…).

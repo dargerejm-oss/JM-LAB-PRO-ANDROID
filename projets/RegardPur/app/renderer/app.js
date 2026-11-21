@@ -1091,7 +1091,7 @@ var TYPE_TOOLS = {
 };
 function typeShow(p) {
   if (!p || !p.a) { $("typeBox").style.display = "none"; return; }
-  var c = catOf(p), T = (MYSTYLE ? [["Mon style", {v: MYSTYLE.v, my: 1}]] : []).concat(TYPE_TOOLS[c] || []); TYPE_CUR = T; $("typeBox").style.display = T.length ? "" : "none";
+  var c = catOf(p), T = (MYSTYLE ? [["Mon style", {v: MYSTYLE.v, curve: MYSTYLE.curve, my: 1}]] : []).concat(TYPE_TOOLS[c] || []); TYPE_CUR = T; $("typeBox").style.display = T.length ? "" : "none";
   $("typeTitle").textContent = "Pour ce type de photo : " + (CATS[c] ? CATS[c].nom : c);
   var used = (p.dev && p.dev.tt) || [];
   $("typeTools").innerHTML = T.filter(function (t) { return !/^ai:/.test(t[1]) || AI.has[t[1] === "ai:face" ? "gfp" : t[1].slice(3)]; }).map(function (t) { return "<button data-tt='" + T.indexOf(t) + "'" + (used.indexOf(t[0]) >= 0 ? " class='done'" : "") + ">" + t[0] + "</button>"; }).join("");
@@ -1103,7 +1103,7 @@ $("typeTools").addEventListener("click", function (e) {
   if (typeof a === "string" && a.indexOf("rp:") === 0) { var k = a.slice(3); p.ret = {preset: k, str: 100, v: JSON.parse(JSON.stringify(RP_PRESETS[k].v))}; rp.cur = p.ret; }
   else if (a === "crop") { var cc = autoCrop(p, "orig"); if (!cc) { toast("Le cadrage est déjà bon."); return; } devGet(p).crop = cc; }
   else if (a === "tilt") { if (!p.a.tilt) { toast("L'horizon de cette photo est déjà droit."); return; } devGet(p).tilt = true; }
-  else { var d = devGet(p); if (a.sky) d.sky = JSON.parse(JSON.stringify(a.sky)); if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
+  else { var d = devGet(p); if (a.sky) d.sky = JSON.parse(JSON.stringify(a.sky)); if (a.curve) d.curve = JSON.parse(JSON.stringify(a.curve)); if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
   var d2 = devGet(p); d2.tt = (d2.tt || []).filter(function (x) { return x !== t[0]; }).concat([t[0]]);
   devShow(p); devChanged(p); toast("« " + t[0] + " » appliqué — affinez avec les curseurs si besoin.");
 });
@@ -2111,26 +2111,59 @@ function lrParse(txt) {
   LRMAP.forEach(function (m) { var re = new RegExp("crs:" + m[0] + "\\s*=\\s*\"([+\\-0-9.]+)\"|<crs:" + m[0] + ">([+\\-0-9.]+)<"), r = re.exec(txt); if (r) { o[m[0]] = parseFloat(r[1] || r[2]); n++; } });
   return n ? o : null;
 }
-function dopParse(txt) { // DxO PhotoLab : format a confirmer avec des fichiers d'exemple
-  if (!txt) return null; var o = {}, n = 0, g = function (k) { var r = new RegExp(k + "\\s*=\\s*([+\\-0-9.]+)").exec(txt); return r ? parseFloat(r[1]) : null; };
-  var map = {ExposureCompensation: "Exposure2012", Contrast: "Contrast2012", MicroContrast: "Clarity2012", Vibrancy: "Vibrance", Saturation: "Saturation", ClearViewIntensity: "Dehaze"};
-  Object.keys(map).forEach(function (k) { var v = g(k); if (v != null) { o[map[k]] = v; n++; } });
+/* DxO PhotoLab (.dop) : fichier en forme de tableau Lua ; on fusionne les reglages de base (Base) et ceux que vous avez
+   changes (Overrides), puis on les traduit en reglages Regard Pur (meme sens, echelle prudente) */
+function luaParse(txt) {
+  var i = 0, n = txt.length;
+  function ws() { while (i < n && /[\s,]/.test(txt[i])) i++; }
+  function val() {
+    ws(); var c = txt[i];
+    if (c === "{") { i++; var obj = {}, arr = [], keyed = false; for (;;) { ws(); if (txt[i] === "}") { i++; break; } if (i >= n) break;
+        var m = /^([A-Za-z_][A-Za-z0-9_]*)\s*=/.exec(txt.slice(i, i + 80));
+        if (m) { i += m[0].length; obj[m[1]] = val(); keyed = true; } else arr.push(val()); }
+      return keyed ? obj : arr; }
+    if (c === '"') { var j = i + 1, out = ""; while (j < n && txt[j] !== '"') { if (txt[j] === "\\") j++; out += txt[j++]; } i = j + 1; return out; }
+    var mm = /^(true|false|-?[0-9.eE+-]+|[A-Za-z_][A-Za-z0-9_]*)/.exec(txt.slice(i, i + 40)); if (!mm) { i++; return null; } i += mm[0].length;
+    return mm[0] === "true" ? true : mm[0] === "false" ? false : isNaN(+mm[0]) ? mm[0] : +mm[0];
+  }
+  var m0 = /Sidecar\s*=/.exec(txt); if (m0) i = m0.index + m0[0].length; return val();
+}
+function dopParse(txt) {
+  if (!txt || txt.indexOf("Sidecar") < 0) return null; var t; try { t = luaParse(txt); } catch (e) { return null; }
+  var it = t && t.Source && t.Source.Items && t.Source.Items[0], st = it && it.Settings; if (!st) return null;
+  var S2 = Object.assign({}, st.Base || {}, st.Overrides || {}), o = {}, n = 0, put = function (k, v) { if (v != null && isFinite(v) && v !== 0) { o[k] = v; n++; } };
+  if (S2.ExposureActive) put("Exposure2012", S2.ExposureBias);
+  if (S2.ContrastControlGroupActive !== false) { put("Contrast2012", S2.ColorModeContrast); put("Clarity2012", S2.LightingV2LocalContrastAmount); }
+  if (S2.ContrastEnhancementActive) { put("Contrast2012", (o.Contrast2012 || 0) + (S2.ContrastEnhancementGlobalIntensity || 0)); put("Clarity2012", (o.Clarity2012 || 0) + (S2.ContrastEnhancementMidlightIntensity || 0) * 0.5); }
+  put("Vibrance", S2.VibrancyIntensity); put("Saturation", S2.ColorModeSaturation);
+  if (S2.HazeRemovalActive) put("Dehaze", ((S2.DehazingValue || 0) - 0) * 0.8);
+  if (S2.SelectiveTonalControlActive) { put("Highlights2012", S2.LightingV3Highlights); put("Shadows2012", S2.LightingV3Shadows); put("Blacks2012", S2.LightingV3BlackPoint); put("Whites2012", S2.LightingV3WhitePoint); }
+  if (S2.LightingActive) { var li = S2.LightingV3Intensity != null ? S2.LightingV3Intensity : 25, f = /Strong/.test(S2.LightingMode || "") ? 1.6 : /Medium/.test(S2.LightingMode || "") ? 1.2 : 0.8;
+    put("Shadows2012", (o.Shadows2012 || 0) + li * f); put("Highlights2012", (o.Highlights2012 || 0) - li * f * 0.6); } // Smart Lighting : debouche les ombres, garde les hautes lumieres
+  if (S2.ArtisticVignettingActive) put("PostCropVignetteAmount", -(S2.ArtisticVignettingCornerAttenuation || 0));
+  if (S2.ToneCurveActive && S2.ToneCurveMasterPoints && S2.ToneCurveMasterPoints.length >= 4) {
+    var P = S2.ToneCurveMasterPoints, pts = []; for (var k = 0; k + 1 < P.length; k += 2) pts.push([Math.round(P[k] * 255), Math.round(P[k + 1] * 255)]);
+    var lin = pts.length === 2 && pts[0][1] === 0 && pts[1][1] === 255; if (!lin) { o.__curve = pts; n++; }
+  }
   return n ? o : null;
 }
 async function learnStyle() {
   if (!N || !N.styleFiles) return; var dir = await N.pickDir("Dossier de photos retouchées (Lightroom ou DxO)", S.dir); if (!dir) return;
-  $("styleInfo").textContent = "⏳ Lecture…"; var L = await N.styleFiles(dir), vals = {}, nf = 0, src = {lr: 0, dxo: 0};
+  $("styleInfo").textContent = "⏳ Lecture…"; var L = await N.styleFiles(dir), vals = {}, nf = 0, src = {lr: 0, dxo: 0}, curves = [];
   for (var i = 0; i < L.length; i++) {
     var f = L[i], o = null;
     try { if (f.kind === "dop") { o = dopParse(await N.readText(f.path)); if (o) src.dxo++; }
       else { var t = f.kind === "xmp" ? await N.readText(f.path) : new TextDecoder("latin1").decode(await N.readHead(f.path, 262144)); o = lrParse(t); if (o) src.lr++; } } catch (e) {}
-    if (o) { nf++; Object.keys(o).forEach(function (k) { (vals[k] = vals[k] || []).push(o[k]); }); }
+    if (o) { nf++; if (o.__curve) { curves.push(o.__curve); delete o.__curve; } Object.keys(o).forEach(function (k) { (vals[k] = vals[k] || []).push(o[k]); }); }
     if (i % 25 === 0) $("styleInfo").textContent = "⏳ " + (i + 1) + " / " + L.length;
   }
   if (nf < 3) { $("styleInfo").textContent = "Pas assez de photos retouchées trouvées (" + nf + ")."; return; }
   var med = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }, v = {};
   LRMAP.forEach(function (m) { var a = vals[m[0]]; if (!a || a.length < nf * 0.3) return; var x = med(a); if (m[0] === "Exposure2012") x = x / 0.65; else x = x * m[2]; x = Math.round(x * 10) / 10; if (Math.abs(x) >= (m[0] === "Exposure2012" ? 0.1 : 2)) v[m[1]] = Math.max(-100, Math.min(100, x)); });
-  MYSTYLE = {v: v, n: nf, lr: src.lr, dxo: src.dxo, date: Date.now()}; try { localStorage.setItem("rp_mystyle", JSON.stringify(MYSTYLE)); } catch (e) {}
+  // courbe des tons : mediane des courbes (lues a 5 hauteurs), si au moins un tiers des photos en a une
+  var curve = null; if (curves.length >= Math.max(1, nf * 0.3)) { curve = [[0, 0]]; [64, 128, 192].forEach(function (x) { curve.push([x, Math.round(med(curves.map(function (c) { return crvLut(c)[x]; })))]); }); curve.push([255, 255]); }
+  if (Object.keys(v).length === 0 && !curve) { $("styleInfo").textContent = "Vos photos n'ont pas de réglage commun à reprendre."; return; }
+  MYSTYLE = {v: v, curve: curve, n: nf, lr: src.lr, dxo: src.dxo, date: Date.now()}; try { localStorage.setItem("rp_mystyle", JSON.stringify(MYSTYLE)); } catch (e) {}
   $("styleInfo").textContent = "Style appris sur " + nf + " photo(s) (" + (src.lr ? "Lightroom " + src.lr : "") + (src.lr && src.dxo ? ", " : "") + (src.dxo ? "DxO " + src.dxo : "") + ")";
   var p = S.byId[S.view[S.cur]]; if (p) typeShow(p);
 }
