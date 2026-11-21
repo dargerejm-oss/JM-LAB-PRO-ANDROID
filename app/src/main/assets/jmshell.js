@@ -80,6 +80,7 @@ gate.innerHTML = '<div class="jmsBoxG"><div class="jmsTitle">🚀 PRÊT À LANCE
  '<div class="gN" id="gN"></div>'+
  '<div class="gPv" id="gPv"><img id="gPvI" alt=""><div id="gPvM">⏳ Aperçu de la 1re photo…</div></div>'+
  '<div class="gSt" id="gSt"></div>'+
+ '<button class="gBtn" id="gZero">🔄 REPARTIR DE ZÉRO<small>Profil, curseurs, outils et effets remis à zéro — ProLab gardé</small></button>'+
  '<button class="gBtn csb" id="gCS">🖼️ CADRE + SIGNATURE<small id="gCSs"></small></button>'+
  '<label class="gL">⚙️ Qualité / taille</label><select id="gQ" class="gIn sel"><option value="orig">Maximum : taille d\'origine, qualité 92</option><option value="web">Web léger : 2480 px, qualité 85</option><option value="mini">Très léger : 1600 px, qualité 80</option><option value="mail">Mail : 1200 px, qualité 75</option></select><div class="gOrig" id="gOrig"></div>'+
  '<label class="gL">📁 Nom du dossier</label><input id="gName" class="gIn" type="text">'+
@@ -131,7 +132,26 @@ window.__jmsLotGate = function(files){
   return new Promise(function(resolve){
     var d = new Date();
     $("gN").textContent = files.length + " image" + (files.length>1?"s":"") + " choisie" + (files.length>1?"s":"");
-    $("gSt").innerHTML = "<b>Style appliqué :</b><br>" + styleSummary() + "<br><small>Pour le changer : annule, change de profil ou de réglage, puis relance.</small>";
+    var stUpd = function(){
+      var pb = document.querySelector(".scroll-content > .mt-5 button.border-\\[\\#ffcc00\\]"), pn = pb ? ((pb.firstElementChild || pb).textContent || "").trim() : "";
+      var fx = window.__jmsFX ? window.__jmsFX.summary() : "";
+      $("gSt").innerHTML = "<b>Style appliqué :</b><br>" + (pn ? "Profil : " + pn + "<br>" : "") + styleSummary() + (fx ? "<br>Outils / effets : " + fx : "") + "<br><small>Le lot reprend vos réglages actuels : profil, ProLab, curseurs, outils (Courbes, Détails, HDR…) et effets. Le correcteur, le recadrage, la sélection, le pinceau et la double exposition ne servent qu'à la photo ouverte. Pour partir d'une base propre : 🔄 REPARTIR DE ZÉRO (ProLab gardé). Pour changer de style : annule, règle, puis relance.</small>";
+      var g = $("gFx"); if(g && g.parentNode) g.parentNode.removeChild(g);
+    };
+    stUpd();
+    $("gZero").onclick = function(){
+      if(!confirm("Remettre à zéro le profil, les curseurs, les outils (Retouches, Courbes, Détails, HDR…) et les effets ?\nProLab, le cadre / signature et le filigrane sont gardés.")) return;
+      var sl = function(){ var c = document.querySelector(".space-y-3.mb-4"); return c ? Array.prototype.slice.call(c.querySelectorAll('input[type="range"]')) : []; };
+      var dos = sl()[0] ? sl()[0].value : null;
+      try{ var o = JSON.parse(localStorage.getItem("jms_fx")||"{}"); localStorage.setItem("jms_fx", JSON.stringify({wm:o.wm||"", wmop:o.wmop||30})); }catch(e){}
+      try{ localStorage.setItem("jms_fx2", "{}"); }catch(e){}
+      var p0 = document.querySelector(".scroll-content > .mt-5 button"); if(p0) p0.click();
+      setTimeout(function(){
+        var setV = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        sl().forEach(function(r, i){ var v = i === 0 ? (dos !== null ? dos : 65) : 0; if(String(r.value) === String(v)) return; setV.call(r, String(v)); r.dispatchEvent(new Event("input", {bubbles:true})); });
+        setTimeout(function(){ stUpd(); lotPreview(files[0]); }, 300);
+      }, 450);
+    };
     $("gName").value = "Lot_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+"_"+pad(d.getHours())+pad(d.getMinutes());
     var o; try{ o = JSON.parse(localStorage.getItem("jms_opts")||"{}"); }catch(e){ o = {}; }
     $("gDirect").checked = o.direct !== false; $("gZip").checked = !!o.zip;

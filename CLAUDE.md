@@ -18,7 +18,7 @@
 - Dire clairement ce qui est publié et ce qui ne l'est pas encore.
 
 ## État actuel
-Version 4.11 : tous les outils demandés sont faits (grille OUTILS : Retouches, Détails, Courbes, Balance des blancs,
+Version 4.13 (bouton « REPARTIR DE ZÉRO » sur l'écran du lot, ProLab gardé) ; tous les outils demandés sont faits (grille OUTILS : Retouches, Détails, Courbes, Balance des blancs,
 Contraste des tons, Sélection, Pinceau, Correcteur, Recadrer, Théâtral, HDR, Double exposition, Éclat glamour, Effets),
 vue en grand, mode d'emploi FR + EN à jour (16 pages, sources dans `store/manuel`, `PAGES` dans `jmabout.js`).
 Ne PAS ajouter : Perspective, Noir et blanc complet.
