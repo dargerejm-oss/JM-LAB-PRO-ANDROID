@@ -55,6 +55,14 @@ jobs:
         shell: bash
         run: ls -la dist
 
+      - name: Retirer l'ancien .exe seul (on garde le ZIP et l'installateur)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=${{ (github.ref_name == 'main' || github.ref_name == 'master') && 'regardpur' || 'regardpur-test' }}
+          gh release delete-asset "$TAG" RegardPur.exe -y -R "${{ github.repository }}" || true
+
       - name: Publier
         uses: softprops/action-gh-release@v2
         with:
@@ -63,8 +71,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           prerelease: ${{ github.ref_name != 'main' && github.ref_name != 'master' }}
           make_latest: 'false'
-          body: "Regard Pur pour Windows. RegardPur.exe se lance sans installation ; RegardPur_Installation.exe l'installe avec un raccourci. Construit le ${{ github.event.head_commit.timestamp }}."
+          body: "Regard Pur pour Windows. RegardPur.zip : a decompresser, puis double-clic sur RegardPur.exe (sans installation). RegardPur_Installation.exe : installe avec un raccourci. Construit le ${{ github.event.head_commit.timestamp }}."
           files: |
             projets/RegardPur/app/dist/RegardPur.zip
-            projets/RegardPur/app/dist/RegardPur.exe
             projets/RegardPur/app/dist/RegardPur_Installation.exe

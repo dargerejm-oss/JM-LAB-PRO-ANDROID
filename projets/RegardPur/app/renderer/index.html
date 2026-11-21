@@ -34,6 +34,12 @@
     <h4>Options</h4>
     <label class="ck"><input type="checkbox" id="cGroup" checked> Regrouper les rafales et doublons</label>
     <label class="ck"><input type="checkbox" id="cAdvance" checked> Passer à la suivante après P / X</label>
+    <label class="sel full">Catégorie de la séance
+      <select id="sCat"><option value="auto">Auto (devinée photo par photo)</option><option value="mariage">💍 Mariage</option><option value="portrait">🙂 Portrait</option><option value="famille">👨‍👩‍👧 Famille / groupe</option><option value="contre-jour">🌅 Contre-jour</option><option value="plage">🏖️ Plage</option><option value="paysage">🏞️ Paysage</option><option value="nuit">🌙 Nuit</option></select>
+    </label>
+    <label class="sel full">Client / séance (facultatif)
+      <input type="text" id="tClient" placeholder="ex. Léa &amp; Hugo">
+    </label>
     <label class="sel full">Trier par
       <select id="sSort"><option value="date">Date de prise de vue</option><option value="score">Score (meilleures d'abord)</option><option value="name">Nom du fichier</option></select>
     </label>

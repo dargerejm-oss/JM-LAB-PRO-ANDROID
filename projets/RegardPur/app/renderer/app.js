@@ -101,6 +101,37 @@ function score(p) {
 }
 
 /* ---------------- raisons (pourquoi garder / rejeter) ---------------- */
+/* ---------------- categories de seance (reprises de « Vrai Regard », sans doublon avec ProLab) ----------------
+   cibles : niveaux visés (L*, 0-100) pour ombres, sombres, moyens, clairs, hautes lumières ; peau : protection de la peau ;
+   prof : profil JM LAB PRO conseillé ; ev / wb / tint : petits décalages. */
+var CATS = {
+  "mariage":     {nom: "Mariage", cibles: [18, 35, 50, 70, 86], peau: 0.85, prof: "Astia", ev: 0.18, wb: 6, tint: 2},
+  "portrait":    {nom: "Portrait", cibles: [15, 32, 48, 68, 85], peau: 0.90, prof: "Astia", ev: 0.15, wb: 5, tint: 0},
+  "famille":     {nom: "Famille / groupe", cibles: [16, 34, 50, 70, 86], peau: 0.85, prof: "Provia", ev: 0.15, wb: 5, tint: 1},
+  "contre-jour": {nom: "Contre-jour", cibles: [22, 38, 52, 68, 84], peau: 0.90, prof: "Provia", ev: 0.27, wb: 8, tint: 0},
+  "plage":       {nom: "Plage", cibles: [12, 30, 48, 70, 86], peau: 0.80, prof: "Astia", ev: 0.0, wb: 3, tint: 0},
+  "paysage":     {nom: "Paysage", cibles: [10, 30, 48, 70, 88], peau: 0.60, prof: "Velvia", ev: 0.0, wb: 2, tint: 0},
+  "nuit":        {nom: "Nuit", cibles: [10, 28, 45, 65, 82], peau: 0.80, prof: "Classic Chrome", ev: 0.2, wb: 8, tint: 3}
+};
+function guessCat(a) {
+  if (!a || a.err) return "portrait";
+  var f = bigFaces(a), col = a.col || [];
+  if (f.length) {
+    var fl = avg(f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }));
+    if (a.expo.hi > 6 && fl && fl < a.expo.mean - 10) return "contre-jour";
+    return f.length >= 3 ? "famille" : "portrait";
+  }
+  // nuit : seulement si la prise de vue le confirme (heure, ISO eleves, pose longue) ; une photo de jour ratee reste « trop sombre »
+  var ex = a.exif || {}, hr = ex.date ? new Date(ex.date).getHours() : 12;
+  if (a.expo.mean < 80 && (hr >= 20 || hr < 6 || (ex.iso || 0) >= 1600 || (ex.speed || 0) >= 1 / 30)) return "nuit";
+  // ciel bleu en haut, sable clair et chaud en bas
+  var top = [0, 0, 0], bot = [0, 0, 0];
+  for (var i = 0; i < 4; i++) for (var k = 0; k < 3; k++) { top[k] += (col[i * 3 + k] || 0) / 4; bot[k] += (col[36 + i * 3 + k] || 0) / 4; }
+  if (top[2] > top[0] + 15 && bot[0] > 140 && bot[0] >= bot[1] && bot[1] > bot[2]) return "plage";
+  return "paysage";
+}
+function catOf(p) { var c = $("sCat").value; return c === "auto" ? guessCat(p.a) : c; }
+
 function reasons(p) {
   var a = p.a, k = strict(), rej = [], warn = [], good = [];
   if (!a) return {rej: rej, warn: ["Analyse en cours…"], good: good};
@@ -121,8 +152,10 @@ function reasons(p) {
   }
   // portrait : si le visage est bien expose, un fond tres clair ou tres sombre est un choix, pas une erreur
   var fl = f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }), faceOk = fl.length && avg(fl) >= 55 && avg(fl) <= 225;
-  if (a.expo.hi > TH.hi[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très clair" : "Très surexposée"); else if (a.expo.hi > 4) warn.push("Blancs brûlés (" + a.expo.hi + " %)");
-  if (a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) (faceOk ? warn : rej).push(faceOk ? "Fond très sombre" : "Très sombre"); else if (a.expo.mean < 62 && !faceOk) warn.push("Sombre");
+  // la categorie change ce qui est normal : nuit sombre, contre-jour et plage tres clairs, robe blanche au mariage
+  var cat = catOf(p), hiTol = {"contre-jour": 99, "plage": 8, "mariage": 10}[cat] || 0, dark = cat === "nuit";
+  if (a.expo.hi > TH.hi[k] + hiTol) (faceOk ? warn : rej).push(faceOk ? "Fond très clair" : "Très surexposée"); else if (a.expo.hi > 4 + hiTol) warn.push(cat === "contre-jour" ? "Contre-jour : ciel très clair" : "Blancs brûlés (" + a.expo.hi + " %)");
+  if ((a.expo.lo > TH.lo[k] || a.expo.mean < TH.dark[k]) && !dark) (faceOk ? warn : rej).push(faceOk ? "Fond très sombre" : "Très sombre"); else if (a.expo.mean < (dark ? 18 : 62) && !faceOk) warn.push(dark ? "Nuit très sombre" : "Sombre");
   // composition
   if (f.some(function (x) { return x.x < 0.004 || x.y < 0.004 || x.x + x.w > 0.996 || x.y + x.h > 0.996; }) && f.length) warn.push("Visage coupé par le bord");
   if (f.length >= 2) { var turned = f.filter(function (x) { return x.yaw != null && Math.abs(x.yaw) > 0.42; }).length; if (turned) warn.push(turned + " personne" + (turned > 1 ? "s tournent" : " tourne") + " la tête"); }
@@ -181,7 +214,7 @@ async function load(dir, items, label) {
   if (!items.length) { toast("Aucune photo dans ce dossier."); return; }
   stopAnalysis();
   S.photos.forEach(function (p) { if (p.thumbUrl) URL.revokeObjectURL(p.thumbUrl); });
-  persNames = {}; PERS = []; descQueue = [];
+  persNames = {}; PERS = []; descQueue = []; $("sCat").value = "auto"; $("tClient").value = "";
   S.dir = dir; S.photos = items; S.byId = {}; S.sel.clear(); S.cur = 0; S.openGroup = -1; S.undo = []; S.filter = "all";
   items.forEach(function (p) { p.status = ""; p.auto = false; p.stars = 0; p.a = null; p.score = 0; p.g = -1; S.byId[p.id] = p; });
   $("folderName").textContent = (dir || label || "") + " — " + items.length + " photos";
@@ -189,7 +222,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -204,7 +237,7 @@ function saveSoon() {
   if (!N || !S.dir) return;
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
-    var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames};
+    var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
     S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
@@ -549,6 +582,8 @@ $("grid").addEventListener("dblclick", function (e) { var c = e.target.closest("
 $("rSize").addEventListener("input", function () { $("grid").style.setProperty("--sz", this.value + "px"); try { localStorage.setItem("rp_size", this.value); } catch (e) {} });
 try { var sz = localStorage.getItem("rp_size"); if (sz) { $("rSize").value = sz; $("grid").style.setProperty("--sz", sz + "px"); } var st = localStorage.getItem("rp_strict"); if (st) $("sStrict").value = st; } catch (e) {}
 $("sSort").addEventListener("change", function () { refresh(); });
+$("sCat").addEventListener("change", function () { rescore(); refresh(); saveSoon(); });
+$("tClient").addEventListener("change", function () { saveSoon(); });
 $("cGroup").addEventListener("change", function () { S.openGroup = -1; refresh(); });
 $("sStrict").addEventListener("change", function () { try { localStorage.setItem("rp_strict", this.value); } catch (e) {} rescore(); refresh(); toast("Exigence : " + this.options[this.selectedIndex].text + ". Relancez ✨ Tri automatique pour l'appliquer."); });
 
@@ -649,7 +684,7 @@ function showPanel() {
   var ex = expoScore(a); h += bar("Exposition", ex, colOf(ex), ex + (a.expo.hi > 2 ? " · blancs brûlés " + a.expo.hi + " %" : "") + (a.expo.lo > 5 ? " · noirs " + a.expo.lo + " %" : ""));
   $("pvBars").innerHTML = h;
   var w = p.why || reasons(p);
-  $("pvWhy").innerHTML = w.rej.map(function (t) { return '<div style="color:var(--rej)">✖ ' + esc(t) + "</div>"; }).join("") + w.warn.map(function (t) { return '<div style="color:var(--doubt)">⚠ ' + esc(t) + "</div>"; }).join("") + w.good.map(function (t) { return '<div style="color:var(--keep)">✔ ' + esc(t) + "</div>"; }).join("");
+  $("pvWhy").innerHTML = "<div style='color:var(--mut)'>📁 Catégorie : " + CATS[catOf(p)].nom + ($("sCat").value === "auto" ? " (devinée)" : "") + "</div>" + w.rej.map(function (t) { return '<div style="color:var(--rej)">✖ ' + esc(t) + "</div>"; }).join("") + w.warn.map(function (t) { return '<div style="color:var(--doubt)">⚠ ' + esc(t) + "</div>"; }).join("") + w.good.map(function (t) { return '<div style="color:var(--keep)">✔ ' + esc(t) + "</div>"; }).join("");
   var cv = $("pvHist"), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
   if (a.hist) { var mx = Math.max.apply(null, a.hist.slice(1, 63)) || 1; x.fillStyle = "#9aa3b2"; a.hist.forEach(function (v, i) { var hh = Math.min(1, v / mx) * (cv.height - 4); x.fillRect(i * cv.width / 64, cv.height - hh, cv.width / 64 + 0.5, hh); }); }
   $("pvExif").innerHTML = exifTxt(a) + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px" + (p.raw ? " (aperçu du RAW)" : "") : "");
@@ -883,13 +918,16 @@ function parseStyle(t) {
   return Object.keys(v).length ? {name: name ? name.replace(/_/g, " ") : "style", v: v} : null;
 }
 function renderUI() {
-  return "<label class='opt'><input type='checkbox' id='rOn'" + (REND.on ? " checked" : "") + "><div><b>🎨 Retoucher avec le rendu JM LAB PRO</b> (même moteur que l'appli) : les photos exportées sont développées en JPEG. Les originaux ne sont jamais modifiés.</div></label>" +
+  return "<label class='opt'><input type='checkbox' id='rOn'" + (REND.on ? " checked" : "") + "><div><b>🎨 Retoucher les photos exportées</b> (rendu JM LAB PRO, même moteur que l'appli) : elles sont développées en JPEG. Les originaux ne sont jamais modifiés.</div></label>" +
     "<div id='rBox' style='display:" + (REND.on ? "grid" : "none") + ";grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:4px 0 8px 26px'>" +
-    "<span>Profil</span><select id='rProf'>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'" + ((REND.profile || "LABO PRO EV5") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+    "<span>Correction auto</span><label class='ck' style='margin:0'><input type='checkbox' id='rCat'" + (REND.cat === false ? "" : " checked") + "> selon la catégorie de chaque photo (tons, peau protégée)</label>" +
+    "<span>Profil</span><select id='rProf'><option value='cat'" + ((REND.profile || "cat") === "cat" ? " selected" : "") + ">Selon la catégorie (conseillé)</option>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'" + (REND.profile === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
     "<span>ProLab automatique</span><label class='ck' style='margin:0'><input type='checkbox' id='rAuto'" + (REND.off ? "" : " checked") + "> exposition corrigée photo par photo</label>" +
     "<span>Intensité</span><div style='display:flex;gap:8px;align-items:center'><input type='range' id='rDose' min='0' max='100' value='" + (REND.dose == null ? 65 : REND.dose) + "'><b id='rDoseV' style='width:42px'>" + (REND.dose == null ? 65 : REND.dose) + " %</b></div>" +
     "<span>Protection hautes lumières</span><div style='display:flex;gap:8px;align-items:center'><input type='range' id='rHp' min='0' max='100' value='" + (REND.hp == null ? 30 : REND.hp) + "'><b id='rHpV' style='width:42px'>" + (REND.hp == null ? 30 : REND.hp) + " %</b></div>" +
     "<span>Code de style<br><small class='small'>(facultatif)</small></span><div><input type='text' id='rCode' style='width:100%' placeholder='Collez un code JMLAB_PRESET:… de l&#39;appli (Styles › Partager)' value='" + esc(REND.code || "") + "'><div id='rCodeI' class='small'></div></div>" +
+    "<span>Horizon</span><label class='ck' style='margin:0'><input type='checkbox' id='rTilt'" + (REND.tilt === false ? "" : " checked") + "> redresser l'horizon penché (recadrage automatique)</label>" +
+    "<span>Noms</span><label class='ck' style='margin:0'><input type='checkbox' id='rName'" + (REND.name ? " checked" : "") + "> catégorie_client_001.jpg</label>" +
     "<span></span><label class='ck' style='margin:0'><input type='checkbox' id='rOrig'" + (REND.orig ? " checked" : "") + "> joindre aussi l'original</label>" +
     "</div>";
 }
@@ -901,11 +939,23 @@ function renderWire() {
   ["rOn", "rDose", "rHp", "rCode"].forEach(function (id) { $(id).addEventListener("input", upd); $(id).addEventListener("change", upd); }); upd();
 }
 function renderRead() {
-  REND = {on: $("rOn").checked, profile: $("rProf").value, off: !$("rAuto").checked, dose: +$("rDose").value, hp: +$("rHp").value, code: $("rCode").value.trim(), orig: $("rOrig").checked};
+  REND = {on: $("rOn").checked, cat: $("rCat").checked, profile: $("rProf").value, off: !$("rAuto").checked, dose: +$("rDose").value, hp: +$("rHp").value, code: $("rCode").value.trim(), orig: $("rOrig").checked, tilt: $("rTilt").checked, name: $("rName").checked};
   try { localStorage.setItem("rp_render", JSON.stringify(REND)); } catch (e) {}
+  // memoire par client : ses reglages sont retrouves la prochaine fois
+  var cl = ($("tClient").value || "").trim(); if (cl) { CLI[cl] = REND; try { localStorage.setItem("rp_clients", JSON.stringify(CLI)); } catch (e) {} }
   if (!REND.on) return null;
   var st = parseStyle(REND.code) || {v: {}}, dose = st.v.Dosage != null ? st.v.Dosage : REND.dose;
   return {profile: REND.profile, off: REND.off, dose: dose, hp: REND.hp, v: st.v, q: 92};
+}
+var CLI = (function () { try { return JSON.parse(localStorage.getItem("rp_clients")) || {}; } catch (e) { return {}; } })();
+/* reglages propres a une photo : categorie (cibles, profil conseille, peau) et horizon */
+function styleFor(p, base) {
+  var o = JSON.parse(JSON.stringify(base)), cat = CATS[catOf(p)];
+  if (REND.cat) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
+  else o.skin = 0.85;
+  if (o.profile === "cat") o.profile = cat.prof;
+  if (REND.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
+  return o;
 }
 var devWait = {};
 function developOne(p, style) {
@@ -917,6 +967,8 @@ function developOne(p, style) {
 }
 
 function openExport() {
+  var cl = ($("tClient").value || "").trim(), mem = cl && CLI[cl];
+  if (mem) REND = JSON.parse(JSON.stringify(mem));
   var nP = S.photos.filter(function (p) { return p.status === "P"; }).length, nX = S.photos.filter(function (p) { return p.status === "X"; }).length, nS = S.photos.filter(function (p) { return p.stars > 0; }).length;
   if (!N) { dialog("<h3>📤 Exporter</h3><p>L'export (copie des photos, fichiers XMP) se fait dans la version PC de Regard Pur.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>"); return; }
   dialog("<h3>📤 Exporter</h3>" +
@@ -924,7 +976,7 @@ function openExport() {
     "<label class='opt'><input type='radio' name='eW' value='PT'><div><b>Les gardées et les « à voir »</b> (tout sauf les rejetées)</div></label>" +
     "<label class='opt'><input type='radio' name='eW' value='S'><div><b>Avec au moins <select id='eS'><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> étoile(s)</b> (" + nS + " avec étoiles)</div></label>" +
     "<div style='display:flex;gap:8px;align-items:center;margin:10px 0'><select id='eA'><option value='copy'>Copier</option><option value='move'>Déplacer</option></select> dans le sous-dossier <input type='text' id='eD' value='Retenues' style='flex:1'></div>" +
-    renderUI() +
+    (mem ? "<p class='small' style='color:var(--gold)'>Réglages retrouvés pour « " + esc(cl) + " ».</p>" : "") + renderUI() +
     "<label class='opt'><input type='checkbox' id='eRej'><div>Ranger aussi les <b>rejetées</b> (" + nX + ") dans le sous-dossier « Rejetées » (rien n'est effacé)</div></label>" +
     "<label class='opt'><input type='checkbox' id='eX' checked><div><b>Écrire les fichiers XMP</b> à côté de toutes les photos : étoiles, vert = gardée, rouge = rejetée. Lus par <b>Lightroom</b>, <b>Capture One</b>, <b>DxO</b>, <b>Bridge</b>.</div></label>" +
     "<div class='row'><button data-c='cancel'>Annuler</button><button class='pri' data-c='go'>Exporter</button></div>",
@@ -950,7 +1002,8 @@ async function doExport() {
     if (style) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
-      try { var jpg = await developOne(pick[i], style); await N.writeBin(join(dest, pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO.jpg"), jpg); } catch (e) { err++; }
+      var nm = REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
+      try { var jpg = await developOne(pick[i], styleFor(pick[i], style)); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
     }
     if (withOrig) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
     step();

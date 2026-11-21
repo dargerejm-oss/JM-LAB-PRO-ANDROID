@@ -318,7 +318,25 @@ async function develop(m) {
   var aw = Math.min(256, W), ah = Math.min(256, H), ac = canvas(aw, ah), ax = ac.getContext("2d", {willReadFrequently: true}); ax.drawImage(bmp, 0, 0, aw, ah);
   var d = ax.getImageData(0, 0, aw, ah).data, K = 0, he = 0;
   for (var i = 0; i < d.length; i += 64) { K += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; he++; }
-  var ze = he ? K / he : 128, dn = S.off ? 0 : Math.max(-5, Math.min(5, (128 - ze) / 38)), v = S.v || {};
+  var ze = he ? K / he : 128, dn = S.off || S.auto ? 0 : Math.max(-5, Math.min(5, (128 - ze) / 38)), v = S.v || {};
+  // correction selon la categorie (reprise de « Vrai Regard ») : les niveaux de la photo sont amenes vers des cibles
+  // (en L*, converties en niveaux d'ecran) ; elle remplace l'exposition automatique ProLab pour ne pas corriger deux fois
+  var LUT = null, AU = S.auto;
+  if (AU) {
+    var ys = []; for (i = 0; i < d.length; i += 16) ys.push(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+    ys.sort(function (a, b) { return a - b; });
+    var pc = function (q) { return ys[Math.min(ys.length - 1, Math.floor(ys.length * q))]; };
+    var toV = function (L) { var y = L > 8 ? Math.pow((L + 16) / 116, 3) : L / 903.3; return 255 * (y <= 0.0031308 ? 12.92 * y : 1.055 * Math.pow(y, 1 / 2.4) - 0.055); };
+    var xs = [0, pc(0.10), pc(0.25), pc(0.50), pc(0.75), pc(0.90), 255], tg = [0].concat(AU.cibles.map(toV)).concat([255]);
+    // a moitie chemin seulement : on rapproche, on n'ecrase pas le caractere de la photo
+    LUT = new Float32Array(256); var evf = Math.pow(2, AU.ev || 0);
+    for (var vv = 0; vv < 256; vv++) {
+      var j = 1; while (j < xs.length - 1 && vv > xs[j]) j++;
+      var x0 = xs[j - 1], x1 = Math.max(xs[j], x0 + 1), t = Math.max(0, Math.min(1, (vv - x0) / (x1 - x0))), y = tg[j - 1] + (tg[j] - tg[j - 1]) * t;
+      LUT[vv] = Math.min(255, (vv + (y - vv) * 0.55) * evf);
+    }
+  }
+  function isSkin(r, g, b) { var mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx < 40 || mx === mn || r !== mx) return 0; var h = (g - b) / (mx - mn) * 60; if (h < 0 || h > 50) return 0; var sa = (mx - mn) / mx; return sa > 0.1 && sa < 0.75 ? 1 : 0; }
   var g = function (k) { return +v[k] || 0; }, Z = (S.dose == null ? 65 : S.dose) / 100;
   var P = {off: !!S.off, hp: S.hp || 0, fe: Math.pow(2, (dn + g("Exposition") * 20 / 100 * 2.5) * Z * 0.85), le: 1 + g("Contraste") / 100 * Z * 0.9,
     Qe: g("Temperature") / 100 * 28 * Z, se: g("Teinte") / 100 * 22 * Z, c: g("Teinte"), I: g("Hautes SANS GRIS") / 100 * Z, O: g("Ombres") / 100 * Z, R: g("Vibrance") / 100 * Z,
@@ -327,9 +345,30 @@ async function develop(m) {
   // par bandes, pour ne pas reserver trop de memoire d'un coup sur les grandes photos
   var band = Math.max(1, Math.floor(4000000 / W));
   for (var y = 0; y < H; y += band) {
-    var bh = Math.min(band, H - y), id = x.getImageData(0, y, W, bh); P.px = id.data; P.y0 = y; JMRUN(P); x.putImageData(id, 0, y);
+    var bh = Math.min(band, H - y), id = x.getImageData(0, y, W, bh), px = id.data, pre = null;
+    if (LUT) for (i = 0; i < px.length; i += 4) {
+      var r = px[i], gg = px[i + 1], b = px[i + 2], Y = 0.299 * r + 0.587 * gg + 0.114 * b, k = LUT[Y | 0] / Math.max(1, Y);
+      r *= k; gg *= k; b *= k; var wb = (AU.wb || 0) * 0.6, ti = (AU.tint || 0) * 0.35;
+      px[i] = r + wb + ti * 0.8; px[i + 1] = gg - ti; px[i + 2] = b - wb + ti * 0.5;
+    }
+    if (S.skin) pre = new Uint8ClampedArray(px);
+    if (S.jm !== false) { P.px = px; P.y0 = y; JMRUN(P); }
+    // protection de la peau : le profil peut renforcer les couleurs, mais pas sur la peau (au-dela de +10 %)
+    if (pre) for (i = 0; i < px.length; i += 4) {
+      if (!isSkin(pre[i], pre[i + 1], pre[i + 2])) continue;
+      var r0 = pre[i], g0 = pre[i + 1], b0 = pre[i + 2], s0 = (Math.max(r0, g0, b0) - Math.min(r0, g0, b0)) / Math.max(1, Math.max(r0, g0, b0));
+      var r1 = px[i], g1 = px[i + 1], b1 = px[i + 2], m1 = Math.max(r1, g1, b1), s1 = (m1 - Math.min(r1, g1, b1)) / Math.max(1, m1), lim = s0 * (1 + 0.1 + (1 - S.skin) * 0.5);
+      if (s1 > lim && s1 > 0) { var l1 = 0.299 * r1 + 0.587 * g1 + 0.114 * b1, f = 1 - (1 - lim / s1) * S.skin; px[i] = l1 + (r1 - l1) * f; px[i + 1] = l1 + (g1 - l1) * f; px[i + 2] = l1 + (b1 - l1) * f; }
+    }
+    x.putImageData(id, 0, y);
   }
   bmp.close();
+  // horizon penche : on tourne et on recadre juste ce qu'il faut pour ne pas voir de coins vides
+  if (S.tilt) {
+    var th = S.tilt * Math.PI / 180, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W * cs + H * sn) / W, (W * sn + H * cs) / H);
+    var c2 = canvas(W, H), x2 = c2.getContext("2d"); x2.imageSmoothingQuality = "high";
+    x2.translate(W / 2, H / 2); x2.rotate(-th); x2.scale(kz, kz); x2.drawImage(c, -W / 2, -H / 2); c = c2;
+  }
   var out = new Uint8Array(await (await c.convertToBlob({type: "image/jpeg", quality: (S.q || 92) / 100})).arrayBuffer());
   var ex = m.heic ? null : exifOf(new Uint8Array(m.buf));
   if (ex) { var r = new Uint8Array(out.length + ex.length); r.set(out.subarray(0, 2), 0); r.set(ex, 2); r.set(out.subarray(2), 2 + ex.length); out = r; }
