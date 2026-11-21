@@ -39,9 +39,10 @@ dans `projets/RegardPur/LISEZMOI.md`. Le .exe est fabriqué par `.github/workflo
 `regardpur`, jamais « latest » pour ne pas casser le lien de JM LAB PRO). Tests : servir `renderer/` (python3 -m http.server)
 et Playwright, ou le vrai programme avec `xvfb-run` + `_electron` (dialogue de dossier remplacé dans le test).
 Le dépôt est public : l'utilisateur a refusé un dépôt privé séparé pour Regard Pur (ne pas le reproposer).
-Fait jusqu'à 2.11 (voir LISEZMOI) : tri, personnes, œil artistique (NIMA), composition, rendu JM LAB PRO à l'export,
+Fait jusqu'à 3.3 (voir LISEZMOI : nouvelle interface, flou revu, « Pas d'accord », qualité d'image, réglages complets) : tri, personnes, œil artistique (NIMA), composition, rendu JM LAB PRO à l'export,
 catégories (idées de « Vrai Regard » sans doublon), retouche rapide apprise, Retouche portrait.
-Suite décidée avec l'utilisateur, dans l'ordre : correcteur au pinceau (fait), puis RÉORGANISATION DE L'INTERFACE
+Reste (ordre) : outils adaptés au type de photo, outils créatifs JM LAB PRO (Détails, HDR, Théâtral…), puis la suite ci-dessous.
+Suite décidée avec l'utilisateur, dans l'ordre : correcteur au pinceau (fait), RÉORGANISATION DE L'INTERFACE (faite)
 (onglets TRIER · RETOUCHER · EXPORTER, vraies icônes SVG au lieu des émojis, mode Simple / Expert, grille allégée pour
 les gros dossiers + temps restant, export simplifié avec options avancées repliées, sections repliables, bulles d'aide « ? »),
 « garder les N meilleures », ciel + recadrage auto, style appris depuis Lightroom (XMP), vrais RAW, version anglaise,

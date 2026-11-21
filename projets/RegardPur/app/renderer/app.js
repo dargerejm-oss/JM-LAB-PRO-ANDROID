@@ -284,7 +284,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -300,7 +300,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -832,20 +832,97 @@ function adjShow(p) {
   var a = p.adj || {ev: 0, wb: 0};
   $("lpEv").value = Math.round(a.ev * 10); $("lpWb").value = a.wb;
   $("lpEvV").textContent = (a.ev > 0 ? "+" : "") + a.ev.toFixed(1).replace(".", ","); $("lpWbV").textContent = (a.wb > 0 ? "+" : "") + a.wb;
-  var img = $("lpImg"), w = $("lpWarm");
-  img.style.filter = a.ev ? "brightness(" + Math.pow(2, a.ev * 0.85).toFixed(3) + ")" : "";
-  w.style.background = a.wb > 0 ? "#ff9a3c" : "#3c8cff"; w.style.opacity = Math.min(0.6, Math.abs(a.wb) / 50);
-  w.style.left = full.tx + "px"; w.style.top = full.ty + "px"; w.style.width = img.naturalWidth * full.sc + "px"; w.style.height = img.naturalHeight * full.sc + "px";
+  devShow(p);
 }
 function adjSet() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
-  var old = p.adj ? {ev: p.adj.ev, wb: p.adj.wb} : null, ev = +$("lpEv").value / 10, wb = +$("lpWb").value;
+  var old = p.adj ? {ev: p.adj.ev, wb: p.adj.wb} : null, ev = Math.round(+$("lpEv").value) / 10, wb = +$("lpWb").value;
   p.adj = (ev || wb) ? {ev: ev, wb: wb} : null;
   clearTimeout(adjSet.t); adjShow(p);
   adjSet.t = setTimeout(function () { adjLearn(p, old && (old.ev || old.wb) ? old : null); saveSoon(); }, 600);
+  rpPreview();
 }
 $("lpEv").addEventListener("input", adjSet); $("lpWb").addEventListener("input", adjSet);
-$("lpAdj0").onclick = function () { $("lpEv").value = 0; $("lpWb").value = 0; adjSet(); };
+$("lpAdj0").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p) return; p.dev = null; $("lpEv").value = 0; $("lpWb").value = 0; adjSet(); devShow(p); saveSoon(); };
+
+/* ---------------- REGLAGES COMPLETS (meme moteur que JM LAB PRO) ---------------- */
+var DEV_DEF = function () { return {profile: "cat", pro: true, dose: 65, v: {}, curve: null}; };
+function devGet(p) { if (!p.dev) p.dev = DEV_DEF(); return p.dev; }
+function devShow(p) {
+  var sel = $("dvProf"); if (!sel.options.length) sel.innerHTML = "<option value='cat'>Selon le type de photo (conseillé)</option>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'>" + o[1] + "</option>"; }).join("");
+  var d = p.dev || DEV_DEF();
+  $("dvProf").value = d.profile || "cat"; $("dvDose").value = d.dose; $("dvDoseV").textContent = d.dose; $("dvPro").checked = d.pro !== false;
+  Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-dv]"), function (r) { var v = +(d.v[r.dataset.dv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
+  curveDraw(d.curve);
+}
+/* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
+function devStyle(p) {
+  if (!p.dev && !p.adj && !p.ret && !p.heals) return null;
+  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, q: 92, jm: !!(p.dev || p.adj)};
+  if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
+  var ad = p.adj || (d.ia ? adjBias(p) : null);
+  if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
+  if (p.ret) o.ret = rpEff(p.ret); if (p.heals) o.heals = p.heals;
+  return o;
+}
+function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
+$("rtTop").addEventListener("input", function (e) {
+  var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (t.dataset.dv) { devGet(p).v[t.dataset.dv] = +t.value; t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); }
+  else if (t.id === "dvDose") { devGet(p).dose = +t.value; $("dvDoseV").textContent = t.value; devChanged(p); }
+});
+$("rtTop").addEventListener("change", function (e) {
+  var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (t.id === "dvProf") { devGet(p).profile = t.value; devChanged(p); }
+  else if (t.id === "dvPro") { devGet(p).pro = t.checked; devChanged(p); }
+});
+/* ✨ Auto : ProLab automatique + correction selon le type de photo + peau protegee + vos habitudes apprises */
+$("dvAuto").onclick = function () {
+  var p = S.byId[S.view[S.cur]]; if (!p) return;
+  p.dev = {profile: "cat", pro: true, dose: 65, v: {}, curve: null, ia: true}; p.adj = null;
+  devShow(p); adjShow(p); devChanged(p);
+  var ab = adjBias(p); toast("Réglage automatique : " + CATS[catOf(p)].nom + (ab ? ", avec vos habitudes (" + ab.n + " photos)" : "") + ".");
+};
+var DEVCLIP = null;
+$("dvCopy").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p) return; DEVCLIP = {dev: p.dev ? JSON.parse(JSON.stringify(p.dev)) : null, adj: p.adj ? JSON.parse(JSON.stringify(p.adj)) : null}; toast("Réglages copiés."); };
+function devPasteTo(list) { if (!DEVCLIP) { toast("Copiez d'abord les réglages d'une photo."); return; } list.forEach(function (q) { q.dev = DEVCLIP.dev ? JSON.parse(JSON.stringify(DEVCLIP.dev)) : null; q.adj = DEVCLIP.adj ? JSON.parse(JSON.stringify(DEVCLIP.adj)) : null; updCard(q); }); saveSoon(); }
+$("dvPaste").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p) return; devPasteTo([p]); devShow(p); adjShow(p); rpPreview(); toast("Réglages collés."); };
+$("rtTop").addEventListener("click", function (e) {
+  var b = e.target.closest("button[data-sync]"); if (!b) return;
+  var p = S.byId[S.view[S.cur]]; if (!p) return; var a = b.dataset.sync, list = [];
+  if (a === "sel") list = Array.from(S.sel).map(function (id) { return S.byId[id]; });
+  if (a === "serie" && p.g >= 0) list = S.groups[p.g].map(function (id) { return S.byId[id]; });
+  if (a === "person") { var f = bigFaces(p.a)[0], o = f && PERS[f.pid]; if (o) list = S.photos.filter(function (q) { return o.ids[q.id]; }); }
+  if (a === "keep") list = S.photos.filter(function (q) { return q.status === "P"; });
+  list = list.filter(function (q) { return q !== p; });
+  if (!list.length) { toast(a === "sel" ? "Sélectionnez d'abord des photos dans la grille (Ctrl + clic)." : a === "serie" ? "Cette photo ne fait pas partie d'une série." : a === "person" ? "Aucune personne reconnue sur cette photo." : "Aucune photo gardée."); return; }
+  DEVCLIP = {dev: p.dev ? JSON.parse(JSON.stringify(p.dev)) : null, adj: p.adj ? JSON.parse(JSON.stringify(p.adj)) : null};
+  devPasteTo(list); toast("Réglages appliqués à " + list.length + " autre" + (list.length > 1 ? "s" : "") + " photo" + (list.length > 1 ? "s" : "") + ".");
+});
+/* courbe : points a tirer */
+var CRV = {pts: null, drag: -1};
+function crvLut(pts) { pts = pts.slice().sort(function (a, b) { return a[0] - b[0]; }); var L = []; for (var v = 0; v < 256; v++) { var k = 0; while (k < pts.length - 2 && v > pts[k + 1][0]) k++; var a = pts[k], b = pts[k + 1], t = Math.max(0, Math.min(1, (v - a[0]) / Math.max(1, b[0] - a[0]))), t2 = t * t * (3 - 2 * t); L.push(a[1] + (b[1] - a[1]) * (t * 0.5 + t2 * 0.5)); } return L; }
+function curveDraw(pts) {
+  var cv = $("dvCurve"); if (!cv) return; var x = cv.getContext("2d"), W = cv.width, H = cv.height;
+  CRV.pts = pts ? pts.map(function (q) { return q.slice(); }) : [[0, 0], [255, 255]];
+  x.fillStyle = "#000"; x.fillRect(0, 0, W, H); x.strokeStyle = "#222"; x.lineWidth = 1;
+  for (var i = 1; i < 4; i++) { x.beginPath(); x.moveTo(W * i / 4, 0); x.lineTo(W * i / 4, H); x.moveTo(0, H * i / 4); x.lineTo(W, H * i / 4); x.stroke(); }
+  var p = S.byId[S.view[S.cur]]; if (p && p.a && p.a.hist) { var mx = Math.max.apply(null, p.a.hist.slice(1, 63)) || 1; x.fillStyle = "#2a2f38"; p.a.hist.forEach(function (v, k) { var hh = Math.min(1, v / mx) * H; x.fillRect(k * W / 64, H - hh, W / 64 + 0.5, hh); }); }
+  var L = crvLut(CRV.pts); x.strokeStyle = "#d4af37"; x.lineWidth = 2; x.beginPath();
+  for (var v = 0; v < 256; v++) { var X = v / 255 * W, Y = H - L[v] / 255 * H; if (v) x.lineTo(X, Y); else x.moveTo(X, Y); } x.stroke();
+  x.fillStyle = "#fff"; CRV.pts.forEach(function (q) { x.beginPath(); x.arc(q[0] / 255 * W, H - q[1] / 255 * H, 4, 0, 7); x.fill(); });
+}
+(function () {
+  var cv = $("dvCurve");
+  function pos(e) { var r = cv.getBoundingClientRect(); return [Math.max(0, Math.min(255, (e.clientX - r.left) / r.width * 255)), Math.max(0, Math.min(255, (1 - (e.clientY - r.top) / r.height) * 255))]; }
+  function near(q) { var best = -1, bd = 14; CRV.pts.forEach(function (o, i) { var d = Math.hypot(o[0] - q[0], o[1] - q[1]); if (d < bd) { bd = d; best = i; } }); return best; }
+  function commit() { var p = S.byId[S.view[S.cur]]; if (!p) return; var pts = CRV.pts.slice().sort(function (a, b) { return a[0] - b[0]; }).map(function (q) { return [Math.round(q[0]), Math.round(q[1])]; }); devGet(p).curve = pts.length === 2 && pts[0][0] === 0 && pts[0][1] === 0 && pts[1][0] === 255 && pts[1][1] === 255 ? null : pts; devChanged(p); }
+  cv.addEventListener("mousedown", function (e) { var q = pos(e), i = near(q); if (i < 0) { CRV.pts.push(q); i = CRV.pts.length - 1; } CRV.drag = i; curveDraw(CRV.pts); });
+  window.addEventListener("mousemove", function (e) { if (CRV.drag < 0) return; var q = pos(e), pt = CRV.pts[CRV.drag], end = CRV.drag < 2 && (pt[0] === 0 || pt[0] === 255); CRV.pts[CRV.drag] = end ? [pt[0], q[1]] : q; curveDraw(CRV.pts); });
+  window.addEventListener("mouseup", function () { if (CRV.drag < 0) return; CRV.drag = -1; commit(); });
+  cv.addEventListener("dblclick", function (e) { var i = near(pos(e)); if (i > 1) { CRV.pts.splice(i, 1); curveDraw(CRV.pts); commit(); } });
+  $("dvCurve0").onclick = function () { CRV.pts = [[0, 0], [255, 255]]; curveDraw(CRV.pts); commit(); };
+})();
 
 /* ---------------- RETOUCHE PORTRAIT (dans la vue en grand) ---------------- */
 var RP_GROUPS = [
@@ -885,10 +962,11 @@ function rpDraw() {
 }
 function rpPreview() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
-  var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id;
+  var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
+  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm) dst = null; }
   clearTimeout(rp.t);
   rp.t = setTimeout(function () {
-    if (!eff && !heals.length) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
+    if (!eff && !heals.length && !dst) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
     var busy = $("rpBusy"); if (busy) busy.textContent = "⏳ Calcul de l'aperçu…";
     var my = ++rp.busy;
     readBytes(p).then(function (b) {
@@ -899,7 +977,7 @@ function rpPreview() {
         var hb = $("healMsg"); if (hb) hb.textContent = "";
         if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
       };
-      w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff, heals: heals}, [c.buffer]);
+      w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff, heals: heals, style: dst}, [c.buffer]);
     });
   }, 300);
 }
@@ -1203,6 +1281,8 @@ function renderRead() {
 var CLI = (function () { try { return JSON.parse(localStorage.getItem("rp_clients")) || {}; } catch (e) { return {}; } })();
 /* reglages propres a une photo : categorie (cibles, profil conseille, peau) et horizon */
 function styleFor(p, base) {
+  // la photo a ses propres reglages (etape Retoucher) : ils passent avant ceux de l'export
+  if (p.dev) { var ds = devStyle(p); if (REND.tilt && p.a && p.a.tilt) ds.tilt = p.a.tilt; if (!ds.skin) ds.skin = 0.85; return ds; }
   var o = JSON.parse(JSON.stringify(base)), cat = CATS[catOf(p)];
   if (REND.cat) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   else o.skin = 0.85;
@@ -1227,7 +1307,7 @@ function openExport() {
   var cl = ($("tClient").value || "").trim(), mem = cl && CLI[cl];
   if (mem) REND = JSON.parse(JSON.stringify(mem));
   var c = function (f) { return S.photos.filter(f).length; }, nP = c(function (p) { return p.status === "P"; }), nX = c(function (p) { return p.status === "X"; }), nS = c(function (p) { return p.stars > 0; }), nT = c(function (p) { return p.status !== "X"; });
-  var nR = c(function (p) { return p.ret || p.heals || p.adj; });
+  var nR = c(function (p) { return p.ret || p.heals || p.adj || p.dev; });
   var pg = $("exportPage");
   if (!N) { pg.innerHTML = "<div class='exp'><h2>Exporter</h2><p>L'export (copie des photos, fichiers pour DxO et Lightroom, retouche) se fait dans la version PC de Regard Pur.</p></div>"; return; }
   if (!S.photos.length) { pg.innerHTML = "<div class='exp'><h2>Exporter</h2><p>Ouvrez d'abord un dossier de photos (étape 1 : Trier).</p></div>"; return; }
@@ -1265,7 +1345,7 @@ async function doExport() {
   }
   var dest = join(S.dir, sub);
   for (i = 0; i < pick.length; i++) {
-    var st2 = style ? styleFor(pick[i], style) : (pick[i].ret || pick[i].heals ? {jm: false, ret: rpEff(pick[i].ret), heals: pick[i].heals, q: 92} : null);
+    var st2 = style ? styleFor(pick[i], style) : devStyle(pick[i]);
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;

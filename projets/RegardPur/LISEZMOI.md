@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.2 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.3 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -47,6 +47,9 @@ Version 3.2 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 
 ## Qualité d'image (3.2)
 - Bruit (méthode d'Immerkær, zone la plus calme, ramené à une vue écran 2400 px), qualité JPEG lue dans la table de quantification du fichier, pixelisation (escalier régulier tous les k pixels), photo agrandie (très floue à 100 % mais nette à 50 %), définition (Mpx + taille de tirage à 200 dpi), photos sans EXIF. Raisons, score, filtres « Qualité d'image » et « Sans EXIF ». Version d'analyse `AVER = 3`.
+
+## Réglages complets (3.3, étape Retoucher)
+- Profil (selon le type de photo ou au choix), ProLab auto, intensité, 13 curseurs (moteur JM LAB PRO), courbe à points (mode Expert), ✨ Auto (ProLab + catégorie + peau + habitudes apprises), copier / coller, appliquer à la sélection / série / personne / gardées. Aperçu = même calcul que l'export (`renderStyle`). Stocké par photo dans `p.dev`.
 
 ## Fabrication
 - Code : `app/` (Electron). La fenêtre est dans `app/renderer/` (HTML / JavaScript), la même base servira pour Android.

@@ -143,10 +143,23 @@
   <div id="lpFaces"></div>
   <aside id="rpSide">
     <div id="rtTop">
-      <h3><svg class="ic"><use href="#i-sliders"/></svg>Retouche rapide <i class="tip" data-tip="Regard Pur apprend ces corrections par catégorie et par client, et les applique aux autres photos à l'export.">?</i></h3>
-      <div class="rl"><span><svg class="ic"><use href="#i-sun"/></svg>Exposition</span><input type="range" id="lpEv" min="-10" max="10" value="0"><b id="lpEvV">0</b></div>
-      <div class="rl"><span><svg class="ic"><use href="#i-temp"/></svg>Chaleur</span><input type="range" id="lpWb" min="-30" max="30" value="0"><b id="lpWbV">0</b></div>
-      <div class="row2"><button id="lpAdj0"><svg class="ic"><use href="#i-undo"/></svg>Remettre à zéro</button><button id="lpHeal" data-tip="Peignez sur une tache ou un objet : la zone est reconstruite avec la matière voisine"><svg class="ic"><use href="#i-brush"/></svg>Correcteur</button></div>
+      <h3><svg class="ic"><use href="#i-sliders"/></svg>Réglages <i class="tip" data-tip="Même moteur que JM LAB PRO. Regard Pur apprend vos corrections d'exposition et de chaleur par catégorie et par client.">?</i></h3>
+      <div class="row3"><button id="dvAuto" class="pri" data-tip="Règle la photo tout seul : ProLab automatique, correction selon le type de photo, peau protégée et vos habitudes apprises"><svg class="ic"><use href="#i-magic"/></svg>Auto</button><button id="dvCopy" data-tip="Copier les réglages de cette photo"><svg class="ic"><use href="#i-grid"/></svg>Copier</button><button id="dvPaste" data-tip="Coller les réglages copiés sur cette photo"><svg class="ic"><use href="#i-check"/></svg>Coller</button></div>
+      <label class="sel full">Profil <select id="dvProf"></select></label>
+      <div class="rl"><span>Intensité</span><input type="range" id="dvDose" min="0" max="100" value="65"><b id="dvDoseV">65</b></div>
+      <label class="ck expert"><input type="checkbox" id="dvPro" checked> ProLab automatique (exposition corrigée)</label>
+      <h5>Lumière</h5>
+      <div class="rl"><span><svg class="ic"><use href="#i-sun"/></svg>Exposition</span><input type="range" id="lpEv" min="-20" max="20" value="0"><b id="lpEvV">0</b></div>
+      <div class="rl"><span>Contraste</span><input type="range" data-dv="Contraste" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Hautes lumières</span><input type="range" data-dv="Hautes SANS GRIS" min="-100" max="0" value="0"><b>0</b></div><div class="rl"><span>Ombres</span><input type="range" data-dv="Ombres" min="0" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Blancs</span><input type="range" data-dv="Blanc" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Noirs</span><input type="range" data-dv="Noir" min="-100" max="100" value="0"><b>0</b></div>
+      <h5>Couleur</h5>
+      <div class="rl"><span><svg class="ic"><use href="#i-temp"/></svg>Chaleur</span><input type="range" id="lpWb" min="-50" max="50" value="0"><b id="lpWbV">0</b></div>
+      <div class="rl expert"><span>Teinte</span><input type="range" data-dv="Teinte" min="-100" max="100" value="0"><b>0</b></div><div class="rl"><span>Vibrance</span><input type="range" data-dv="Vibrance" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Saturation</span><input type="range" data-dv="Saturation" min="-100" max="100" value="0"><b>0</b></div>
+      <h5>Détail et effets</h5>
+      <div class="rl"><span>Clarté</span><input type="range" data-dv="Clarte" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Voile (dehaze)</span><input type="range" data-dv="Dehaze" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Vignette</span><input type="range" data-dv="Vignette" min="-100" max="100" value="0"><b>0</b></div>
+      <div class="expert"><h5>Courbe <i class="tip" data-tip="Cliquez pour ajouter un point, glissez pour le déplacer, double-clic pour l'enlever.">?</i></h5><canvas id="dvCurve" width="290" height="170"></canvas><button id="dvCurve0" style="width:100%;margin-top:4px">Courbe droite</button></div>
+      <h5>Appliquer ces réglages à</h5>
+      <div class="apply"><button data-sync="sel">La sélection</button><button data-sync="serie">Cette série</button><button data-sync="person">Cette personne</button><button data-sync="keep">Toutes les gardées</button></div>
+      <div class="row2"><button id="lpAdj0"><svg class="ic"><use href="#i-undo"/></svg>Tout remettre à zéro</button><button id="lpHeal" data-tip="Peignez sur une tache ou un objet : la zone est reconstruite avec la matière voisine"><svg class="ic"><use href="#i-brush"/></svg>Correcteur</button></div>
     </div>
     <div id="rpPanel"></div>
   </aside>
