@@ -38,6 +38,10 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: npx electron-builder --win portable nsis --x64 --publish never
 
+      - name: Version ZIP (plus facile a telecharger avec Edge)
+        shell: pwsh
+        run: Compress-Archive -Path dist/RegardPur.exe -DestinationPath dist/RegardPur.zip -CompressionLevel Optimal
+
       - name: Lister les fichiers
         shell: bash
         run: ls -la dist
@@ -52,5 +56,6 @@ jobs:
           make_latest: 'false'
           body: "Regard Pur pour Windows. RegardPur.exe se lance sans installation ; RegardPur_Installation.exe l'installe avec un raccourci. Construit le ${{ github.event.head_commit.timestamp }}."
           files: |
+            projets/RegardPur/app/dist/RegardPur.zip
             projets/RegardPur/app/dist/RegardPur.exe
             projets/RegardPur/app/dist/RegardPur_Installation.exe
