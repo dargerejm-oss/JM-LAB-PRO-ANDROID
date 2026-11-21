@@ -1,6 +1,6 @@
 // Regard Pur - partie PC (fenetre, acces aux dossiers et aux fichiers)
 const {app, BrowserWindow, ipcMain, dialog, shell, Menu, protocol} = require('electron');
-const fs = require('fs'), fsp = fs.promises, path = require('path');
+const fs = require('fs'), fsp = fs.promises, path = require('path'), AI = require('./ai');
 
 const HEIC = new Set(['.heic', '.heif', '.hif']);
 const IMG = new Set(['.heic', '.heif', '.hif', '.jpg', '.jpeg', '.png', '.webp', '.bmp', '.gif', '.tif', '.tiff']);
@@ -22,6 +22,7 @@ function createWindow() {
   win.webContents.on('before-input-event', (e, i) => { if (i.type === 'keyDown' && i.key === 'F12') win.webContents.toggleDevTools(); });
 }
 app.whenReady().then(() => {
+  AI.init(app);
   const ROOT = path.join(__dirname, 'renderer');
   protocol.handle('app', async (req) => {
     const u = new URL(req.url), f = path.normalize(path.join(ROOT, decodeURIComponent(u.pathname)));
@@ -116,4 +117,10 @@ ipcMain.handle('copyAs', async (e, src, dst) => {
 ipcMain.handle('join', (e, ...a) => path.join(...a));
 ipcMain.handle('openPath', (e, p) => shell.openPath(p));
 ipcMain.handle('showItem', (e, p) => shell.showItemInFolder(p));
+ipcMain.handle('aiOk', () => AI.available());
+ipcMain.handle('aiRun', async (e, m, rgba, w, h, tw, th) => {
+  let last = 0;
+  const r = await AI.run(m, rgba, w, h, tw, th, (f, ep) => { const t = Date.now(); if (t - last > 300 || f >= 1) { last = t; e.sender.send('aiProg', f, ep); } });
+  return r;
+});
 ipcMain.handle('trash', async (e, p) => { await shell.trashItem(p); return true; });

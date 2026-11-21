@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.6 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.7 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -77,3 +77,13 @@ Version 3.6 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - **Déflouter** (repris de CORRECTION FLOU PRO) : mesure du flou, déconvolution de Wiener (mise au point ou bougé),
   débruitage doux, renforcement sans halo, et filet de sécurité qui annule une correction qui abîmerait la photo.
   Utilisé aussi par « Corriger les problèmes ». Disponible dans la liste « glisser gauche-droite ».
+
+### 3.7
+- **Amélioration IA** (Retoucher, sous Déflouter), calculée sur le PC sans connexion, carte graphique utilisée si possible :
+  - « Déflouter (IA) » : NAFNet (licence MIT) — très efficace sur le bougé, utile sur le flou de mise au point ;
+  - « Restaurer (IA) » : Real-ESRGAN (licence BSD-3) — photos pixelisées, très compressées ou abîmées, même taille ;
+  - « Agrandir ×2 (IA) » : Real-ESRGAN, détails reconstruits ; rendu Net ou Doux en mode Expert.
+  - Le résultat est enregistré à part (dossier caché .regardpur/ia), l'original n'est jamais modifié ; les réglages
+    s'appliquent par-dessus ; « Revenir à l'original » annule. À l'export sans autre réglage : fichier « _IA.jpg ».
+- Déflouter (classique) deux fois plus rapide ; le bougé est repéré par l'analyse (l'horizon ne le trompe plus).
+- Modèles préparés par `.github/workflows/rp-modeles.yml` (publication « regardpur-modeles »).

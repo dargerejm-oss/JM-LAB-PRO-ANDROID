@@ -290,3 +290,6 @@ body.tab-exporter #side,body.tab-exporter #panel{display:none}
 #rtTop .chan button{padding:3px 2px;font-size:11px}
 #rtTop .chan button.on{border-color:var(--gold);background:#2a2410}
 #rtTop .dbInfo{font-size:11px;color:var(--mut,#9a9a9a);margin:2px 0 6px;min-height:0}
+#rtTop .aiBtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:2px 0 4px}
+#rtTop .aiBtns button{padding:5px 2px;font-size:11px}
+#rtTop .aiBtns button:disabled{opacity:.45}

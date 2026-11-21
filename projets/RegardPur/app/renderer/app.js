@@ -38,7 +38,9 @@ function rawPreview(buf) {
   }
   return best && best.len > 20000 ? buf.subarray(best.start, best.start + best.len) : null;
 }
-async function readBytes(p) {
+function heicOf(p) { return !!p.heic && !p.ai; }
+async function readBytes(p, orig) {
+  if (N && p.ai && !orig) { var bi = await N.read(p.ai.file, false); if (bi) return bi; }
   if (N) return await N.read(p.path, p.raw);
   var b = new Uint8Array(await p.file.arrayBuffer());
   return p.raw ? rawPreview(b) : b;
@@ -284,7 +286,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -300,7 +302,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -351,7 +353,7 @@ function pump() {
     while (w.inflight < 2 && queue.length) {
       var p = queue.shift(); w.inflight++;
       (function (p, w) {
-        readBytes(p).then(function (buf) {
+        readBytes(p, true).then(function (buf) {
           if (rid !== runId) { w.inflight--; return; }
           if (!buf) { w.inflight--; done(p, {err: "Aperçu introuvable dans ce RAW"}); return; }
           var copy = buf.buffer.byteLength === buf.byteLength ? buf : buf.slice();
@@ -363,6 +365,7 @@ function pump() {
 }
 function onResult(w, e) {
   var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (r.joined !== undefined) { var cbj = prevWait[r.id]; delete prevWait[r.id]; if (cbj) cbj(r); return; }
   if (r.prev !== undefined) { var cbp = prevWait[r.id]; delete prevWait[r.id]; if (cbp) cbp(r); return; }
   if (r.dev !== undefined) { var cbd = devWait[r.id]; delete devWait[r.id]; if (cbd) cbd(r); return; }
   if (r.full !== undefined) { var cb = fullWait[r.id]; delete fullWait[r.id]; if (cb) cb(r.full); return; }
@@ -856,6 +859,7 @@ function devShow(p) {
   curveDraw(CRV.ch === "m" ? d.curve : (d.curves || {})[CRV.ch]);
   var db = d.deblur || {}; $("dbAmt").value = db.amt || 0; $("dbAmt").nextElementSibling.textContent = db.amt || 0; $("dbKind").value = db.kind || "auto"; if (!(db.amt > 0)) $("dbInfo").textContent = "";
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-lv]"), function (r) { var v = +((d.levels || {})[r.dataset.lv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 && r.dataset.lv === "g" ? "+" + v : v; });
+  aiShow(p);
   $("dvFixed").textContent = d.fix && d.fix.length ? "🩺 Corrigé : " + d.fix.join(", ") : "";
   var lk = d.looks || {};
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop [data-lk]"), function (r) { var k = r.dataset.lk.split("."), v = +((lk[k[0]] || {})[k[1]] || 0); r.value = v; if (r.tagName === "INPUT") r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
@@ -1077,11 +1081,75 @@ function rpPreview() {
         var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
         if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
       };
-      w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff, heals: heals, style: dst}, [c.buffer]);
+      w.postMessage({id: key, buf: c, heic: heicOf(p), preview: true, max: 2400, ret: eff, heals: heals, style: dst}, [c.buffer]);
     });
   }, 300);
 }
 var prevWait = {};
+/* ---------------- AMELIORATION IA (NAFNet, Real-ESRGAN) : calcul sur le PC, resultat enregistre a part ---------------- */
+var AI = {ok: false, busy: false};
+var AIK = {naf: "Déflouée par IA", esr: "Restaurée par IA", x2: "Agrandie ×2 par IA"};
+function aiShow(p) {
+  if (!AI.ok) return; $("aiBox").style.display = "";
+  ["aiNaf", "aiEsr", "aiX2"].forEach(function (k) { $(k).disabled = AI.busy; });
+  if (!AI.busy) $("aiState").textContent = p && p.ai ? "✓ " + AIK[p.ai.kind] + " (vos réglages s'appliquent par-dessus)." : "";
+  $("aiOff").style.display = p && p.ai && !AI.busy ? "" : "none";
+}
+function aiJoin(jpg, orig) { // remet les informations de prise de vue (EXIF) de l'original
+  ensurePool(); var w = pool[0], key = "ej:" + Date.now() + Math.random();
+  return new Promise(function (res) { prevWait[key] = function (r) { res(r.joined || jpg); }; w.postMessage({id: key, exifjoin: true, jpg: jpg.buffer, orig: orig ? orig.buffer : null}); });
+}
+async function aiOne(p, kind, nb, of) {
+  var orig = await readBytes(p, true); if (!orig) throw new Error("photo illisible");
+  var blob;
+  if (p.heic) { blob = await new Promise(function (res) { ensurePool(); var w = pool[pool.length - 1], key = "full:ai:" + Date.now(), c = orig.slice(); fullWait[key] = function (bl) { res(bl); }; w.postMessage({id: key, buf: c.buffer, full: true}, [c.buffer]); }); if (!blob) throw new Error("HEIC illisible"); }
+  else blob = new Blob([orig]);
+  var bm = await createImageBitmap(blob, {imageOrientation: "from-image"}), W = bm.width, H = bm.height, MP = W * H;
+  var model = kind === "naf" ? "naf" : $("aiSoft").value, d, tw, th;
+  if (kind === "naf") { d = Math.min(1, Math.sqrt(8e6 / MP)); }
+  else if (kind === "esr") { d = Math.max(0.25, Math.min(1, Math.sqrt(3e6 / MP))); }
+  else { var t = Math.min(2, Math.sqrt(60e6 / MP)); d = Math.max(t / 4, Math.min(1, Math.sqrt(3e6 / MP))); }
+  var iw = Math.max(16, Math.round(W * d)), ih = Math.max(16, Math.round(H * d));
+  if (kind === "naf") { tw = iw; th = ih; } else if (kind === "esr") { tw = W; th = H; } else { tw = Math.round(W * Math.min(2, Math.sqrt(60e6 / MP))); th = Math.round(H * tw / W); }
+  var ci = new OffscreenCanvas(iw, ih), xi = ci.getContext("2d"); xi.imageSmoothingQuality = "high"; xi.drawImage(bm, 0, 0, iw, ih);
+  var src = xi.getImageData(0, 0, iw, ih), t0 = Date.now();
+  N.onAiProg(function (f, ep) {
+    var el = (Date.now() - t0) / 1000, rest = f > 0.02 ? Math.round(el / f - el) : null;
+    $("aiState").textContent = "⏳ " + AIK[kind].replace(" par IA", "") + " " + (of > 1 ? "(photo " + nb + " / " + of + ") " : "") + Math.round(f * 100) + " %" + (rest != null ? " — encore ~" + (rest > 90 ? Math.round(rest / 60) + " min" : rest + " s") : "") + " · " + ep;
+  });
+  var out = await N.aiRun(model, new Uint8Array(src.data.buffer), iw, ih, tw, th);
+  var co = new OffscreenCanvas(kind === "naf" ? W : tw, kind === "naf" ? H : th), xo = co.getContext("2d");
+  if (kind === "naf" && (tw !== W || th !== H)) {
+    // grande photo : l'IA travaille sur une version reduite, puis on ajoute seulement la difference a l'image pleine taille
+    xo.drawImage(bm, 0, 0); var fimg = xo.getImageData(0, 0, W, H), fd = fimg.data;
+    var cd = new OffscreenCanvas(tw, th), xd = cd.getContext("2d"), dd = new ImageData(tw, th);
+    for (var i = 0; i < dd.data.length; i += 4) { dd.data[i] = Math.max(0, Math.min(255, 128 + (out[i] - src.data[i]))); dd.data[i + 1] = Math.max(0, Math.min(255, 128 + (out[i + 1] - src.data[i + 1]))); dd.data[i + 2] = Math.max(0, Math.min(255, 128 + (out[i + 2] - src.data[i + 2]))); dd.data[i + 3] = 255; }
+    xd.putImageData(dd, 0, 0); var cu = new OffscreenCanvas(W, H), xu = cu.getContext("2d"); xu.imageSmoothingQuality = "high"; xu.drawImage(cd, 0, 0, W, H);
+    var up = xu.getImageData(0, 0, W, H).data;
+    for (i = 0; i < fd.length; i += 4) { fd[i] += up[i] - 128; fd[i + 1] += up[i + 1] - 128; fd[i + 2] += up[i + 2] - 128; }
+    xo.putImageData(fimg, 0, 0);
+  } else xo.putImageData(new ImageData(new Uint8ClampedArray(out.buffer, out.byteOffset, out.length), tw, th), 0, 0);
+  bm.close();
+  var jpg = new Uint8Array(await (await co.convertToBlob({type: "image/jpeg", quality: 0.95})).arrayBuffer());
+  jpg = await aiJoin(jpg, p.heic || p.raw ? null : orig);
+  var file = sessPath("ia" + N.sep + String(p.rel || p.name).replace(/[\\\/:*?"<>|]+/g, "_").replace(/\.[^.]+$/, "") + "_" + kind + ".jpg");
+  await N.writeBin(file, jpg);
+  p.ai = {kind: kind, file: file, w: co.width, h: co.height}; full.cache.delete(p.id);
+}
+async function aiRun(kind) {
+  if (AI.busy || !N) return; var list = fixTargets(); if (!list.length) return;
+  AI.busy = true; aiShow(); var ok = 0, t0 = Date.now(), errs = [];
+  for (var i = 0; i < list.length; i++) { try { await aiOne(list[i], kind, i + 1, list.length); ok++; updCard(list[i]); } catch (e) { errs.push(e.message || String(e)); } }
+  AI.busy = false; saveSoon();
+  var p = S.byId[S.view[S.cur]]; aiShow(p); if (p) rpPreview();
+  toast(ok ? ok + " photo" + (ok > 1 ? "s" : "") + " " + AIK[kind].replace(/^./, function (c) { return c.toLowerCase(); }).replace("ée ", ok > 1 ? "ées " : "ée ") + " en " + Math.round((Date.now() - t0) / 1000) + " s." + (errs.length ? " Échec : " + errs[0] : "") : "Échec de l'IA : " + (errs[0] || ""), 5000);
+}
+$("aiNaf").onclick = function () { aiRun("naf"); };
+$("aiEsr").onclick = function () { aiRun("esr"); };
+$("aiX2").onclick = function () { aiRun("x2"); };
+$("aiOff").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p || !p.ai) return; p.ai = null; full.cache.delete(p.id); saveSoon(); aiShow(p); rpPreview(); updCard(p); };
+if (N && N.aiOk) N.aiOk().then(function (v) { AI.ok = !!v; aiShow(S.byId[S.view[S.cur]]); });
+
 function dbText(i) {
   var t = {LEGER: "flou léger : renforcement", MOYEN: "flou de mise au point moyen", FORT: "flou de mise au point fort", BOUGE: "bougé (direction " + i.ang + "°)", IRRECUPERABLE: "flou très fort : amélioration limitée"}[i.cat] || i.cat;
   return "Détecté : " + t + (i.safe ? " — correction prudente (la déconvolution aurait abîmé la photo)" : "") + ".";
@@ -1167,7 +1235,7 @@ function fullUrl(p) {
   if (full.cache.has(p.id)) return full.cache.get(p.id);
   var pr = readBytes(p).then(function (b) {
     if (!b) return p.thumbUrl;
-    if (!p.heic) return URL.createObjectURL(new Blob([b], {type: "image/jpeg"}));
+    if (!heicOf(p)) return URL.createObjectURL(new Blob([b], {type: "image/jpeg"}));
     // HEIC : le navigateur ne sait pas l'afficher, un assistant la convertit
     ensurePool(); var w = pool[pool.length - 1], key = "full:" + p.id + ":" + Date.now();
     return new Promise(function (res) { fullWait[key] = function (bl) { res(bl ? URL.createObjectURL(bl) : p.thumbUrl); }; var c = b.buffer.byteLength === b.byteLength ? b : b.slice(); w.postMessage({id: key, buf: c, full: true}, [c.buffer]); });
@@ -1403,7 +1471,7 @@ function developOne(p, style) {
   return readBytes(p).then(function (b) {
     if (!b) throw new Error("aperçu introuvable");
     ensurePool(); var w = pool[0], key = "dev:" + p.id + ":" + Date.now(), c = b.buffer.byteLength === b.byteLength ? b : b.slice();
-    return new Promise(function (res, rej) { devWait[key] = function (r) { if (r.dev) res(r.dev); else rej(new Error(r.err || "échec")); }; w.postMessage({id: key, buf: c, heic: !!p.heic, develop: true, style: style}, [c.buffer]); });
+    return new Promise(function (res, rej) { devWait[key] = function (r) { if (r.dev) res(r.dev); else rej(new Error(r.err || "échec")); }; w.postMessage({id: key, buf: c, heic: heicOf(p), develop: true, style: style}, [c.buffer]); });
   });
 }
 
@@ -1455,6 +1523,8 @@ async function doExport() {
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
       var nm = REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
       try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
+    } else if (pick[i].ai) { // seulement l'amelioration IA : on livre la version amelioree a cote de l'original
+      try { await N.copyAs(pick[i].ai.file, join(dest, pick[i].name.replace(/\.[^.]+$/, "") + "_IA.jpg")); } catch (e) { err++; }
     }
     if (withOrig || !st2) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
     step();

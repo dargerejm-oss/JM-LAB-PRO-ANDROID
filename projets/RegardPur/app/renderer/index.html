@@ -162,6 +162,13 @@
       <div class="rl"><span>Force</span><input type="range" id="dbAmt" min="0" max="100" value="0"><b>0</b></div>
       <div class="rl expert"><span>Type de flou</span><select id="dbKind" style="grid-column:span 2"><option value="auto">Automatique</option><option value="optique">Mise au point</option><option value="bouge">Bougé</option></select></div>
       <div id="dbInfo" class="dbInfo"></div>
+      <div id="aiBox" style="display:none">
+        <h5>Amélioration IA <i class="tip" data-tip="Intelligence artificielle installée sur votre PC (aucune connexion) : NAFNet pour le flou et le bougé, Real-ESRGAN pour les photos pixelisées, compressées ou trop petites. Le résultat est enregistré à part : l'original n'est jamais modifié. Vos réglages s'appliquent ensuite par-dessus.">?</i></h5>
+        <div class="aiBtns"><button id="aiNaf" data-tip="Corrige le bougé et le flou de mise au point">Déflouter (IA)</button><button id="aiEsr" data-tip="Photo pixelisée, très compressée ou abîmée : même taille, détails reconstruits">Restaurer (IA)</button><button id="aiX2" data-tip="Double la taille de la photo en reconstruisant les détails">Agrandir ×2 (IA)</button></div>
+        <div class="rl expert"><span>Rendu</span><select id="aiSoft" style="grid-column:span 2"><option value="esr">Net</option><option value="esrd">Doux (moins de bruit)</option></select></div>
+        <div id="aiState" class="dbInfo"></div>
+        <button id="aiOff" style="display:none;width:100%">Revenir à l'original (sans IA)</button>
+      </div>
       <h5>Détail et effets</h5>
       <div class="rl"><span>Clarté</span><input type="range" data-dv="Clarte" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Voile (dehaze)</span><input type="range" data-dv="Dehaze" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Vignette</span><input type="range" data-dv="Vignette" min="-100" max="100" value="0"><b>0</b></div>
       <details class="tools" open><summary>Outils de JM LAB PRO</summary>

@@ -28,7 +28,18 @@ jobs:
           node-version: '22'
 
       - name: Installer les briques
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
         run: npm ci --no-audit --no-fund
+
+      - name: Embarquer les modeles d'IA locale (NAFNet, Real-ESRGAN)
+        shell: bash
+        run: |
+          mkdir -p modeles
+          for f in deblurring_nafnet.onnx realesr-general-x4v3.onnx realesr-general-wdn-x4v3.onnx; do
+            curl -fsSL -o modeles/$f https://github.com/${{ github.repository }}/releases/download/regardpur-modeles/$f
+          done
+          ls -la modeles
 
       - name: Embarquer le module visages (hors ligne)
         run: node tools/vendor.js

@@ -546,6 +546,11 @@ self.onmessage = function (e) {
     }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n, db: DBI}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
     return;
   }
+  if (m.exifjoin) { // JPEG produit par l'IA : on y remet les informations de prise de vue de l'original
+    var ej = new Uint8Array(m.jpg), ex2 = m.orig ? exifOf(new Uint8Array(m.orig)) : null;
+    if (ex2) { var rj = new Uint8Array(ej.length + ex2.length); rj.set(ej.subarray(0, 2), 0); rj.set(ex2, 2); rj.set(ej.subarray(2), 2 + ex2.length); ej = rj; }
+    self.postMessage({id: m.id, joined: ej}, [ej.buffer]); return;
+  }
   if (m.full) { // image en grand pour une photo HEIC
     queue = queue.then(function () { return heicCanvas(m.buf).then(function (c) { return c.convertToBlob({type: "image/jpeg", quality: 0.92}); }); })
       .then(function (b) { self.postMessage({id: m.id, full: b}); }, function (err) { self.postMessage({id: m.id, full: null, err: String(err && err.message || err)}); });
