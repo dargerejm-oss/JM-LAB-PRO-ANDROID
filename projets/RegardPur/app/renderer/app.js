@@ -2145,11 +2145,11 @@ $("dlg").addEventListener("click", function (e) {
 });
 function help() {
   dialog("<h3>⌨️ Raccourcis clavier</h3><table>" +
-    [["P", "Garder"], ["X", "Rejeter"], ["U", "Annuler le choix (à voir)"], ["1 … 5", "Étoiles (même chiffre = enlever)"], ["← →", "Photo précédente / suivante"], ["↑ ↓", "Ligne du dessus / dessous (grille)"],
+    [["P", "Garder"], ["X", "Rejeter"], ["[  ]", "Tourner à gauche / à droite"], ["Suppr", "Mettre à la corbeille"], ["S", "Copie rapide (Maj+S : changer de dossier)"], ["B", "Avant / Après (Retoucher)"], ["U", "Annuler le choix (à voir)"], ["1 … 5", "Étoiles (même chiffre = enlever)"], ["← →", "Photo précédente / suivante"], ["↑ ↓", "Ligne du dessus / dessous (grille)"],
      ["Entrée", "Vue en grand"], ["Échap", "Revenir à la grille"], ["Z", "Zoom 100 % sur les yeux ou la zone nette"], ["F", "Montrer / cacher visages et zone nette"],
      ["C", "Comparer (sélection ou série)"], ["Espace", "Ouvrir / fermer la série"], ["G", "Regrouper les séries oui / non"], ["Ctrl + clic", "Sélectionner plusieurs photos"], ["Maj + clic", "Sélectionner une suite"],
      ["Ctrl + A", "Tout sélectionner"], ["Ctrl + Z", "Annuler la dernière action"]].map(function (r) { return "<tr><td>" + r[0] + "</td><td>" + r[1] + "</td></tr>"; }).join("") +
-    "</table><p class='small'>Score : netteté mesurée à 100 % (sur les yeux s'il y a un visage), flou de bougé, yeux fermés, exposition. Il apprend de vos choix P / X.</p><div class='row'><button data-c='guide'>Revoir le guide</button><button class='pri' data-c='ok'>OK</button></div>", function (c) { if (c === "guide") guide(0); });
+    "</table><p class='small'>Score : netteté mesurée à 100 % (sur les yeux s'il y a un visage), flou de bougé, yeux fermés, exposition. Il apprend de vos choix P / X.</p><div class='row'><button data-c='lang' class='notr'>" + (window.__rpLang === "en" ? "🇫🇷 Français" : "🇬🇧 English") + "</button><button data-c='guide'>Revoir le guide</button><button class='pri' data-c='ok'>OK</button></div>", function (c) { if (c === "guide") guide(0); if (c === "lang" && window.__rpSetLang) window.__rpSetLang(window.__rpLang === "en" ? "fr" : "en"); });
 }
 
 /* ---------------- clavier ---------------- */
