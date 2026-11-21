@@ -118,6 +118,12 @@ ipcMain.handle('join', (e, ...a) => path.join(...a));
 ipcMain.handle('openPath', (e, p) => shell.openPath(p));
 ipcMain.handle('showItem', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('aiOk', () => AI.available());
+// mode d'emploi PDF : copie hors de l'archive du programme, puis ouverture avec le lecteur PDF de Windows
+ipcMain.handle('openManual', async (e, lang) => {
+  const f = lang === 'en' ? 'RegardPur_user_guide.pdf' : 'RegardPur_mode_emploi.pdf', dst = path.join(app.getPath('temp'), f);
+  await fsp.writeFile(dst, await fsp.readFile(path.join(__dirname, 'renderer', 'manuel', f)));
+  return shell.openPath(dst);
+});
 // style appris : reglages Lightroom (.xmp a cote des photos, ou XMP dans les JPEG exportes) et DxO (.dop)
 ipcMain.handle('styleFiles', async (e, dir) => {
   const out = [];

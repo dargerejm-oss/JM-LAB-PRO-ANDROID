@@ -53,6 +53,9 @@ Ne plus fabriquer/publier de version de test à chaque étape : envoyer le trava
 (sauf les modèles : `.github/rp_modeles` / rp-modeles.yml). Fabriquer une version seulement quand tout est fini ou quand il la demande.
 3.8 PUBLIÉE (IA NAFNet/Real-ESRGAN/SCUNet/GFPGAN dans ai_child.js, doublons, cadre, signature, corrections auto). Depuis : voir LISEZMOI « Après 3.8 » (outils Python 1 à 4 faits : lunettes, séances, rotation/corbeille/copie rapide, lieux GPS/SD/tirage).
 
+### Regard Pur — ÉTAT : tout est fait (3.9 + DxO réel + mode d'emploi PDF FR/EN dans l'aide). Fabriquer la version finale
+quand l'utilisateur dit « 95 % » (commit SANS [skip ci], version dans package.json). Mode d'emploi : projets/RegardPur/manuel.
+
 ### Regard Pur — à faire ensuite (validé par l'utilisateur)
 1. Déflouter plus rapide (FFT optimisée, bougé via a.motion au lieu du tenseur : l'horizon trompe la détection).
 2. IA locale façon Topaz (accord donné) : Real-ESRGAN (dépixeliser/agrandir) + NAFNet (déflouter), puis SCUNet (bruit), GFPGAN (visages, en option avec avant/après).

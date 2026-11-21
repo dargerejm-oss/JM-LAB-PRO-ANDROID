@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Regard Pur – User guide</title>
+<style>
+@page { size: 148mm 210mm; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { font-family: "Inter", "DejaVu Sans", system-ui, sans-serif; color: #1d1d1f; font-size: 10.2pt; line-height: 1.42; }
+.page { width: 148mm; height: 210mm; padding: 11mm 11mm 12mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; background: #fff; }
+.page:last-child { page-break-after: auto; }
+.foot { position: absolute; left: 11mm; right: 11mm; bottom: 6mm; font-size: 7.5pt; color: #8a8a8a; display: flex; justify-content: space-between; border-top: 0.3mm solid #e3e3e3; padding-top: 1.6mm; }
+h1 { font-size: 19pt; margin: 0 0 1mm; letter-spacing: .01em; }
+h2 { font-size: 15pt; margin: 0 0 3mm; display: flex; align-items: center; gap: 2.5mm; }
+h2 .n { display: inline-flex; width: 8mm; height: 8mm; border-radius: 50%; background: #C9A24A; color: #fff; font-size: 11pt; align-items: center; justify-content: center; flex: none; }
+h3 { font-size: 11pt; margin: 3.5mm 0 1.2mm; color: #7a5a14; }
+p { margin: 0 0 2mm; }
+ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+li { margin: 0 0 1.1mm; }
+b { color: #000; }
+.row { display: flex; gap: 6mm; align-items: flex-start; }
+.row .txt { flex: 1; min-width: 0; }
+.wide { width: 100%; border-radius: 2mm; border: 0.4mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; margin: 2mm 0 3mm; }
+.shot { flex: none; width: 50mm; border-radius: 4mm; border: 0.6mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; }
+.shot.sm { width: 44mm; }
+.shot.xs { width: 33mm; }
+.tip { background: #FFF7E0; border-left: 1.2mm solid #C9A24A; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
+.warn { background: #FDECEA; border-left: 1.2mm solid #D84315; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
+.k { display: inline-block; background: #1d1d1f; color: #fff; border-radius: 1.4mm; padding: 0 1.6mm; font-weight: 800; font-size: 8.6pt; white-space: nowrap; }
+.k.y { background: #FFB300; color: #000; } .k.b { background: #1E88E5; } .k.g { background: #43A047; }
+table { width: 100%; border-collapse: collapse; font-size: 9.2pt; margin-top: 2mm; }
+th, td { text-align: left; padding: 1.8mm 2mm; border-bottom: 0.3mm solid #e3e3e3; vertical-align: top; }
+th { background: #f4f1ea; font-size: 8.8pt; }
+.cover { background: #141416; color: #fff; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.cover img.logo { width: 46mm; border-radius: 10mm; box-shadow: 0 2mm 8mm rgba(0,0,0,.6); }
+.cover h1 { font-size: 28pt; color: #D2AD59; margin: 9mm 0 1mm; letter-spacing: .06em; }
+.cover .sub { font-size: 14pt; color: #eee; margin-bottom: 14mm; }
+.cover .who { font-size: 10pt; color: #aaa; }
+.cover .ver { position: absolute; bottom: 10mm; font-size: 9pt; color: #777; }
+.toc { list-style: none; padding: 0; margin: 4mm 0 0; }
+.toc li { display: flex; gap: 3mm; padding: 0.9mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 9.6pt; }
+.toc li span:first-child { width: 7mm; color: #C9A24A; font-weight: 800; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 5mm; }
+</style>
+</head>
+<body>
+<section class="page cover">
+  <img class="logo" src="logo.png" alt="">
+  <h1>REGARD PUR</h1>
+  <div class="sub">User guide</div>
+  <div class="who">Sort · Edit · Export your photos<br>on your PC, without internet<br>by JM.Dargère</div>
+  <div class="ver">Version 3.9 • November 2026</div>
+</section>
+<section class="page">
+  <h1>Contents</h1>
+  <ul class="toc">
+    <li><span>1</span><span>Install and open Regard Pur</span></li>
+    <li><span>2</span><span>Open a folder or an SD card</span></li>
+    <li><span>3</span><span>The grid, the score and the reasons</span></li>
+    <li><span>4</span><span>Filters, sessions, people, duplicates, signature</span></li>
+    <li><span>5</span><span>Auto sort and « Keep the N best »</span></li>
+    <li><span>6</span><span>Compare and full view</span></li>
+    <li><span>7</span><span>Edit: fix, settings, type of photo, my style</span></li>
+    <li><span>8</span><span>Light, colour, levels, curves, sky, crop</span></li>
+    <li><span>9</span><span>AI enhancement (deblur, restore, enlarge, denoise, faces)</span></li>
+    <li><span>10</span><span>Portrait, healing, RAW, rotation, recycle bin, prints</span></li>
+    <li><span>11</span><span>Export</span></li>
+    <li><span>12</span><span>Keyboard shortcuts</span></li>
+    <li><span>13</span><span>FAQ, language, privacy</span></li>
+  </ul>
+  <h3>In three steps</h3>
+  <ol>
+    <li><b>① Sort</b>: open a folder; Regard Pur analyses each photo and suggests keeping the best ones.</li>
+    <li><b>② Edit</b>: fix defects in one click, or fine-tune (like JM LAB PRO).</li>
+    <li><b>③ Export</b>: copy the kept photos, edited if you wish.</li>
+  </ol>
+  <div class="tip">Your <b>originals are never modified</b>. Everything happens on your PC, without internet (except the « GPS places » option, which you start yourself).</div>
+<div class="foot"><span>Regard Pur – User guide</span><span>2</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">1</span>Install and open</h2>
+  <h3>Two ways</h3>
+  <ul><li><b>RegardPur.zip</b>: unzip, then double-click <b>RegardPur.exe</b> (nothing to install).</li><li><b>RegardPur_Installation.exe</b>: installs the software with a desktop shortcut.</li></ul>
+  <h3>If Windows blocks the file</h3><p>Regard Pur is not sold by Microsoft: Windows may show a warning.</p>
+  <ul><li>In <b>Edge</b>: arrow <b>˅</b> next to « Delete » → <b>Keep anyway</b>.</li><li>Blue window « Windows protected your PC »: <b>More info</b> → <b>Run anyway</b>.</li><li>Or: right-click the file → <b>Properties</b> → tick <b>Unblock</b>.</li></ul>
+  <h3>First launch</h3><p>A short 5-screen guide presents the three steps. See it again anytime with the <span class="k">?</span> button at the top right, then <b>See the guide again</b>.</p>
+  <h3>Simple or Expert mode</h3><p>Top right: <b>Simple</b> shows the essentials, <b>Expert</b> all the fine settings. The <span class="k">?</span> bubbles explain each setting on hover.</p>
+  <div class="tip">The artificial intelligence (deblur, denoise, faces…) is included in the program: that is why it is rather large (about 600 MB). It uses the PC's graphics card when possible.</div>
+<div class="foot"><span>Regard Pur – User guide</span><span>3</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">2</span>Open a folder or an SD card</h2>
+  <img class="wide" src="c01.jpg" alt="">
+  <ul><li><b>Open a folder</b>: choose the session folder (subfolders are included).</li>
+  <li><b>Import an SD card</b>: the card is found automatically. Regard Pur copies the photos to the PC (subfolder by date or session name, optional renaming, backup copy to another disk, without copying again those already imported), then starts sorting. Nothing is erased from the card.</li>
+  <li>Formats: JPEG, HEIC (iPhone), PNG, TIFF and RAW (CR2, CR3, NEF, ARW, RAF, ORF, RW2, DNG…).</li></ul>
+  <p>The analysis starts at once; thumbnails appear immediately and the remaining time is shown at the top. If you reopen the folder later, your choices are found again (they are kept in a hidden <b>.regardpur</b> folder).</p>
+<div class="foot"><span>Regard Pur – User guide</span><span>4</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">3</span>The grid, the score and the reasons</h2>
+  <img class="wide" src="c02.jpg" alt="">
+  <p>Each thumbnail has a <b>score</b> out of 100. On the right, the panel of the chosen photo explains <b>why</b>:</p>
+  <ul><li><b>Sharpness</b> measured at 100 % (on the eyes if there is a face), <b>camera shake</b>, <b>closed / half-closed eyes</b>, <b>exposure</b> (too dark, blown whites), <b>composition</b> (tilted horizon, cut head), <b>artistic eye</b> (light, colours, composition);</li>
+  <li><b>image quality</b>: noise, pixels, JPEG compression, low resolution, enlarged photo, no EXIF;</li>
+  <li><b>glasses</b> (« check for reflections ») and <b>tinted lenses</b> (eyes not readable: the photo is not rejected for closed eyes).</li></ul>
+  <h3>Disagree?</h3><p>Under the score, say so: <b>It is sharp / blurry</b>, <b>Eyes open / closed</b>. Regard Pur reviews the whole folder with your opinion and tunes its detection to your eye. It also learns from your <span class="k">P</span> / <span class="k">X</span> choices.</p>
+<div class="foot"><span>Regard Pur – User guide</span><span>5</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">4</span>Filters and groupings</h2>
+  <img class="wide" src="c03.jpg" alt="">
+  <ul><li><b>Show</b>: all, kept, rejected, to review, with stars.</li>
+  <li><b>Problems found</b>: blurry, shake, eyes, glasses, exposure, composition, quality, no EXIF, bursts, <b>duplicates</b> (same photo in another file: cropped, brightened, smaller, framed), <b>frame added</b>, signature. <b>Reject duplicates</b> button: keeps the original (no frame, the largest, the oldest).</li>
+  <li><b>Sessions</b>: photos are split according to breaks (adjustable); a session with many people is a « posed session ».</li>
+  <li><b>People</b>: the same faces are grouped; double-click to give a name.</li>
+  <li><b>Expert options</b>: session category, client, strictness, <b>My signature…</b> (your watermark is searched in the corners), <b>GPS places</b> (city and country, internet), <b>Learn my style</b> (Lightroom / DxO).</li></ul>
+<div class="foot"><span>Regard Pur – User guide</span><span>6</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">5</span>Auto sort and the best</h2>
+  <img class="wide" src="c04.jpg" alt="" style="width:78%;margin:1mm auto 2mm">
+  <p><b>✨ Auto sort</b> keeps the best, sets aside the failed ones (with the reason written) and leaves doubtful cases « To review ». Automatic choices have a <b>dotted outline</b>; your choices by hand are never changed. <b>Strictness</b>: Lenient, Normal or Strict.</p>
+  <img class="wide" src="c12.jpg" alt="" style="width:62%;margin:1mm auto 2mm">
+  <p><b>Keep the N best</b>: choose a number, among the displayed photos or <b>in each session</b>, only one per series of similar photos (duplicates counted once); the others can be left alone, set « To review » or rejected. <span class="k">Ctrl+Z</span> undoes.</p>
+<div class="foot"><span>Regard Pur – User guide</span><span>7</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">6</span>Compare and full view</h2>
+  <img class="wide" src="c05.jpg" alt="" style="width:80%;margin:1mm auto 2mm">
+  <p><b>Compare</b> (<span class="k">C</span>): the selection (Ctrl + click) or the photo's series, side by side, the best first. One click zooms to 100 % <b>all the photos at once</b>.</p>
+  <img class="wide" src="c06.jpg" alt="" style="width:80%;margin:1mm auto 2mm">
+  <p><b>Full view</b> (<span class="k">Enter</span>): <span class="k">Z</span> 100 % zoom on the eyes or the sharp area, <span class="k">F</span> shows faces and the sharp area, face close-ups at the top right.</p>
+<div class="foot"><span>Regard Pur – User guide</span><span>8</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">7</span>Edit</h2>
+  <img class="wide" src="c07.jpg" alt="">
+  <ul><li><b>Fix the problems</b> (photo or selection): the right tool for each defect, <b>in the right order</b>: noise → blur → pixels / compression → exposure, colour, horizon. With « Use AI », each correction is <b>measured before / after</b> and undone if it does not improve. Corrections you often undo are no longer applied by default.</li>
+  <li><b>Auto</b>: automatic ProLab, correction for the type of photo, protected skin, your habits.</li>
+  <li><b>For this type of photo</b>: one-click recipes for portrait, wedding, family, backlit, beach, landscape, night (deeper sky, HDR, details, natural skin…) and <b>My style</b>, learned from Lightroom or DxO.</li>
+  <li><b>Copy / Paste</b> settings, and « Apply these settings to » the selection, the series, the person.</li>
+  <li><b>Drag on the photo</b>: ↕ chooses the setting, ↔ sets the amount (like Snapseed).</li></ul>
+<div class="foot"><span>Regard Pur – User guide</span><span>9</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">8</span>Fine settings</h2>
+  <img class="wide" src="c08.jpg" alt="">
+  <ul><li><b>Profile</b> (JM LAB PRO rendering) and strength; <b>Light</b>; <b>Colour</b>.</li>
+  <li><b>Levels</b> (black point, midtones, white point) and <b>Curve</b> per colour (all, red, green, blue).</li>
+  <li><b>Sky</b>: darken, blue, relief — the sky is found automatically.</li>
+  <li><b>Crop</b>: auto (subject on the thirds, no face cut), original, 3:2, 4:5, square, 16:9.</li>
+  <li><b>Deblur</b> (classic, fast) and the <b>JM LAB PRO tools</b>: white balance + eyedropper, details, tonal contrast, HDR, dramatic, glamour glow.</li>
+  <li><b>Before / After</b> (<span class="k">B</span>): drag the line over the photo to compare.</li></ul>
+<div class="foot"><span>Regard Pur – User guide</span><span>10</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">9</span>AI enhancement</h2>
+  <img class="wide" src="c09.jpg" alt="" style="width:88%;margin:1mm auto 2mm">
+  <table><tr><th>Button</th><th>What for</th></tr>
+  <tr><td><b>Deblur (AI)</b></td><td>Camera shake and focus blur. Option « only the people »: the intended blurred background is kept.</td></tr>
+  <tr><td><b>Restore (AI)</b></td><td>Pixelated, highly compressed or damaged photo (same size).</td></tr>
+  <tr><td><b>Enlarge ×2 (AI)</b></td><td>Doubles the size while rebuilding detail. Sharp or Soft rendering.</td></tr>
+  <tr><td><b>Denoise (AI)</b></td><td>Grain of night, indoor, high-ISO photos.</td></tr>
+  <tr><td><b>Faces (AI)</b></td><td>Blurry faces: eyes, skin, mouth. The AI <b>redraws</b>: compare (strength Natural / Strong / Full).</td></tr></table>
+  <div class="tip">The result is saved separately; your settings are applied on top; <b>Back to the original</b> undoes it. Time: a few seconds to a few minutes depending on the photo and the PC.</div>
+<div class="foot"><span>Regard Pur – User guide</span><span>11</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">10</span>Other tools</h2>
+  <ul><li><b>Portrait retouch</b>: skin (keeps the grain), acne, spots, dark circles, lines, eye whites, iris, teeth, lips, glow, background (blur, dark, desaturated), presets Natural, Glow, Glamour, Wedding, Man, Child.</li>
+  <li><b>Healing</b>: paint over a spot or an object, the area is rebuilt.</li>
+  <li><b>Real RAW</b>: in Edit, the RAW is developed from the sensor data (camera white balance, recovered highlights); the export starts from this development.</li>
+  <li><b>Rotation</b> <span class="k">[</span> <span class="k">]</span> (applied at export), <b>Recycle Bin</b> <span class="k">Del</span> (recoverable), <b>Quick copy</b> <span class="k">S</span> to a folder chosen once (<span class="k">Shift+S</span> to change it).</li>
+  <li><b>Print check</b> (Expert mode, right panel): from 10×15 to 50×75 cm, ✓ good (≥ 250 dpi), ≈ just enough, ✗ too small, ✂ face cut by the crop.</li>
+  <li><b>GPS places</b>: city and country of geotagged photos (OpenStreetMap, internet, rounded coordinates).</li></ul>
+<div class="foot"><span>Regard Pur – User guide</span><span>12</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">11</span>Export</h2>
+  <img class="wide" src="c10.jpg" alt="">
+  <ol><li><b>Which photos?</b> The kept ones, everything except rejected, or with at least N stars.</li>
+  <li><b>Where?</b> Copy or move to a subfolder; <b>XMP</b> files for DxO, Lightroom, Capture One (stars, kept in green, rejected in red); put away the rejected ones.</li>
+  <li><b>Retouch</b>: develops the photos with the JM LAB PRO rendering and all your edits (AI, portrait, sky, crop, rotation); category_client_001 naming; also include the original if you wish.</li></ol>
+  <div class="tip">Nothing is erased. A summary is shown at the end, with the estimated time saved.</div>
+<div class="foot"><span>Regard Pur – User guide</span><span>13</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">12</span>Keyboard shortcuts</h2>
+  <table><tr><th>Key</th><th>Action</th></tr>
+  <tr><td>P / X / U</td><td>Keep / Reject / Cancel the choice</td></tr><tr><td>1 … 5</td><td>Stars (same number = remove)</td></tr>
+  <tr><td>← → ↑ ↓</td><td>Previous / next photo, row above / below</td></tr><tr><td>Enter / Esc</td><td>Full view / back to the grid</td></tr>
+  <tr><td>Z / F</td><td>100 % zoom / show faces and sharp area</td></tr><tr><td>C / Space / G</td><td>Compare / open the series / group series</td></tr>
+  <tr><td>B</td><td>Before / After (Edit)</td></tr><tr><td>[ ]</td><td>Rotate left / right</td></tr><tr><td>Del</td><td>Move to the Recycle Bin</td></tr>
+  <tr><td>S / Shift+S</td><td>Quick copy / change folder</td></tr><tr><td>Ctrl + click / Shift + click</td><td>Select several photos / a range</td></tr><tr><td>Ctrl + A / Ctrl + Z</td><td>Select all / undo</td></tr></table>
+<div class="foot"><span>Regard Pur – User guide</span><span>14</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">13</span>Frequently asked questions</h2>
+  <h3>Are my originals modified?</h3><p>Never. Edits are done at export, in new files.</p>
+  <h3>A sharp photo is judged blurry (or the reverse)</h3><p>Use <b>Disagree</b>: Regard Pur tunes itself to your eye for the whole folder.</p>
+  <h3>The AI is slow</h3><p>Without a graphics card, deblurring a large photo can take several minutes. Small photos and « Restore » are fast.</p>
+  <h3>How do I reuse my Lightroom or DxO style?</h3><p>Expert options → <b>Learn my style</b> → choose an edited folder (.xmp, exported JPEGs, .dop). « My style » appears in Edit.</p>
+  <h3>Language</h3><p>French or English according to Windows; <b>English / Français</b> button in the <span class="k">?</span> help.</p>
+  <h3>Privacy</h3><p>No photo leaves your PC. Only the <b>GPS places</b> option, started by you, sends rounded coordinates (about 1 km) to OpenStreetMap.</p>
+<div class="foot"><span>Regard Pur – User guide</span><span>15</span></div>
+</section>
+</body>
+</html>

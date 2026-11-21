@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Regard Pur – Mode d'emploi</title>
+<style>
+@page { size: 148mm 210mm; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #fff; }
+body { font-family: "Inter", "DejaVu Sans", system-ui, sans-serif; color: #1d1d1f; font-size: 10.2pt; line-height: 1.42; }
+.page { width: 148mm; height: 210mm; padding: 11mm 11mm 12mm; position: relative; overflow: hidden; page-break-after: always; break-after: page; background: #fff; }
+.page:last-child { page-break-after: auto; }
+.foot { position: absolute; left: 11mm; right: 11mm; bottom: 6mm; font-size: 7.5pt; color: #8a8a8a; display: flex; justify-content: space-between; border-top: 0.3mm solid #e3e3e3; padding-top: 1.6mm; }
+h1 { font-size: 19pt; margin: 0 0 1mm; letter-spacing: .01em; }
+h2 { font-size: 15pt; margin: 0 0 3mm; display: flex; align-items: center; gap: 2.5mm; }
+h2 .n { display: inline-flex; width: 8mm; height: 8mm; border-radius: 50%; background: #C9A24A; color: #fff; font-size: 11pt; align-items: center; justify-content: center; flex: none; }
+h3 { font-size: 11pt; margin: 3.5mm 0 1.2mm; color: #7a5a14; }
+p { margin: 0 0 2mm; }
+ul, ol { margin: 0 0 2mm; padding-left: 5mm; }
+li { margin: 0 0 1.1mm; }
+b { color: #000; }
+.row { display: flex; gap: 6mm; align-items: flex-start; }
+.row .txt { flex: 1; min-width: 0; }
+.wide { width: 100%; border-radius: 2mm; border: 0.4mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; margin: 2mm 0 3mm; }
+.shot { flex: none; width: 50mm; border-radius: 4mm; border: 0.6mm solid #1d1d1f; box-shadow: 0 1mm 3mm rgba(0,0,0,.18); display: block; }
+.shot.sm { width: 44mm; }
+.shot.xs { width: 33mm; }
+.tip { background: #FFF7E0; border-left: 1.2mm solid #C9A24A; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
+.warn { background: #FDECEA; border-left: 1.2mm solid #D84315; border-radius: 2mm; padding: 2.2mm 3mm; margin: 3mm 0 0; font-size: 9.4pt; }
+.k { display: inline-block; background: #1d1d1f; color: #fff; border-radius: 1.4mm; padding: 0 1.6mm; font-weight: 800; font-size: 8.6pt; white-space: nowrap; }
+.k.y { background: #FFB300; color: #000; } .k.b { background: #1E88E5; } .k.g { background: #43A047; }
+table { width: 100%; border-collapse: collapse; font-size: 9.2pt; margin-top: 2mm; }
+th, td { text-align: left; padding: 1.8mm 2mm; border-bottom: 0.3mm solid #e3e3e3; vertical-align: top; }
+th { background: #f4f1ea; font-size: 8.8pt; }
+.cover { background: #141416; color: #fff; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.cover img.logo { width: 46mm; border-radius: 10mm; box-shadow: 0 2mm 8mm rgba(0,0,0,.6); }
+.cover h1 { font-size: 28pt; color: #D2AD59; margin: 9mm 0 1mm; letter-spacing: .06em; }
+.cover .sub { font-size: 14pt; color: #eee; margin-bottom: 14mm; }
+.cover .who { font-size: 10pt; color: #aaa; }
+.cover .ver { position: absolute; bottom: 10mm; font-size: 9pt; color: #777; }
+.toc { list-style: none; padding: 0; margin: 4mm 0 0; }
+.toc li { display: flex; gap: 3mm; padding: 0.9mm 0; border-bottom: 0.3mm dotted #ccc; font-size: 9.6pt; }
+.toc li span:first-child { width: 7mm; color: #C9A24A; font-weight: 800; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5mm 5mm; }
+</style>
+</head>
+<body>
+<section class="page cover">
+  <img class="logo" src="logo.png" alt="">
+  <h1>REGARD PUR</h1>
+  <div class="sub">Mode d'emploi</div>
+  <div class="who">Trier · Retoucher · Exporter vos photos<br>sur votre PC, sans internet<br>par JM.Dargère</div>
+  <div class="ver">Version 3.9 • novembre 2026</div>
+</section>
+<section class="page">
+  <h1>Sommaire</h1>
+  <ul class="toc">
+    <li><span>1</span><span>Installer et ouvrir Regard Pur</span></li>
+    <li><span>2</span><span>Ouvrir un dossier ou une carte SD</span></li>
+    <li><span>3</span><span>La grille, le score et les raisons</span></li>
+    <li><span>4</span><span>Filtres, séances, personnes, doublons, signature</span></li>
+    <li><span>5</span><span>Tri automatique et « Garder les N meilleures »</span></li>
+    <li><span>6</span><span>Comparer et vue en grand</span></li>
+    <li><span>7</span><span>Retoucher : corriger, réglages, type de photo, mon style</span></li>
+    <li><span>8</span><span>Lumière, couleur, niveaux, courbes, ciel, recadrage</span></li>
+    <li><span>9</span><span>Amélioration IA (déflouter, restaurer, agrandir, débruiter, visages)</span></li>
+    <li><span>10</span><span>Portrait, correcteur, RAW, rotation, corbeille, tirage</span></li>
+    <li><span>11</span><span>Exporter</span></li>
+    <li><span>12</span><span>Raccourcis clavier</span></li>
+    <li><span>13</span><span>Questions fréquentes, langue, confidentialité</span></li>
+  </ul>
+  <h3>En trois étapes</h3>
+  <ol>
+    <li><b>① Trier</b> : ouvrez un dossier ; Regard Pur analyse chaque photo et propose de garder les meilleures.</li>
+    <li><b>② Retoucher</b> : corrigez les défauts en un clic, ou réglez finement (comme JM LAB PRO).</li>
+    <li><b>③ Exporter</b> : copiez les photos gardées, retouchées si vous le souhaitez.</li>
+  </ol>
+  <div class="tip">Vos <b>originaux ne sont jamais modifiés</b>. Tout se passe sur votre PC, sans internet (sauf l'option « Lieux GPS », que vous lancez vous-même).</div>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>2</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">1</span>Installer et ouvrir</h2>
+  <h3>Deux façons</h3>
+  <ul>
+    <li><b>RegardPur.zip</b> : décompressez, puis double-cliquez sur <b>RegardPur.exe</b> (rien à installer).</li>
+    <li><b>RegardPur_Installation.exe</b> : installe le logiciel avec un raccourci sur le bureau.</li>
+  </ul>
+  <h3>Si Windows bloque le fichier</h3>
+  <p>Regard Pur n'est pas vendu par Microsoft : Windows peut afficher un avertissement.</p>
+  <ul>
+    <li>Dans <b>Edge</b> : flèche <b>˅</b> à côté de « Supprimer » → <b>Conserver quand même</b>.</li>
+    <li>Fenêtre bleue « Windows a protégé votre ordinateur » : <b>Informations complémentaires</b> → <b>Exécuter quand même</b>.</li>
+    <li>Ou : clic droit sur le fichier → <b>Propriétés</b> → cocher <b>Débloquer</b>.</li>
+  </ul>
+  <h3>Premier lancement</h3>
+  <p>Un petit guide en 5 écrans présente les trois étapes. Vous pouvez le revoir à tout moment avec le bouton <span class="k">?</span> en haut à droite, puis <b>Revoir le guide</b>.</p>
+  <h3>Mode Simple ou Expert</h3>
+  <p>En haut à droite : <b>Simple</b> montre l'essentiel, <b>Expert</b> tous les réglages fins. Les bulles <span class="k">?</span> expliquent chaque réglage au survol.</p>
+  <div class="tip">L'intelligence artificielle (déflouter, débruiter, visages…) est incluse dans le programme : c'est pour cela qu'il est assez gros (environ 600 Mo). Elle utilise la carte graphique du PC si possible.</div>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>3</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">2</span>Ouvrir un dossier ou une carte SD</h2>
+  <img class="wide" src="c01.jpg" alt="">
+  <ul>
+    <li><b>Ouvrir un dossier</b> : choisissez le dossier de la séance (les sous-dossiers sont inclus).</li>
+    <li><b>Importer une carte SD</b> : la carte est trouvée toute seule. Regard Pur copie les photos vers le PC (sous-dossier par date ou nom de séance, renommage au choix, copie de sécurité vers un autre disque, sans recopier celles déjà importées), puis lance le tri. Rien n'est effacé de la carte.</li>
+    <li>Formats : JPEG, HEIC (iPhone), PNG, TIFF et RAW (CR2, CR3, NEF, ARW, RAF, ORF, RW2, DNG…).</li>
+  </ul>
+  <p>L'analyse démarre aussitôt ; les vignettes apparaissent immédiatement, le temps restant est affiché en haut. Si vous rouvrez le dossier plus tard, vos choix sont retrouvés (ils sont gardés dans un dossier caché <b>.regardpur</b>).</p>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>4</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">3</span>La grille, le score et les raisons</h2>
+  <img class="wide" src="c02.jpg" alt="">
+  <p>Chaque vignette porte un <b>score</b> sur 100. À droite, le panneau de la photo choisie explique <b>pourquoi</b> :</p>
+  <ul>
+    <li><b>Netteté</b> mesurée à 100 % (sur les yeux s'il y a un visage), <b>flou de bougé</b>, <b>yeux fermés / mi-clos</b>, <b>exposition</b> (trop sombre, blancs brûlés), <b>composition</b> (horizon penché, tête coupée), <b>œil artistique</b> (lumière, couleurs, composition) ;</li>
+    <li><b>qualité d'image</b> : bruit, pixels, compression JPEG, petite définition, photo agrandie, sans EXIF ;</li>
+    <li><b>lunettes</b> (« vérifiez les reflets ») et <b>verres teintés</b> (yeux non lisibles : la photo n'est pas rejetée pour yeux fermés).</li>
+  </ul>
+  <h3>Pas d'accord ?</h3>
+  <p>Sous le score, dites-le : <b>Elle est nette / floue</b>, <b>Yeux ouverts / fermés</b>. Regard Pur revoit tout le dossier avec votre avis et règle sa détection sur votre œil. Il apprend aussi de vos choix <span class="k">P</span> / <span class="k">X</span>.</p>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>5</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">4</span>Filtres et classements</h2>
+  <img class="wide" src="c03.jpg" alt="">
+  <ul>
+    <li><b>Afficher</b> : toutes, gardées, rejetées, à voir, avec étoiles.</li>
+    <li><b>Problèmes repérés</b> : floues, bougé, yeux, lunettes, exposition, composition, qualité, sans EXIF, rafales, <b>doublons</b> (même photo dans un autre fichier : recadrée, éclaircie, plus petite, encadrée), <b>cadre ajouté</b>, signature. Bouton <b>Rejeter les doublons</b> : garde l'original (sans cadre, la plus grande, la plus ancienne).</li>
+    <li><b>Séances</b> : les photos sont découpées selon les pauses (réglable) ; une séance avec beaucoup de personnes est une « séance de pose ».</li>
+    <li><b>Personnes</b> : les mêmes visages sont regroupés ; double-clic pour donner un nom.</li>
+    <li><b>Options expert</b> : catégorie de la séance, client, exigence, <b>Ma signature…</b> (votre filigrane est cherché dans les coins), <b>Lieux GPS</b> (ville et pays, internet), <b>Apprendre mon style</b> (Lightroom / DxO).</li>
+  </ul>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>6</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">5</span>Tri automatique et meilleures</h2>
+  <img class="wide" src="c04.jpg" alt="" style="width:78%;margin:1mm auto 2mm">
+  <p><b>✨ Tri automatique</b> garde les meilleures, écarte les ratées (avec la raison écrite) et laisse « À voir » les cas douteux. Les choix automatiques ont un <b>contour pointillé</b> ; vos choix à la main ne sont jamais changés. <b>Exigence</b> : Souple, Normale ou Stricte.</p>
+  <img class="wide" src="c12.jpg" alt="" style="width:62%;margin:1mm auto 2mm">
+  <p><b>Garder les N meilleures</b> : choisissez un nombre, dans les photos affichées ou <b>dans chaque séance</b>, une seule par série de photos semblables (doublons comptés une fois) ; les autres peuvent être laissées, mises « À voir » ou rejetées. <span class="k">Ctrl+Z</span> annule.</p>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>7</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">6</span>Comparer et vue en grand</h2>
+  <img class="wide" src="c05.jpg" alt="" style="width:80%;margin:1mm auto 2mm">
+  <p><b>Comparer</b> (<span class="k">C</span>) : la sélection (Ctrl + clic) ou la série de la photo, côte à côte, la meilleure en premier. Un clic zoome à 100 % <b>toutes les photos en même temps</b>.</p>
+  <img class="wide" src="c06.jpg" alt="" style="width:80%;margin:1mm auto 2mm">
+  <p><b>Vue en grand</b> (<span class="k">Entrée</span>) : <span class="k">Z</span> zoom 100 % sur les yeux ou la zone nette, <span class="k">F</span> montre les visages et la zone nette, gros plans des visages en haut à droite.</p>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>8</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">7</span>Retoucher</h2>
+  <img class="wide" src="c07.jpg" alt="">
+  <ul>
+    <li><b>Corriger les problèmes</b> (photo ou sélection) : le bon outil pour chaque défaut, <b>dans le bon ordre</b> : bruit → flou → pixels / compression → exposition, couleur, horizon. Avec « Utiliser l'IA », chaque correction est <b>mesurée avant / après</b> et annulée si elle n'améliore pas. Les corrections que vous annulez souvent ne sont plus proposées d'office.</li>
+    <li><b>Auto</b> : ProLab automatique, correction selon le type de photo, peau protégée, vos habitudes.</li>
+    <li><b>Pour ce type de photo</b> : recettes en un clic selon portrait, mariage, famille, contre-jour, plage, paysage, nuit (ciel plus profond, HDR, détails, peau naturelle…) et <b>Mon style</b>, appris de Lightroom ou DxO.</li>
+    <li><b>Copier / Coller</b> les réglages, et « Appliquer ces réglages à » la sélection, la série, la personne.</li>
+    <li><b>Glisser sur la photo</b> : ↕ choisit le réglage, ↔ le dose (comme Snapseed).</li>
+  </ul>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>9</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">8</span>Réglages fins</h2>
+  <img class="wide" src="c08.jpg" alt="">
+  <ul>
+    <li><b>Profil</b> (rendu de JM LAB PRO) et intensité ; <b>Lumière</b> ; <b>Couleur</b>.</li>
+    <li><b>Niveaux</b> (point noir, tons moyens, point blanc) et <b>Courbe</b> par couleur (toutes, rouge, vert, bleu).</li>
+    <li><b>Ciel</b> : assombrir, bleu, relief — le ciel est repéré tout seul.</li>
+    <li><b>Recadrage</b> : auto (sujet sur les tiers, aucun visage coupé), formats d'origine, 3:2, 4:5, carré, 16:9.</li>
+    <li><b>Déflouter</b> (classique, rapide) et les <b>outils de JM LAB PRO</b> : balance des blancs + pipette, détails, contraste des tons, HDR, théâtral, éclat glamour.</li>
+    <li><b>Avant / Après</b> (<span class="k">B</span>) : glissez la ligne sur la photo pour comparer.</li>
+  </ul>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>10</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">9</span>Amélioration IA</h2>
+  <img class="wide" src="c09.jpg" alt="" style="width:88%;margin:1mm auto 2mm">
+  <table>
+    <tr><th>Bouton</th><th>Pour quoi</th></tr>
+    <tr><td><b>Déflouter (IA)</b></td><td>Bougé et flou de mise au point. Option « seulement les personnes » : le fond flou voulu est gardé.</td></tr>
+    <tr><td><b>Restaurer (IA)</b></td><td>Photo pixelisée, très compressée ou abîmée (même taille).</td></tr>
+    <tr><td><b>Agrandir ×2 (IA)</b></td><td>Double la taille en reconstruisant les détails. Rendu Net ou Doux.</td></tr>
+    <tr><td><b>Débruiter (IA)</b></td><td>Grain des photos de nuit, en intérieur, ISO élevés.</td></tr>
+    <tr><td><b>Visages (IA)</b></td><td>Visages flous : yeux, peau, bouche. L'IA <b>redessine</b> : comparez (force Naturel / Marqué / Complet).</td></tr>
+  </table>
+  <div class="tip">Le résultat est enregistré à part ; vos réglages s'appliquent par-dessus ; <b>Revenir à l'original</b> annule. Durée : quelques secondes à quelques minutes selon la photo et le PC.</div>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>11</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">10</span>Autres outils</h2>
+  <ul>
+    <li><b>Retouche portrait</b> : peau (garde le grain), acné, taches, cernes, rides, blanc des yeux, iris, dents, lèvres, éclat, fond (flou, sombre, désaturé), préréglages Naturel, Éclat, Glamour, Mariage, Homme, Enfant.</li>
+    <li><b>Correcteur</b> : peignez sur une tache ou un objet, la zone est reconstruite.</li>
+    <li><b>Vrais RAW</b> : en Retoucher, le RAW est développé depuis les données du capteur (balance des blancs de l'appareil, hautes lumières récupérées) ; l'export part de ce développement.</li>
+    <li><b>Rotation</b> <span class="k">[</span> <span class="k">]</span> (appliquée à l'export), <b>Corbeille</b> <span class="k">Suppr</span> (récupérable), <b>Copie rapide</b> <span class="k">S</span> vers un dossier choisi une fois (<span class="k">Maj+S</span> pour changer).</li>
+    <li><b>Contrôle avant tirage</b> (mode Expert, panneau de droite) : du 10×15 au 50×75 cm, ✓ bon (≥ 250 dpi), ≈ juste, ✗ trop petite, ✂ visage coupé par le recadrage.</li>
+    <li><b>Lieux GPS</b> : ville et pays des photos géolocalisées (OpenStreetMap, internet, coordonnées arrondies).</li>
+  </ul>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>12</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">11</span>Exporter</h2>
+  <img class="wide" src="c10.jpg" alt="">
+  <ol>
+    <li><b>Quelles photos ?</b> Les gardées, tout sauf les rejetées, ou avec au moins N étoiles.</li>
+    <li><b>Où ?</b> Copier ou déplacer dans un sous-dossier ; fichiers <b>XMP</b> pour DxO, Lightroom, Capture One (étoiles, gardées en vert, rejetées en rouge) ; ranger les rejetées.</li>
+    <li><b>Retouche</b> : développe les photos avec le rendu JM LAB PRO et toutes vos retouches (IA, portrait, ciel, recadrage, rotation) ; nommage catégorie_client_001 ; joindre l'original si vous voulez.</li>
+  </ol>
+  <div class="tip">Rien n'est effacé. Un bilan s'affiche à la fin, avec le temps gagné estimé.</div>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>13</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">12</span>Raccourcis clavier</h2>
+  <table>
+    <tr><th>Touche</th><th>Action</th></tr>
+    <tr><td>P / X / U</td><td>Garder / Rejeter / Annuler le choix</td></tr>
+    <tr><td>1 … 5</td><td>Étoiles (même chiffre = enlever)</td></tr>
+    <tr><td>← → ↑ ↓</td><td>Photo précédente / suivante, ligne du dessus / dessous</td></tr>
+    <tr><td>Entrée / Échap</td><td>Vue en grand / revenir à la grille</td></tr>
+    <tr><td>Z / F</td><td>Zoom 100 % / montrer visages et zone nette</td></tr>
+    <tr><td>C / Espace / G</td><td>Comparer / ouvrir la série / regrouper les séries</td></tr>
+    <tr><td>B</td><td>Avant / Après (Retoucher)</td></tr>
+    <tr><td>[ ]</td><td>Tourner à gauche / à droite</td></tr>
+    <tr><td>Suppr</td><td>Mettre à la corbeille</td></tr>
+    <tr><td>S / Maj+S</td><td>Copie rapide / changer de dossier</td></tr>
+    <tr><td>Ctrl + clic / Maj + clic</td><td>Sélectionner plusieurs photos / une suite</td></tr>
+    <tr><td>Ctrl + A / Ctrl + Z</td><td>Tout sélectionner / annuler</td></tr>
+  </table>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>14</span></div>
+</section>
+<section class="page">
+  <h2><span class="n">13</span>Questions fréquentes</h2>
+  <h3>Mes originaux sont-ils modifiés ?</h3><p>Jamais. Les retouches sont faites à l'export, dans de nouveaux fichiers.</p>
+  <h3>Une photo nette est jugée floue (ou l'inverse)</h3><p>Utilisez <b>Pas d'accord</b> : Regard Pur se règle sur votre œil pour tout le dossier.</p>
+  <h3>L'IA est lente</h3><p>Sans carte graphique, déflouter une grande photo peut prendre plusieurs minutes. Les petites photos et « Restaurer » sont rapides.</p>
+  <h3>Comment reprendre mon style Lightroom ou DxO ?</h3><p>Options expert → <b>Apprendre mon style</b> → choisissez un dossier retouché (.xmp, JPEG exportés, .dop). « Mon style » apparaît dans Retoucher.</p>
+  <h3>Langue</h3><p>Français ou anglais selon Windows ; bouton <b>English / Français</b> dans l'aide <span class="k">?</span>.</p>
+  <h3>Confidentialité</h3><p>Aucune photo ne quitte votre PC. Seule l'option <b>Lieux GPS</b>, lancée par vous, envoie des coordonnées arrondies (environ 1 km) à OpenStreetMap.</p>
+<div class="foot"><span>Regard Pur – Mode d'emploi</span><span>15</span></div>
+</section>
+</body>
+</html>
