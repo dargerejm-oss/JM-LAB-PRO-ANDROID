@@ -330,8 +330,24 @@ public class MainActivity extends Activity {
             return;
         }
         if (code == 7 && chooser != null) {
-            chooser.onReceiveValue(res == RESULT_OK && data != null
-                    ? android.webkit.WebChromeClient.FileChooserParams.parseResult(res, data) : null);
+            Uri[] out = null;
+            if (res == RESULT_OK && data != null) {
+                /* plusieurs photos choisies : Android les donne dans une liste (ClipData) */
+                android.content.ClipData clip = data.getClipData();
+                if (clip != null && clip.getItemCount() > 0) {
+                    ArrayList<Uri> l = new ArrayList<>();
+                    for (int i = 0; i < clip.getItemCount(); i++) {
+                        Uri u = clip.getItemAt(i).getUri();
+                        if (u != null) {
+                            l.add(u);
+                        }
+                    }
+                    out = l.toArray(new Uri[0]);
+                } else if (data.getData() != null) {
+                    out = new Uri[]{data.getData()};
+                }
+            }
+            chooser.onReceiveValue(out);
             chooser = null;
         }
     }

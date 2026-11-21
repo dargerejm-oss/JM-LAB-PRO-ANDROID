@@ -15,9 +15,9 @@ function makePool(){
   pool = []; for(var i = 0; i < N; i++) pool.push(new Worker(url));
   return pool;
 }
-function job(wk, P){
+function job(wk, P, ms){
   return new Promise(function(res, rej){
-    var t = setTimeout(function(){ rej(new Error("timeout")); }, 120000);
+    var t = setTimeout(function(){ rej(new Error("timeout")); }, ms || 60000);
     wk.onmessage = function(e){ clearTimeout(t); res(e.data); };
     wk.onerror = function(e){ clearTimeout(t); rej(e); };
     wk.postMessage(P, [P.px.buffer]);
@@ -30,7 +30,7 @@ async function check(base){
     var px = new Uint8ClampedArray(64 * 4); for(var i = 0; i < px.length; i++) px[i] = (i * 37) % 256;
     var a = Object.assign({}, base, {px:new Uint8ClampedArray(px), w:8, h:8, y0:0}), b = Object.assign({}, base, {px:new Uint8ClampedArray(px), w:8, h:8, y0:0, id:-1});
     getInline()(a);
-    var r = await job(makePool()[0], b);
+    var r = await job(makePool()[0], b, 3000);   /* pas de reponse en 3 s : calcul normal */
     mode = r.px.every(function(v, i){ return v === a.px[i]; }) ? "worker" : "inline";
   }catch(e){ mode = "inline"; }
   return mode;
@@ -45,8 +45,14 @@ window.__jmsPix = async function(img, P){
     var y0 = k * rows, y1 = Math.min(h, y0 + rows); if(y1 <= y0) break;
     jobs.push(Object.assign({}, base, {px:src.slice(y0 * w * 4, y1 * w * 4), y0:y0, id:k}));
   }
-  img = null; src = null;
-  var out = await Promise.all(jobs.map(function(P, k){ return job(ws[k], P); }));
-  return out.map(function(r){ return {d:new ImageData(r.px, w, r.px.length / 4 / w), y:r.y0}; });
+  src = null;
+  try{
+    var out = await Promise.all(jobs.map(function(P, k){ return job(ws[k], P); }));
+    return out.map(function(r){ return {d:new ImageData(r.px, w, r.px.length / 4 / w), y:r.y0}; });
+  }catch(e){
+    /* un calcul en arriere-plan a echoue : on repasse en calcul normal pour la suite */
+    mode = "inline"; try{ pool.forEach(function(wk){ wk.terminate(); }); }catch(x){} pool = null;
+    var o = Object.assign({}, base, {px:img.data, y0:0}); getInline()(o); return [{d:img, y:0}];
+  }
 };
 })();
