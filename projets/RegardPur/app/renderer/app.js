@@ -750,6 +750,78 @@ async function doExport() {
     function (c) { if (c === "open") N.openPath(dest); });
 }
 
+/* ---------------- importer depuis une carte SD (copie + renommage + copie de securite) ---------------- */
+var IMP = (function () { try { return JSON.parse(localStorage.getItem("rp_import")) || {}; } catch (e) { return {}; } })();
+function impSave() { try { localStorage.setItem("rp_import", JSON.stringify(IMP)); } catch (e) {} }
+function pad(n, k) { n = String(n); while (n.length < k) n = "0" + n; return n; }
+function ymd(t) { var d = new Date(t); return d.getFullYear() + "-" + pad(d.getMonth() + 1, 2) + "-" + pad(d.getDate(), 2); }
+function hms(t) { var d = new Date(t); return pad(d.getHours(), 2) + "-" + pad(d.getMinutes(), 2) + "-" + pad(d.getSeconds(), 2); }
+async function openImport() {
+  if (!N) { dialog("<h3>📥 Importer une carte</h3><p>L'import depuis une carte SD se fait dans la version PC de Regard Pur.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>"); return; }
+  var src = await N.pickDir("Choisir la carte SD (ou le dossier à importer)"); if (!src) return;
+  var list = await N.list(src); if (!list.length) { toast("Aucune photo sur cette carte."); return; }
+  if (!IMP.dest) IMP.dest = join(await N.picturesDir(), "Regard Pur");
+  var done = IMP.seen || {}, fresh = list.filter(function (o) { return !done[o.name + "|" + o.size]; }).length;
+  dialog("<h3>📥 Importer " + list.length + " photos</h3><p class='small'>Depuis : " + esc(src) + "</p>" +
+    "<label class='opt' style='display:block'><b>Copier vers</b><div style='display:flex;gap:6px;margin-top:6px'><input type='text' id='iDest' value='" + esc(IMP.dest) + "' style='flex:1'><button data-c='dest'>Changer…</button></div></label>" +
+    "<div style='display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:10px 0'>" +
+    "<span>Sous-dossier</span><select id='iSub'><option value='date'>Date de prise de vue (" + ymd(Date.now()) + ")</option><option value='name'>Date + nom de la séance</option><option value='none'>Aucun</option></select>" +
+    "<span>Nom de la séance</span><input type='text' id='iName' placeholder='ex. Mariage Julie' value='" + esc(IMP.name || "") + "'>" +
+    "<span>Renommer</span><select id='iRen'><option value='keep'>Garder le nom d'origine</option><option value='dt'>Date et heure (" + ymd(Date.now()) + "_" + hms(Date.now()) + ")</option><option value='dn'>Date + numéro (" + ymd(Date.now()) + "_0001)</option><option value='nn'>Nom de la séance + numéro (Seance_0001)</option></select>" +
+    "</div>" +
+    "<label class='opt'><input type='checkbox' id='iBak'" + (IMP.bak ? " checked" : "") + "><div><b>Copie de sécurité</b> en même temps vers : <span id='iBakP'>" + esc(IMP.bak || "(choisir…)") + "</span> <button data-c='bak' style='padding:2px 8px'>Choisir…</button></div></label>" +
+    "<label class='opt'><input type='checkbox' id='iSkip' checked><div>Ne pas recopier les photos <b>déjà importées</b> (" + (list.length - fresh) + " sur cette carte)</div></label>" +
+    "<p class='small'>Rien n'est effacé de la carte. Les fichiers RAW + JPEG d'une même photo gardent le même nom.</p>" +
+    "<div class='row'><button data-c='cancel'>Annuler</button><button class='pri' data-c='go'>Importer puis trier</button></div>",
+    async function (c) {
+      if (c === "dest") { var d = await N.pickDir("Dossier où copier les photos", $("iDest").value); if (d) $("iDest").value = d; return keepOpen(); }
+      if (c === "bak") { var b = await N.pickDir("Dossier de la copie de sécurité (autre disque, clé USB…)"); if (b) { IMP.bak = b; $("iBakP").textContent = b; $("iBak").checked = true; } return keepOpen(); }
+      if (c === "go") doImport(src, list);
+    });
+  $("iSub").value = IMP.sub || "date"; $("iRen").value = IMP.ren || "keep";
+}
+function keepOpen() { $("dlg").classList.add("show"); }
+async function doImport(src, list) {
+  var dest = $("iDest").value.trim(), sub = $("iSub").value, name = ($("iName").value || "").trim().replace(/[\\\/:*?"<>|]/g, "_"), ren = $("iRen").value, bak = $("iBak").checked && IMP.bak, skip = $("iSkip").checked;
+  if (!dest) { toast("Choisissez le dossier de destination."); keepOpen(); return; }
+  if ((sub === "name" || ren === "nn") && !name) { toast("Indiquez le nom de la séance."); keepOpen(); return; }
+  IMP.dest = dest; IMP.sub = sub; IMP.ren = ren; IMP.name = name; if (!$("iBak").checked) IMP.bak = IMP.bak || ""; impSave();
+  closeDialog();
+  IMP.seen = IMP.seen || {};
+  var todo = list.filter(function (o) { return !skip || !IMP.seen[o.name + "|" + o.size]; });
+  if (!todo.length) { toast("Toutes ces photos ont déjà été importées."); return; }
+  // date de prise de vue de chaque photo (pour les dossiers et les noms)
+  S.analysing = true; totalN = todo.length * 2; doneN = 0; prog();
+  for (var i = 0; i < todo.length; i++) {
+    var o = todo[i];
+    try { var h = await N.readHead(o.path, 262144), ex = await window.exifr.parse(h, {pick: ["DateTimeOriginal", "CreateDate"]}).catch(function () { return null; }); var dt = ex && (ex.DateTimeOriginal || ex.CreateDate); o.t = dt instanceof Date ? dt.getTime() : o.mtime; } catch (e) { o.t = o.mtime; }
+    doneN++; prog(); $("progTxt").textContent = "Lecture des dates " + (i + 1) + " / " + todo.length;
+  }
+  todo.sort(function (a, b) { return a.t - b.t || (a.name < b.name ? -1 : 1); });
+  // numerotation : une meme photo en RAW + JPEG garde le meme numero
+  var num = 0, last = null, out = [], err = 0, skipped = 0;
+  for (i = 0; i < todo.length; i++) {
+    o = todo[i];
+    var base = o.name.replace(/\.[^.]+$/, ""), ext = o.name.slice(base.length).toLowerCase();
+    if (base !== last) { num++; last = base; }
+    var folder = sub === "date" ? join(dest, ymd(o.t)) : sub === "name" ? join(dest, ymd(o.t) + " " + name) : dest;
+    var nm = ren === "dt" ? ymd(o.t) + "_" + hms(o.t) : ren === "dn" ? ymd(o.t) + "_" + pad(num, 4) : ren === "nn" ? name.replace(/\s+/g, "_") + "_" + pad(num, 4) : base;
+    try {
+      var r = await N.copyAs(o.path, join(folder, nm + ext));
+      if (r.skipped) skipped++;
+      if (bak) await N.copyAs(o.path, join(bak, folder.slice(dest.length).replace(/^[\\\/]/, ""), nm + ext));
+      IMP.seen[o.name + "|" + o.size] = 1;
+      out.push({path: r.path, name: r.path.split(/[\\\/]/).pop(), size: o.size, mtime: o.t, raw: o.raw, heic: o.heic});
+    } catch (e) { err++; }
+    doneN++; prog(); $("progTxt").textContent = "Copie " + (i + 1) + " / " + todo.length;
+  }
+  impSave(); S.analysing = false; prog();
+  toast(out.length + " photo(s) importée(s)" + (skipped ? " (" + skipped + " déjà présentes)" : "") + (bak ? ", copie de sécurité faite" : "") + (err ? " — " + err + " erreur(s)" : "") + ". Analyse en cours…", 5000);
+  // on trie directement ce qui vient d'etre importe
+  var root = dest;
+  await load(root, out.map(function (o) { var rel = o.path.slice(root.length).replace(/^[\\\/]/, ""); return {id: rel, name: o.name, path: o.path, rel: rel, size: o.size, mtime: o.mtime, raw: o.raw, heic: o.heic}; }), "");
+}
+
 /* ---------------- fenetres de dialogue ---------------- */
 var dlgCb = null;
 function dialog(html, cb) { $("dlgBox").innerHTML = html; $("dlg").classList.add("show"); dlgCb = cb || null; }
@@ -814,7 +886,7 @@ document.addEventListener("keydown", function (e) {
 /* ---------------- boutons ---------------- */
 $("bOpen").onclick = openFolder; $("bOpen2").onclick = openFolder;
 $("bAuto").onclick = function () { if (S.analysing) { toast("Attendez la fin de l'analyse…"); return; } autoCull(); };
-$("bCompare").onclick = openCompare; $("bExport").onclick = openExport; $("bHelp").onclick = help;
+$("bImport").onclick = openImport; $("bCompare").onclick = openCompare; $("bExport").onclick = openExport; $("bHelp").onclick = help;
 updLearn();
 window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load};
 })();

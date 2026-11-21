@@ -1,9 +1,10 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.2 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
+- **📥 Importer une carte** (comme Photo Mechanic) : copie vers le PC, sous-dossier par date ou par séance, renommage (date-heure, date + numéro, séance + numéro ; RAW + JPEG gardent le même numéro), copie de sécurité simultanée vers un 2e disque, sans recopier ce qui est déjà importé, puis tri automatique.
 - Vignettes immédiates (petite image intégrée à la photo), avant même l'analyse.
 - **Gros plans des visages** (pleine résolution) à côté de la photo et dans la vue en grand ; un clic zoome sur le visage.
 - Analyse chaque photo, sans internet :
@@ -31,4 +32,4 @@ Version 2.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - Android (réutiliser `renderer/`, accès aux photos par la partie Android comme JM LAB PRO).
 - Lien « Retoucher dans JM LAB PRO ».
 - Régler la netteté sur de vraies photos d'appareil ; vérifier HEIC et yeux fermés sur de vraies photos.
-- Copie depuis la carte SD avec renommage ; classement par personne ; recherche de photos semblables ; mode d'emploi.
+- Classement par personne ; recherche de photos semblables ; mode d'emploi.

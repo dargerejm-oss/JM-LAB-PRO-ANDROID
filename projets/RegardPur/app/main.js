@@ -97,6 +97,22 @@ ipcMain.handle('copy', async (e, src, dstDir, move) => {
   if (fs.existsSync(sx)) { const dx = d.replace(/\.[^.]+$/, '.xmp'); if (move) await fsp.rename(sx, dx).catch(() => {}); else await fsp.copyFile(sx, dx).catch(() => {}); }
   return d;
 });
+ipcMain.handle('pickDir', async (e, title, def) => {
+  const r = await dialog.showOpenDialog(win, {title: title || 'Choisir un dossier', defaultPath: def || undefined, properties: ['openDirectory', 'createDirectory']});
+  return r.canceled ? null : r.filePaths[0];
+});
+ipcMain.handle('picturesDir', () => app.getPath('pictures'));
+// copie sous un nouveau nom ; si un fichier identique (meme taille) existe deja, on ne recopie pas
+ipcMain.handle('copyAs', async (e, src, dst) => {
+  await fsp.mkdir(path.dirname(dst), {recursive: true});
+  const ss = await fsp.stat(src); let d = dst, n = 1;
+  while (fs.existsSync(d)) {
+    const st = await fsp.stat(d); if (st.size === ss.size) return {path: d, skipped: true};
+    const x = path.parse(dst); d = path.join(x.dir, x.name + '_' + (n++) + x.ext);
+  }
+  await fsp.copyFile(src, d); await fsp.utimes(d, ss.atime, ss.mtime).catch(() => {});
+  return {path: d, skipped: false};
+});
 ipcMain.handle('join', (e, ...a) => path.join(...a));
 ipcMain.handle('openPath', (e, p) => shell.openPath(p));
 ipcMain.handle('showItem', (e, p) => shell.showItemInFolder(p));
