@@ -6,6 +6,7 @@ var N = window.RPNative || null;               // partie PC (absente dans un sim
 var RAWX = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|x3f|3fr|iiq|rwl|mrw|kdc|erf)$/i;
 var IMGX = /\.(jpe?g|png|webp|bmp|gif|tiff?|heic|heif|hif)$/i, HEICX = /\.(heic|heif|hif)$/i;
 
+var AVER = 2; // version de l'analyse : si elle change, les photos sont reanalysees (les choix P / X / etoiles sont gardes)
 var S = {
   photos: [], byId: {}, view: [], cur: -1, sel: new Set(), filter: "all", dir: null, groups: [], openGroup: -1,
   undo: [], analysing: false, saveT: 0
@@ -160,7 +161,7 @@ function reasons(p) {
   if (f.some(function (x) { return x.x < 0.004 || x.y < 0.004 || x.x + x.w > 0.996 || x.y + x.h > 0.996; }) && f.length) warn.push("Visage coupé par le bord");
   if (f.length >= 2) { var turned = f.filter(function (x) { return x.yaw != null && Math.abs(x.yaw) > 0.42; }).length; if (turned) warn.push(turned + " personne" + (turned > 1 ? "s tournent" : " tourne") + " la tête"); }
   if (a.tilt) warn.push("Horizon penché (" + Math.abs(a.tilt).toFixed(1).replace(".", ",") + "°)");
-  var ae = aesScore(a); if (ae != null && ae >= 72) good.push("Belle image (œil artistique)");
+  var ae = aesScore(a); if (ae != null && ae >= 72 && !rej.length && !warn.some(function (t) { return /Netteté|bougé/.test(t); })) good.push("Belle image (œil artistique)");
   var g = p.g >= 0 ? S.groups[p.g] : null;
   if (g) {
     if (p.best) good.push("Meilleure de la série (" + g.length + " photos)");
@@ -222,7 +223,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";

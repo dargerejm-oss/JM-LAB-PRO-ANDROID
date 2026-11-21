@@ -144,6 +144,32 @@ function sharpAt(bmp, sx, sy, sw, sh, k) {
   // nettete : moyenne de la direction la plus nette et de la plus floue ; bouge : ecart entre les deux
   return {v: (mx + mn) / 2, max: mx, min: mn, n: ok.reduce(function (s, o) { return s + o.n; }, 0)};
 }
+/* flou par « re-floutage » (Crété-Roffet, 2007) : on floute la zone et on regarde ce qui change.
+   Une zone nette perd beaucoup de detail, une zone deja floue presque rien. Resultat : 0 = net, 1 = tres flou.
+   La zone est d'abord ramenee a une taille fixe (ex. l'oeil a 160 px) : la mesure ne depend plus de la taille de la photo. */
+function cropGray(bmp, sx, sy, sw, sh, dw) {
+  sx = Math.max(0, Math.round(sx)); sy = Math.max(0, Math.round(sy)); sw = Math.round(Math.min(sw, bmp.width - sx)); sh = Math.round(Math.min(sh, bmp.height - sy));
+  if (sw < 16 || sh < 16) return null;
+  var k = Math.min(1, dw / sw), w = Math.max(16, Math.round(sw * k)), h = Math.max(16, Math.round(sh * k));
+  var c = canvas(w, h), x = c.getContext("2d", {willReadFrequently: true}); x.imageSmoothingQuality = "high"; x.drawImage(bmp, sx, sy, sw, sh, 0, 0, w, h);
+  return {g: grayOf(x.getImageData(0, 0, w, h), w, h), w: w, h: h};
+}
+function creteBlur(o) {
+  if (!o) return null;
+  var g = o.g, w = o.w, h = o.h, R = 4, res = [];
+  [[1, 0], [0, 1]].forEach(function (d) {
+    var dx = d[0], dy = d[1], sF = 0, sV = 0;
+    for (var y = R + 1; y < h - R; y++) for (var x = R + 1; x < w - R; x++) {
+      var p = y * w + x, q = p - dy * w - dx, b1 = 0, b2 = 0;
+      for (var t = -R; t <= R; t++) { b1 += g[p + t * (dy * w + dx)]; b2 += g[q + t * (dy * w + dx)]; }
+      var dF = Math.abs(g[p] - g[q]), dB = Math.abs(b1 - b2) / (2 * R + 1);
+      sF += dF; sV += Math.max(0, dF - dB);
+    }
+    res.push(sF > 0 ? (sF - sV) / sF : 1);
+  });
+  return Math.max(res[0], res[1]);
+}
+function creteScore(b) { return b == null ? null : Math.max(0, Math.min(100, Math.round((0.62 - b) / (0.62 - 0.30) * 100))); }
 function toScore(v) { return Math.max(0, Math.min(100, Math.round((v - 0.40) / (0.80 - 0.40) * 100))); }
 
 /* horizon penche : parmi les bords forts, cherche une ligne longue presque horizontale (entre 0,8 et 8 degres) */
@@ -193,7 +219,7 @@ function colorSig(img) {
 }
 
 async function analyse(msg) {
-  var out = {id: msg.id};
+  var out = {id: msg.id, v: 2};
   var blob = new Blob([msg.buf], {type: "image/jpeg"});
   // informations de prise de vue
   try {
@@ -249,6 +275,8 @@ async function analyse(msg) {
     if (r) { all.push(r); if (!best || r.v > best.v) { best = r; best.zone = {x: (cx - crop / 2) / W, y: (cy - crop / 2) / H, w: crop / W, h: crop / H}; } }
   }
   out.sharp = best ? toScore(best.v) : 0;
+  // double verification par « re-floutage » sur la zone la plus nette, ramenee a une taille fixe
+  if (best && best.zone) { var zb = creteBlur(cropGray(bmp, best.zone.x * W, best.zone.y * H, best.zone.w * W, best.zone.h * H, 360)); out.sharpBlur = zb != null ? Math.round(zb * 1000) / 1000 : null; var zc = creteScore(zb); if (zc != null) out.sharp = Math.min(out.sharp, Math.round(zc * 0.5 + out.sharp * 0.5)); }
   out.sharpRaw = best ? Math.round(best.max * 1000) / 1000 + "/" + Math.round(best.min * 1000) / 1000 : 0;
   out.zone = best ? best.zone : null;
   // bouge : toutes les zones detaillees sont nettes dans une direction mais floues dans l'autre
@@ -272,7 +300,8 @@ async function analyse(msg) {
           var ex1 = pts[33], ex2 = pts[263], eyeW = Math.abs(ex2.x - ex1.x) * W, ecx = (ex1.x + ex2.x) / 2 * W, ecy = (ex1.y + ex2.y) / 2 * H;
           var ew = Math.max(48, eyeW * 1.6), eh = Math.max(36, eyeW * 0.7);
           var es = sharpOfCrop(bmp, ecx - ew / 2, ecy - eh / 2, ew, eh);
-          var fs2 = sharpOfCrop(bmp, minx * W, miny * H, bw * W, bh * H);
+          var ecb = creteBlur(cropGray(bmp, ecx - ew / 2, ecy - eh / 2, ew, eh, 160 * 1.6)), eCre = creteScore(ecb);
+          var fs2 = sharpOfCrop(bmp, minx * W, miny * H, bw * W, bh * H), fCre = creteScore(creteBlur(cropGray(bmp, minx * W, miny * H, bw * W, bh * H, 300)));
           // visage redresse (yeux a l'horizontale) 150 x 150 : sert a reconnaitre la personne
           var le = {x: (pts[33].x + pts[133].x) / 2 * W, y: (pts[33].y + pts[133].y) / 2 * H}, re = {x: (pts[263].x + pts[362].x) / 2 * W, y: (pts[263].y + pts[362].y) / 2 * H};
           var ang = Math.atan2(re.y - le.y, re.x - le.x), fcx = (minx + bw / 2) * W, fcy = (miny + bh / 2) * H, side = Math.max(bw * W, bh * H) * 1.1;
@@ -284,7 +313,7 @@ async function analyse(msg) {
           var yaw = Math.round((nose.x * W - eyeMid) / eyeD * 100) / 100;
           out.faces.push({yaw: yaw, px: px, lum: fn ? Math.round(fl / fn) : null, x: minx, y: miny, w: bw, h: bh, blink: Math.round(blink * 100) / 100, blinkMin: Math.round(blinkMin * 100) / 100,
             closed: blinkMin > 0.5, half: !(blinkMin > 0.5) && blink > 0.45, smile: Math.round(smile * 100) / 100,
-            eyeSharp: es ? toScore(es.v) : null, faceSharp: fs2 ? toScore(fs2.v) : null});
+            eyeSharp: eCre != null ? (es ? Math.min(toScore(es.v), eCre) : eCre) : (es ? toScore(es.v) : null), eyeBlur: ecb != null ? Math.round(ecb * 1000) / 1000 : null, eyeRatio: es ? toScore(es.v) : null, faceSharp: fs2 ? (fCre != null ? Math.min(toScore(fs2.v), fCre) : toScore(fs2.v)) : fCre});
         });
       } catch (e) { self.postMessage({log: "visages : " + e.message}); }
     }

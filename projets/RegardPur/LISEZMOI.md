@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.0 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.0.1 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -37,6 +37,10 @@ Version 3.0 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - **💄 Retouche portrait** (2.11, vue en grand) : préréglages Naturel, Éclat, Glamour, Mariage, Homme, Enfant + intensité ; peau (lissage qui garde le grain et les contours), acné, taches, rousseur, cernes, rides du sourire et du front, blanc des yeux, iris, dents, lèvres, éclat du visage, fond (flou, assombri, désaturé) ; aperçu avant / après ; appliquer à la photo, la personne, la série ou toutes ; mémorisé par catégorie et client ; faite à l'export en pleine résolution. Points du visage MediaPipe + séparation « selfie multiclass » (sans internet).
 - **🩹 Correcteur** (2.12, vue en grand) : on peint sur une tache ou un objet, la zone est reconstruite avec la matière voisine (même moteur que JM LAB PRO, extrait de `jmfx2.js`) ; annuler, tout effacer, taille ; fait à l'export en pleine résolution.
 - **Session** enregistrée dans le dossier (`.regardpur/`) : en rouvrant le dossier, tout est repris tout de suite.
+
+## Mesure de la netteté (3.0.1)
+- Deux mesures, on garde la plus sévère : largeur des bords (100 % / 50 %) et « re-floutage » (Crété-Roffet 2007) sur une zone ramenée à une taille fixe (œil à 160 px, visage à 300 px, zone nette à 360 px) : ne dépend plus de la taille de la photo, ne se laisse plus tromper par une photo très floue.
+- Version d'analyse `AVER = 2` : une session plus ancienne est réanalysée automatiquement (choix P / X / étoiles gardés).
 
 ## Fabrication
 - Code : `app/` (Electron). La fenêtre est dans `app/renderer/` (HTML / JavaScript), la même base servira pour Android.
