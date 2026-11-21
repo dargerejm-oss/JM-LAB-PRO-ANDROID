@@ -39,7 +39,7 @@ dans `projets/RegardPur/LISEZMOI.md`. Le .exe est fabriqué par `.github/workflo
 `regardpur`, jamais « latest » pour ne pas casser le lien de JM LAB PRO). Tests : servir `renderer/` (python3 -m http.server)
 et Playwright, ou le vrai programme avec `xvfb-run` + `_electron` (dialogue de dossier remplacé dans le test).
 Le dépôt est public : l'utilisateur a refusé un dépôt privé séparé pour Regard Pur (ne pas le reproposer).
-Fait jusqu'à 3.3 (voir LISEZMOI : nouvelle interface, flou revu, « Pas d'accord », qualité d'image, réglages complets) : tri, personnes, œil artistique (NIMA), composition, rendu JM LAB PRO à l'export,
+Fait jusqu'à 3.6 (3.4 outils JM LAB PRO + glisser façon Snapseed ; 3.5 « Corriger les problèmes » ; 3.6 Niveaux, courbes R/V/B, Déflouter repris de CORRECTION_FLOU_PRO.py) (voir LISEZMOI : nouvelle interface, flou revu, « Pas d'accord », qualité d'image, réglages complets) : tri, personnes, œil artistique (NIMA), composition, rendu JM LAB PRO à l'export,
 catégories (idées de « Vrai Regard » sans doublon), retouche rapide apprise, Retouche portrait.
 Reste (ordre) : outils adaptés au type de photo, outils créatifs JM LAB PRO (Détails, HDR, Théâtral…), puis la suite ci-dessous.
 Suite décidée avec l'utilisateur, dans l'ordre : correcteur au pinceau (fait), RÉORGANISATION DE L'INTERFACE (faite)
@@ -47,3 +47,11 @@ Suite décidée avec l'utilisateur, dans l'ordre : correcteur au pinceau (fait),
 les gros dossiers + temps restant, export simplifié avec options avancées repliées, sections repliables, bulles d'aide « ? »),
 « garder les N meilleures », ciel + recadrage auto, style appris depuis Lightroom (XMP), vrais RAW, version anglaise,
 puis EN DERNIER mode d'emploi PDF + aide intégrée en FRANÇAIS ET ANGLAIS. PAS de version Android pour le moment.
+
+### Regard Pur — à faire ensuite (validé par l'utilisateur)
+1. Déflouter plus rapide (FFT optimisée, bougé via a.motion au lieu du tenseur : l'horizon trompe la détection).
+2. IA locale façon Topaz (accord donné) : Real-ESRGAN (dépixeliser/agrandir) + NAFNet (déflouter), puis SCUNet (bruit), GFPGAN (visages, en option avec avant/après).
+3. Idées d'AUDIT_PHOTOS_PRO.py : cadre ajouté, signature, doublons tolérant la rotation, taille différente dans un groupe, choix de l'original.
+4. Outils Python : lunettes (TRI_YEUX_LUNETTES_PRO), séances par écarts de temps (TRI_SHOOTING_PRO), rotation + corbeille (VISIONNEUSE), lieux GPS en option, contrôle d'impression (ARCHIVAGE_TRI_PRO).
+5. Outils selon le type de photo, « garder les N meilleures », ciel + recadrage auto, style Lightroom (XMP) ET DxO (.dop, attendre des exemples), vrais RAW, version anglaise, puis manuel PDF + aide FR/EN.
+Les outils Python de l'utilisateur ne vont JAMAIS dans le dépôt (public) : les redemander s'ils ne sont plus dans le dossier temporaire.
