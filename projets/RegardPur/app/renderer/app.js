@@ -222,7 +222,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -238,7 +238,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -684,7 +684,9 @@ function showPanel() {
   var ex = expoScore(a); h += bar("Exposition", ex, colOf(ex), ex + (a.expo.hi > 2 ? " · blancs brûlés " + a.expo.hi + " %" : "") + (a.expo.lo > 5 ? " · noirs " + a.expo.lo + " %" : ""));
   $("pvBars").innerHTML = h;
   var w = p.why || reasons(p);
-  $("pvWhy").innerHTML = "<div style='color:var(--mut)'>📁 Catégorie : " + CATS[catOf(p)].nom + ($("sCat").value === "auto" ? " (devinée)" : "") + "</div>" + w.rej.map(function (t) { return '<div style="color:var(--rej)">✖ ' + esc(t) + "</div>"; }).join("") + w.warn.map(function (t) { return '<div style="color:var(--doubt)">⚠ ' + esc(t) + "</div>"; }).join("") + w.good.map(function (t) { return '<div style="color:var(--keep)">✔ ' + esc(t) + "</div>"; }).join("");
+  var ab = adjBias(p);
+  $("pvWhy").innerHTML = "<div style='color:var(--mut)'>📁 Catégorie : " + CATS[catOf(p)].nom + ($("sCat").value === "auto" ? " (devinée)" : "") + "</div>" +
+    (p.adj ? "<div style='color:var(--gold)'>🎚 Votre retouche : " + (p.adj.ev > 0 ? "+" : "") + p.adj.ev.toFixed(1) + " EV, chaleur " + (p.adj.wb > 0 ? "+" : "") + p.adj.wb + "</div>" : ab ? "<div style='color:var(--gold)'>🧠 Retouche apprise (" + ab.n + " photos) : " + (ab.ev > 0 ? "+" : "") + ab.ev.toFixed(1).replace(".", ",") + " EV, chaleur " + (ab.wb > 0 ? "+" : "") + ab.wb + "</div>" : "") + w.rej.map(function (t) { return '<div style="color:var(--rej)">✖ ' + esc(t) + "</div>"; }).join("") + w.warn.map(function (t) { return '<div style="color:var(--doubt)">⚠ ' + esc(t) + "</div>"; }).join("") + w.good.map(function (t) { return '<div style="color:var(--keep)">✔ ' + esc(t) + "</div>"; }).join("");
   var cv = $("pvHist"), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
   if (a.hist) { var mx = Math.max.apply(null, a.hist.slice(1, 63)) || 1; x.fillStyle = "#9aa3b2"; a.hist.forEach(function (v, i) { var hh = Math.min(1, v / mx) * (cv.height - 4); x.fillRect(i * cv.width / 64, cv.height - hh, cv.width / 64 + 0.5, hh); }); }
   $("pvExif").innerHTML = exifTxt(a) + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px" + (p.raw ? " (aperçu du RAW)" : "") : "");
@@ -732,6 +734,40 @@ function zoomFace(k) {
 $("pvFaces").addEventListener("click", function (e) { var c = e.target.closest(".fc"); if (c) zoomFace(+c.dataset.k); });
 $("lpFaces").addEventListener("click", function (e) { var c = e.target.closest(".fc"); if (c) zoomFace(+c.dataset.k); });
 
+/* ---------------- retouche rapide + apprentissage de vos corrections (idee de « Vrai Regard ») ----------------
+   chaque correction (exposition, chaleur) est retenue par categorie et par client ; a l'export, les photos
+   sans retouche recoivent votre correction habituelle */
+var LADJ = (function () { try { return JSON.parse(localStorage.getItem("rp_adj")) || {}; } catch (e) { return {}; } })();
+function adjKeys(p) { var c = catOf(p), cl = ($("tClient").value || "").trim(); return cl ? [c + "|" + cl, c] : [c]; }
+function adjLearn(p, old) {
+  adjKeys(p).forEach(function (k) {
+    var o = LADJ[k] || {n: 0, ev: 0, wb: 0, s: {}};
+    if (old) { o.ev -= old.ev; o.wb -= old.wb; o.n--; }
+    if (p.adj && (p.adj.ev || p.adj.wb)) { o.ev += p.adj.ev; o.wb += p.adj.wb; o.n++; }
+    o.n = Math.max(0, o.n); LADJ[k] = o;
+  });
+  try { localStorage.setItem("rp_adj", JSON.stringify(LADJ)); } catch (e) {}
+}
+function adjBias(p) { var ks = adjKeys(p); for (var i = 0; i < ks.length; i++) { var o = LADJ[ks[i]]; if (o && o.n >= 3) return {ev: Math.round(o.ev / o.n * 10) / 10, wb: Math.round(o.wb / o.n), n: o.n, k: ks[i]}; } return null; }
+function adjShow(p) {
+  var a = p.adj || {ev: 0, wb: 0};
+  $("lpEv").value = Math.round(a.ev * 10); $("lpWb").value = a.wb;
+  $("lpEvV").textContent = (a.ev > 0 ? "+" : "") + a.ev.toFixed(1).replace(".", ","); $("lpWbV").textContent = (a.wb > 0 ? "+" : "") + a.wb;
+  var img = $("lpImg"), w = $("lpWarm");
+  img.style.filter = a.ev ? "brightness(" + Math.pow(2, a.ev * 0.85).toFixed(3) + ")" : "";
+  w.style.background = a.wb > 0 ? "#ff9a3c" : "#3c8cff"; w.style.opacity = Math.min(0.6, Math.abs(a.wb) / 50);
+  w.style.left = full.tx + "px"; w.style.top = full.ty + "px"; w.style.width = img.naturalWidth * full.sc + "px"; w.style.height = img.naturalHeight * full.sc + "px";
+}
+function adjSet() {
+  var p = S.byId[S.view[S.cur]]; if (!p) return;
+  var old = p.adj ? {ev: p.adj.ev, wb: p.adj.wb} : null, ev = +$("lpEv").value / 10, wb = +$("lpWb").value;
+  p.adj = (ev || wb) ? {ev: ev, wb: wb} : null;
+  clearTimeout(adjSet.t); adjShow(p);
+  adjSet.t = setTimeout(function () { adjLearn(p, old && (old.ev || old.wb) ? old : null); saveSoon(); }, 600);
+}
+$("lpEv").addEventListener("input", adjSet); $("lpWb").addEventListener("input", adjSet);
+$("lpAdj0").onclick = function () { $("lpEv").value = 0; $("lpWb").value = 0; adjSet(); };
+
 /* ---------------- vue en grand (loupe) ---------------- */
 var full = {cache: new Map(), zoom: false, sc: 1, tx: 0, ty: 0}, fullWait = {};
 function fullUrl(p) {
@@ -757,7 +793,8 @@ function fit() {
 function apply() {
   var img = $("lpImg"); img.style.transform = "translate(" + full.tx + "px," + full.ty + "px) scale(" + full.sc + ")";
   $("lpView").classList.toggle("zoom", full.zoom);
-  var o = $("lpOver"), W = img.naturalWidth * full.sc, H = img.naturalHeight * full.sc;
+  var o = $("lpOver"), W = img.naturalWidth * full.sc, H = img.naturalHeight * full.sc, wm = $("lpWarm");
+  wm.style.left = full.tx + "px"; wm.style.top = full.ty + "px"; wm.style.width = W + "px"; wm.style.height = H + "px";
   o.style.left = full.tx + "px"; o.style.top = full.ty + "px"; o.style.width = W + "px"; o.style.height = H + "px";
 }
 function drawLoupeMarks(p) {
@@ -778,7 +815,7 @@ function showLoupe() {
     fullUrl(p).then(function (u) { if (img.dataset.id !== id || !u) return; img.onload = function () { img.dataset.full = id; if (!full.zoom) fit(); drawLoupeMarks(p); }; img.src = u; });
     var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
   } else drawLoupeMarks(p);
-  drawFaces($("lpFaces"), p);
+  drawFaces($("lpFaces"), p); adjShow(p);
   var w = p.why || {rej: [], warn: [], good: []};
   $("lpInfo").innerHTML = (p.a && !p.a.err ? "<b style='font-size:18px;color:" + colOf(p.score) + "'>" + p.score + "</b> / 100 · " + (p.status === "P" ? "<span style='color:var(--keep)'>✔ gardée</span>" : p.status === "X" ? "<span style='color:var(--rej)'>✖ rejetée</span>" : "à voir") + "<br>" : "") +
     w.rej.map(function (t) { return "<span style='color:var(--rej)'>✖ " + esc(t) + "</span>"; }).concat(w.warn.map(function (t) { return "<span style='color:var(--doubt)'>⚠ " + esc(t) + "</span>"; }), w.good.map(function (t) { return "<span style='color:var(--keep)'>✔ " + esc(t) + "</span>"; })).join("<br>");
@@ -955,6 +992,8 @@ function styleFor(p, base) {
   else o.skin = 0.85;
   if (o.profile === "cat") o.profile = cat.prof;
   if (REND.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
+  var ad = p.adj || adjBias(p);
+  if (ad) { o.v = o.v || {}; o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100) / 0.85 * 0.85; o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   return o;
 }
 var devWait = {};

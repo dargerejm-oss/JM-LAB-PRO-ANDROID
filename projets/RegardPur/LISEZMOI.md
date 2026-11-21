@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.9 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.10 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
@@ -25,6 +25,7 @@ Version 2.9 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - **🎨 Rendu JM LAB PRO à l'export** (2.7) : profils, ProLab automatique, intensité, protection des hautes lumières et code de style `JMLAB_PRESET:…` de l'appli ; même moteur que JM LAB PRO (extrait de `app/src/main/assets` par `tools/jmlab_core.js` à chaque fabrication) ; fichiers `_JMD_LAB_PRO.jpg` avec EXIF conservé ; originaux jamais modifiés.
 - **📊 Bilan de la séance** (gardées / rejetées / à voir, raisons, 5 meilleures, temps gagné) et **guide du premier lancement** (5 écrans, à revoir depuis ❔).
 - **Catégories de séance** (2.9, idées reprises de « Vrai Regard » sans doublon) : Auto (devinée photo par photo, la nuit confirmée par l'heure / ISO / pose) ou mariage, portrait, famille, contre-jour, plage, paysage, nuit. Le tri en tient compte (nuit sombre, contre-jour et plage clairs, robe blanche) ; à l'export : correction des tons vers les cibles de la catégorie (remplace l'exposition auto ProLab pour ne pas corriger deux fois), profil JM LAB PRO conseillé, **peau protégée**, **horizon redressé**, nommage `categorie_client_001.jpg`, **mémoire des réglages par client**.
+- **Retouche rapide** dans la vue en grand (☀ exposition, 🌡 chaleur) et **apprentissage de vos retouches** par catégorie et par client (idée « leçons » de Vrai Regard) : appliquées à l'export aux photos non retouchées.
 - **Session** enregistrée dans le dossier (`.regardpur/`) : en rouvrant le dossier, tout est repris tout de suite.
 
 ## Fabrication

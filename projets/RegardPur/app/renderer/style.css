@@ -148,3 +148,10 @@ input[type=range]{accent-color:var(--gold);width:100%}
 .prs b{flex:1;font-weight:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .prs span{font-size:12px;color:var(--mut);background:#0005;border-radius:9px;padding:0 7px}
 #persHint{font-weight:400;text-transform:none;letter-spacing:0}
+
+/* retouche rapide dans la vue en grand */
+.adj{display:flex;align-items:center;gap:4px;font-size:13px;margin-left:6px;padding-left:8px;border-left:1px solid var(--line)}
+.adj input{width:80px}
+.adj b{width:30px;font-size:11px;color:var(--mut);font-weight:400}
+.adj button{padding:2px 7px}
+#lpWarm{position:absolute;pointer-events:none;mix-blend-mode:soft-light;transform-origin:0 0}
