@@ -28,3 +28,7 @@ Ne PAS ajouter : Perspective, Noir et blanc complet.
 - GitHub construit l'APK et l'AAB à chaque envoi (`.github/workflows/build.yml`) ; la clé de signature est dans les secrets GitHub.
 - Tests dans le navigateur (Playwright) : ouvrir `app/src/main/assets/index.html` ; pour le lot et l'enregistrement,
   simuler `window.JMNative` (la partie Android) et servir le dossier assets en local (`python3 -m http.server`).
+
+## Mode d'emploi et PDF
+- Pour TOUTES les captures du mode d'emploi et des PDF (français et anglais), utiliser **l'image du singe**
+  fournie par l'utilisateur (à demander si elle n'est pas dans la conversation), pas les photos personnelles.
