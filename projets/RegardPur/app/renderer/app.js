@@ -468,6 +468,7 @@ function pump() {
 }
 function onResult(w, e) {
   var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (r.meas !== undefined) { var cbm = prevWait[r.id]; delete prevWait[r.id]; if (cbm) cbm(r); return; }
   if (r.faces5 !== undefined) { var cbf = prevWait[r.id]; delete prevWait[r.id]; if (cbf) cbf(r); return; }
   if (r.joined !== undefined) { var cbj = prevWait[r.id]; delete prevWait[r.id]; if (cbj) cbj(r); return; }
   if (r.prev !== undefined) { var cbp = prevWait[r.id]; delete prevWait[r.id]; if (cbp) cbp(r); return; }
@@ -1092,13 +1093,65 @@ function fixPhoto(p) {
   d.fix = done;
   return done.length ? d : null;
 }
-function fixRun(list) {
-  var n = 0, none = 0;
+/* « Corriger les problemes » plus efficace : le bon outil pour chaque defaut, dans le bon ordre (bruit, flou, pixels / compression,
+   visages), chaque correction IA mesuree avant / apres et annulee si elle n'ameliore pas ; les corrections que vous annulez
+   souvent ne sont plus proposees d'office (apprentissage) */
+var AIPREF = {}; try { AIPREF = JSON.parse(localStorage.getItem("rp_aipref") || "{}"); } catch (e) {}
+function aiPrefAdd(k, f) { var o = AIPREF[k] = AIPREF[k] || {auto: 0, undo: 0}; o[f]++; try { localStorage.setItem("rp_aipref", JSON.stringify(AIPREF)); } catch (e) {} }
+function aiRefused(k) { var o = AIPREF[k]; return !!o && o.undo >= 2 && o.undo > o.auto * 0.5; }
+function aiNeeds(p) {
+  var a = p.a; if (!a || a.err) return [];
+  var out = [], er = eyeRaw(a), sh = er != null ? er : a.sharp, f = bigFaces(a);
+  if (AI.has.scu && a.noiseView != null && a.noiseView > 5 && (a.mp || 0) >= 0.8) out.push("scu");
+  if (AI.has.naf && sh != null && (sh < 35 || a.motion > 55)) out.push("naf");
+  if (AI.has.esr && (a.pix || (a.up != null && a.up > 0.07) || (a.jq != null && a.jq < 45))) out.push("esr");
+  if (AI.has.gfp && $("fixFace").checked && f.length && er != null && er < 30) out.push("face");
+  return out;
+}
+function measure(p) {
+  return readBytes(p).then(function (b) { if (!b) return null; ensurePool(); var w = pool[0], key = "ms:" + p.id + Date.now(), c = b.slice();
+    return new Promise(function (res) { prevWait[key] = function (r) { res(r.meas); }; w.postMessage({id: key, buf: c.buffer, heic: heicOf(p), measure: true}, [c.buffer]); }); });
+}
+function qualOf(a, k) { // ce qu'on attend de chaque correction
+  if (!a || a.err) return null; var er = eyeRaw(a), sh = er != null ? er : a.sharp;
+  if (k === "scu") return {v: -(a.noiseView || 0), txt: "bruit " + String(Math.round((a.noiseView || 0) * 10) / 10).replace(".", ","), sh: sh};
+  return {v: sh || 0, txt: "netteté " + Math.round(sh || 0), sh: sh};
+}
+async function fixRun(list) {
+  var n = 0, none = 0, ai = AI.ok && N && $("fixAi").checked, gains = [], skipped = {};
   list.forEach(function (p) { var d = fixPhoto(p); if (d) { p.dev = d; n++; updCard(p); } else none++; });
+  if (ai) {
+    AI.busy = true; aiShow(); var todo = list.map(function (p) { return [p, aiNeeds(p).filter(function (k) { if (aiRefused(k)) { skipped[k] = 1; return false; } return true; })]; }).filter(function (x) { return x[1].length; });
+    for (var i = 0; i < todo.length; i++) {
+      var p = todo[i][0], ks = todo[i][1], before = p.a;
+      if (p.ai) { p.ai = null; full.cache.delete(p.id); } // on repart de l'original
+      for (var j = 0; j < ks.length; j++) {
+        var k = ks[j], q0 = qualOf(before, k), save = p.ai;
+        try {
+          await aiOne(p, k, i + 1, todo.length, true);
+          if (k !== "face") {
+            $("aiState").textContent = "⏳ Vérification du résultat…";
+            var m = await measure(p), q1 = qualOf(m, k);
+            if (q0 && q1 && (q1.v <= q0.v || (k === "scu" && q1.sh < q0.sh * 0.7))) { p.ai = save; full.cache.delete(p.id); gains.push(p.name + " : " + AIW[k] + " annulée (pas d'amélioration)"); continue; }
+            if (q0 && q1) { var g = q0.txt + " → " + q1.txt.replace(/^\D+/, ""); p.ai.gain = (p.ai.gain ? p.ai.gain + ", " : "") + g; before = m; }
+          }
+          p.ai.auto = true; aiPrefAdd(k, "auto");
+          if (p.dev) { p.dev.fix = (p.dev.fix || []).concat([AIW[k] + " par IA" + (k !== "face" && p.ai.gain ? "" : "")]);
+            if (k === "naf") { p.dev.deblur = null; var L2 = p.dev.looks || {}; if (L2.details) L2.details.n = Math.min(L2.details.n || 0, 15); } }
+          else { p.dev = DEV_DEF(); p.dev.fix = [AIW[k] + " par IA"]; }
+        } catch (e) { gains.push(p.name + " : " + (e.message || e)); }
+      }
+      if (p.ai && p.ai.gain) gains.push(p.name + " : " + p.ai.gain);
+      updCard(p); n += p.dev && !list.indexOf ? 0 : 0;
+    }
+    AI.busy = false;
+  }
   saveSoon();
-  if (!n) { toast("Aucun problème corrigeable sur " + (list.length > 1 ? "ces photos" : "cette photo") + "."); return; }
-  toast(n + " photo" + (n > 1 ? "s corrigées" : " corrigée") + (none ? " (" + none + " sans problème à corriger)" : "") + ". Finition possible dans Retoucher.", 4000);
-  if (S.tab !== "retoucher") setTab("retoucher"); else { var p = S.byId[S.view[S.cur]]; devShow(p); rpPreview(); }
+  var nn = list.filter(function (p) { return p.dev && p.dev.fix && p.dev.fix.length; }).length;
+  if (!nn) { aiShow(S.byId[S.view[S.cur]]); toast("Aucun problème corrigeable sur " + (list.length > 1 ? "ces photos" : "cette photo") + "."); return; }
+  var sk = Object.keys(skipped).map(function (k) { return AIW[k]; });
+  toast(nn + " photo" + (nn > 1 ? "s corrigées" : " corrigée") + ". " + (gains.length ? gains.slice(0, 3).join(" · ") + (gains.length > 3 ? "…" : "") + ". " : "") + (sk.length ? "Non proposé (souvent annulé par vous) : " + sk.join(", ") + ". " : "") + "Finition possible dans Retoucher.", 7000);
+  if (S.tab !== "retoucher") setTab("retoucher"); else { var pc = S.byId[S.view[S.cur]]; devShow(pc); rpPreview(); }
 }
 function fixTargets() { return S.sel.size ? Array.from(S.sel).map(function (id) { return S.byId[id]; }) : [S.byId[S.view[S.cur]]].filter(Boolean); }
 $("bFix").onclick = function () { fixRun(fixTargets()); };
@@ -1199,20 +1252,22 @@ var prevWait = {};
 var AI = {ok: false, busy: false, has: {}};
 var AIK = {naf: "Déflouée par IA", esr: "Restaurée par IA", x2: "Agrandie ×2 par IA", scu: "Débruitée par IA", face: "Visages réparés par IA"};
 function aiShow(p) {
-  if (!AI.ok) return; $("aiBox").style.display = "";
+  if (!AI.ok) return; $("aiBox").style.display = ""; $("fixOpts").style.display = "";
   [["aiNaf", "naf"], ["aiEsr", "esr"], ["aiX2", "esr"], ["aiScu", "scu"], ["aiGfp", "gfp"]].forEach(function (k) { $(k[0]).disabled = AI.busy; $(k[0]).style.display = AI.has[k[1]] ? "" : "none"; });
-  if (!AI.busy) $("aiState").textContent = p && p.ai ? "✓ " + AIK[p.ai.kind] + " (vos réglages s'appliquent par-dessus)." : "";
+  if (!AI.busy) $("aiState").textContent = p && p.ai ? "✓ " + aiLabel(p.ai) + (p.ai.gain ? " — " + p.ai.gain : "") + " (vos réglages s'appliquent par-dessus)." : "";
   $("aiOff").style.display = p && p.ai && !AI.busy ? "" : "none";
 }
+var AIW = {naf: "défloutée", esr: "restaurée", x2: "agrandie ×2", scu: "débruitée", face: "visages réparés"};
+function aiLabel(ai) { var k = ai.kinds || [ai.kind]; return k.length === 1 ? AIK[k[0]] : "IA : " + k.map(function (x) { return AIW[x]; }).join(", puis "); }
 function aiJoin(jpg, orig) { // remet les informations de prise de vue (EXIF) de l'original
   ensurePool(); var w = pool[0], key = "ej:" + Date.now() + Math.random();
   return new Promise(function (res) { prevWait[key] = function (r) { res(r.joined || jpg); }; w.postMessage({id: key, exifjoin: true, jpg: jpg.buffer, orig: orig ? orig.buffer : null}); });
 }
-async function aiOne(p, kind, nb, of) {
-  if (kind === "face") return aiFace(p, nb, of);
-  var orig = await readBytes(p, true); if (!orig) throw new Error("photo illisible");
+async function aiOne(p, kind, nb, of, chain) {
+  if (kind === "face") return aiFace(p, nb, of, chain);
+  var first = await readBytes(p, true), orig = chain && p.ai ? await readBytes(p) : first; if (!orig) throw new Error("photo illisible");
   var blob;
-  if (p.heic) { blob = await new Promise(function (res) { ensurePool(); var w = pool[pool.length - 1], key = "full:ai:" + Date.now(), c = orig.slice(); fullWait[key] = function (bl) { res(bl); }; w.postMessage({id: key, buf: c.buffer, full: true}, [c.buffer]); }); if (!blob) throw new Error("HEIC illisible"); }
+  if (heicOf(p) && !(chain && p.ai)) { blob = await new Promise(function (res) { ensurePool(); var w = pool[pool.length - 1], key = "full:ai:" + Date.now(), c = orig.slice(); fullWait[key] = function (bl) { res(bl); }; w.postMessage({id: key, buf: c.buffer, full: true}, [c.buffer]); }); if (!blob) throw new Error("HEIC illisible"); }
   else blob = new Blob([orig]);
   var bm = await createImageBitmap(blob, {imageOrientation: "from-image"}), W = bm.width, H = bm.height, MP = W * H;
   var same = kind === "naf" || kind === "scu", model = same ? kind : $("aiSoft").value, d, tw, th;
@@ -1240,14 +1295,15 @@ async function aiOne(p, kind, nb, of) {
     xo.putImageData(fimg, 0, 0);
   } else xo.putImageData(new ImageData(new Uint8ClampedArray(out.buffer, out.byteOffset, out.length), tw, th), 0, 0);
   bm.close();
-  await aiSave(p, kind, co, p.heic || p.raw ? null : orig);
+  await aiSave(p, kind, co, p.heic || p.raw ? null : first, chain);
 }
-async function aiSave(p, kind, co, orig) {
+async function aiSave(p, kind, co, orig, chain) {
   var jpg = new Uint8Array(await (await co.convertToBlob({type: "image/jpeg", quality: 0.95})).arrayBuffer());
   jpg = await aiJoin(jpg, orig);
-  var file = sessPath("ia" + N.sep + String(p.rel || p.name).replace(/[\\\/:*?"<>|]+/g, "_").replace(/\.[^.]+$/, "") + "_" + kind + ".jpg");
+  var kinds = (chain && p.ai ? (p.ai.kinds || [p.ai.kind]) : []).concat([kind]);
+  var file = sessPath("ia" + N.sep + String(p.rel || p.name).replace(/[\\\/:*?"<>|]+/g, "_").replace(/\.[^.]+$/, "") + "_" + kinds.join("-") + ".jpg");
   await N.writeBin(file, jpg);
-  p.ai = {kind: kind, file: file, w: co.width, h: co.height}; full.cache.delete(p.id);
+  p.aiPrev = p.ai || null; p.ai = {kind: kind, kinds: kinds, file: file, w: co.width, h: co.height}; full.cache.delete(p.id);
 }
 /* visages : chaque visage est redresse sur le modele FFHQ (512 px), repare par GFPGAN, puis recolle en fondu */
 var FFHQ = [[192.98138, 239.94708], [318.90277, 240.1936], [256.63416, 314.01935], [201.26117, 371.41043], [313.08905, 371.15118]];
@@ -1256,7 +1312,7 @@ function simil(src, dst) { // similitude (echelle, rotation, deplacement) au sen
   var num1 = 0, num2 = 0, den = 0; for (i = 0; i < n; i++) { var x = src[i][0] - sx, y = src[i][1] - sy, u = dst[i][0] - dx, v = dst[i][1] - dy; num1 += x * u + y * v; num2 += x * v - y * u; den += x * x + y * y; }
   var a = num1 / den, b = num2 / den; return {a: a, b: b, tx: dx - (a * sx - b * sy), ty: dy - (b * sx + a * sy)};
 }
-async function aiFace(p, nb, of) {
+async function aiFace(p, nb, of, chain) {
   $("aiState").textContent = "⏳ Recherche des visages…";
   var cur = await readBytes(p); if (!cur) throw new Error("photo illisible");
   var hc = heicOf(p), blob;
@@ -1277,7 +1333,7 @@ async function aiFace(p, nb, of) {
     var det = T.a * T.a + T.b * T.b, A = T.a / det, B = -T.b / det, C = T.b / det, D = T.a / det;
     xo.save(); xo.imageSmoothingQuality = "high"; xo.globalAlpha = al; xo.setTransform(A, B, C, D, -(A * T.tx + C * T.ty), -(B * T.tx + D * T.ty)); xo.drawImage(rc, 0, 0); xo.restore();
   }
-  await aiSave(p, "face", co, p.heic || p.raw || p.ai ? null : cur);
+  await aiSave(p, "face", co, p.heic || p.raw || p.ai ? null : cur, true);
   return f5.length;
 }
 async function aiRun(kind) {
@@ -1292,7 +1348,7 @@ async function aiRun(kind) {
 $("aiNaf").onclick = function () { aiRun("naf"); };
 $("aiEsr").onclick = function () { aiRun("esr"); };
 $("aiX2").onclick = function () { aiRun("x2"); };
-$("aiOff").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p || !p.ai) return; p.ai = null; full.cache.delete(p.id); saveSoon(); aiShow(p); rpPreview(); updCard(p); };
+$("aiOff").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p || !p.ai) return; if (p.ai.auto) (p.ai.kinds || [p.ai.kind]).forEach(function (k) { aiPrefAdd(k, "undo"); }); p.ai = null; full.cache.delete(p.id); saveSoon(); aiShow(p); rpPreview(); updCard(p); };
 $("aiScu").onclick = function () { aiRun("scu"); };
 $("aiGfp").onclick = function () { aiRun("face"); };
 if (N && N.aiOk) N.aiOk().then(function (v) { AI.has = v || {}; AI.ok = Object.keys(AI.has).some(function (k) { return AI.has[k]; }); aiShow(S.byId[S.view[S.cur]]); });

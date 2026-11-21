@@ -599,6 +599,10 @@ self.onmessage = function (e) {
     }).then(function (f) { self.postMessage({id: m.id, faces5: f}); }, function (err) { self.postMessage({id: m.id, faces5: [], err: String(err && err.message || err)}); });
     return;
   }
+  if (m.measure) { // nouvelle mesure d'une photo corrigee (verification avant / apres)
+    queue = queue.then(function () { return analyse(m); }).then(function (r) { delete r.thumb; self.postMessage({id: m.id, meas: r}); }, function (err) { self.postMessage({id: m.id, meas: null}); });
+    return;
+  }
   if (m.exifjoin) { // JPEG produit par l'IA : on y remet les informations de prise de vue de l'original
     var ej = new Uint8Array(m.jpg), ex2 = m.orig ? exifOf(new Uint8Array(m.orig)) : null;
     if (ex2) { var rj = new Uint8Array(ej.length + ex2.length); rj.set(ej.subarray(0, 2), 0); rj.set(ex2, 2); rj.set(ej.subarray(2), 2 + ex2.length); ej = rj; }

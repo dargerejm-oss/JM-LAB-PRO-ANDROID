@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.7 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -88,7 +88,7 @@ Version 3.7 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - Déflouter (classique) deux fois plus rapide ; le bougé est repéré par l'analyse (l'horizon ne le trompe plus).
 - Modèles préparés par `.github/workflows/rp-modeles.yml` (publication « regardpur-modeles »).
 
-### Après 3.7 (pas encore publié : la prochaine version regroupera tout)
+### 3.8
 - IA : « Débruiter (IA) » (SCUNet, Apache-2.0) et « Visages (IA) » (GFPGAN v1.4, Apache-2.0 ; force Naturel / Marqué / Complet
   en Expert ; l'IA redessine le visage, à comparer avec l'original). L'IA tourne dans un processus à part (ai_child.js) :
   la fenêtre reste fluide et SCUNet fonctionne (il plantait dans le processus principal d'Electron).
@@ -96,3 +96,6 @@ Version 3.7 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
   retouche, recadrage, redressée, encadrée, plus petite) avec choix de l'original (sans cadre, la plus grande, la plus
   ancienne), filtres « Doublons », « Doublons de taille différente », « Cadre ajouté », bouton « Rejeter les doublons ».
   Analyse version 4 (les photos sont réanalysées une fois ; les choix sont gardés).
+- Signature / filigrane : « Ma signature… » (Options expert) puis recherche dans les coins et en bas ; filtres « Avec / Sans ma signature ».
+- « Corriger les problèmes » utilise l'IA si utile, dans l'ordre bruit → flou → pixels/compression → visages (option),
+  mesure avant / après (annule une correction qui n'améliore pas), et ne propose plus d'office ce que vous annulez souvent.
