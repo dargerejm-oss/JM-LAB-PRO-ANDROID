@@ -73,40 +73,64 @@ function applyCurves(ctx, w, h, s){
 
 /* ---------- correcteur : chaque point est remplace par la zone voisine la plus ressemblante ---------- */
 function heal(c, list){
-  var x = c.getContext("2d"), W = c.width, H = c.height;
-  list.forEach(function(sp){
-    var r = Math.max(3, Math.round(sp.r * Math.min(W, H))), cx = Math.round(sp.x * W), cy = Math.round(sp.y * H);
-    var R2 = Math.round(r * 1.5), size = R2 * 2;
-    function ring(px, py){
-      if(px - R2 < 0 || py - R2 < 0 || px + R2 > W || py + R2 > H) return null;
-      var d = x.getImageData(px - R2, py - R2, size, size).data, s = [0,0,0], n = 0, all = [];
-      for(var yy = 0; yy < size; yy += 2) for(var xx = 0; xx < size; xx += 2){
-        var dd = Math.hypot(xx - R2, yy - R2); if(dd < r || dd > R2) continue;
-        var i = (yy * size + xx) * 4; all.push(d[i], d[i+1], d[i+2]); s[0] += d[i]; s[1] += d[i+1]; s[2] += d[i+2]; n++;
-      }
-      return {v:all, mean:[s[0]/n, s[1]/n, s[2]/n]};
-    }
-    var tgt = ring(cx, cy); if(!tgt) return;
-    var best = null, bestE = 1e18;
-    for(var a = 0; a < 16; a++){
-      for(var dist = 2.2; dist <= 3.4; dist += 0.6){
-        var sx = Math.round(cx + Math.cos(a * Math.PI / 8) * r * dist), sy = Math.round(cy + Math.sin(a * Math.PI / 8) * r * dist);
-        var cand = ring(sx, sy); if(!cand) continue;
-        var e = 0; for(var k = 0; k < cand.v.length; k++){ var q = cand.v[k] - tgt.v[k]; e += q * q; }
-        if(e < bestE){ bestE = e; best = {x:sx, y:sy, mean:cand.mean}; }
-      }
+  var x = c.getContext("2d"), W = c.width, H = c.height, mn = Math.min(W, H);
+  list.forEach(function(sp, si){
+    var r = Math.max(2.5, sp.r * mn), rm = r * 1.15, R = Math.ceil(r * 1.45) + 2, size = 2 * R + 1;
+    var cx = Math.round(sp.x * W), cy = Math.round(sp.y * H);
+    /* zone a reparer trop pres du bord : on rapproche la fenetre de travail */
+    var tx = Math.max(0, Math.min(W - size, cx - R)), ty = Math.max(0, Math.min(H - size, cy - R));
+    if(size > W || size > H) return;
+    var ox = cx - tx, oy = cy - ty;                     /* centre du point dans la fenetre */
+    var T = x.getImageData(tx, ty, size, size).data;
+    /* anneau de comparaison autour du point */
+    var ring = [];
+    for(var yy = 0; yy < size; yy++) for(var xx = 0; xx < size; xx++){ var d = Math.hypot(xx - ox, yy - oy); if(d >= rm && d <= R) ring.push(yy * size + xx); }
+    if(ring.length < 8) return;
+    var tm = [0,0,0]; ring.forEach(function(k){ tm[0] += T[k*4]; tm[1] += T[k*4+1]; tm[2] += T[k*4+2]; }); tm = tm.map(function(v){ return v / ring.length; });
+    /* recherche de la zone source la plus ressemblante (structure + couleur), hors des autres points */
+    var best = null, bestE = Infinity, step = ring.length > 600 ? 3 : 1;
+    for(var a = 0; a < 24; a++) for(var di = 0; di < 4; di++){
+      var dist = [2.1, 2.6, 3.2, 4.0][di] * r, ang = a * Math.PI / 12;
+      var sx = Math.round(tx + Math.cos(ang) * dist), sy = Math.round(ty + Math.sin(ang) * dist);
+      if(sx < 0 || sy < 0 || sx + size > W || sy + size > H) continue;
+      var scx = sx + ox, scy = sy + oy, clash = false;
+      for(var o = 0; o < list.length; o++){ if(o === si) continue; var q = list[o]; if(Math.hypot(scx - q.x * W, scy - q.y * H) < r * 1.2 + q.r * mn) { clash = true; break; } }
+      if(clash) continue;
+      var Sd = x.getImageData(sx, sy, size, size).data, sm = [0,0,0];
+      for(var k = 0; k < ring.length; k += step){ var p = ring[k] * 4; sm[0] += Sd[p]; sm[1] += Sd[p+1]; sm[2] += Sd[p+2]; }
+      var n = Math.ceil(ring.length / step); sm = sm.map(function(v){ return v / n; });
+      var e = 0;
+      for(var k = 0; k < ring.length; k += step){ var p = ring[k] * 4; for(var ch = 0; ch < 3; ch++){ var q2 = (Sd[p+ch] - sm[ch]) - (T[p+ch] - tm[ch]); e += q2 * q2; } }
+      e = e / n + 0.15 * ((sm[0]-tm[0])*(sm[0]-tm[0]) + (sm[1]-tm[1])*(sm[1]-tm[1]) + (sm[2]-tm[2])*(sm[2]-tm[2])) + dist * 0.02;
+      if(e < bestE){ bestE = e; best = Sd; }
     }
     if(!best) return;
-    /* copie de la zone source avec bord adouci et couleur ajustee */
-    var src = x.getImageData(best.x - R2, best.y - R2, size, size), dst = x.getImageData(cx - R2, cy - R2, size, size), sd = src.data, dd2 = dst.data;
-    var off = [tgt.mean[0] - best.mean[0], tgt.mean[1] - best.mean[1], tgt.mean[2] - best.mean[2]];
-    for(var yy = 0; yy < size; yy++) for(var xx = 0; xx < size; xx++){
-      var dd = Math.hypot(xx - R2, yy - R2); if(dd >= R2) continue;
-      var al = dd <= r ? 1 : 1 - (dd - r) / (R2 - r); al = al * al * (3 - 2 * al);
-      var i = (yy * size + xx) * 4;
-      for(var ch = 0; ch < 3; ch++) dd2[i+ch] = dd2[i+ch] * (1 - al) + (sd[i+ch] + off[ch]) * al;
+    /* fondu sans raccord (Poisson) : sortie = source + correction douce qui rejoint exactement le bord */
+    var f = Math.max(1, Math.ceil(size / 72)), n2 = Math.ceil(size / f), inside = new Uint8Array(n2 * n2), hv = [new Float32Array(n2*n2), new Float32Array(n2*n2), new Float32Array(n2*n2)];
+    for(var gy = 0; gy < n2; gy++) for(var gx = 0; gx < n2; gx++){
+      var g = gy * n2 + gx, pcx = (gx + 0.5) * f, pcy = (gy + 0.5) * f;
+      if(Math.hypot(pcx - ox, pcy - oy) < rm) { inside[g] = 1; continue; }
+      var acc = [0,0,0], cnt = 0;
+      for(var yy = gy * f; yy < Math.min(size, (gy + 1) * f); yy++) for(var xx = gx * f; xx < Math.min(size, (gx + 1) * f); xx++){ var p = (yy * size + xx) * 4; for(var ch = 0; ch < 3; ch++) acc[ch] += T[p+ch] - best[p+ch]; cnt++; }
+      for(var ch = 0; ch < 3; ch++) hv[ch][g] = cnt ? acc[ch] / cnt : 0;
     }
-    x.putImageData(dst, cx - R2, cy - R2);
+    var avg = [0,0,0], nb = 0; for(var g = 0; g < n2 * n2; g++) if(!inside[g]){ for(var ch = 0; ch < 3; ch++) avg[ch] += hv[ch][g]; nb++; }
+    for(var g = 0; g < n2 * n2; g++) if(inside[g]) for(var ch = 0; ch < 3; ch++) hv[ch][g] = avg[ch] / Math.max(1, nb);
+    for(var it = 0; it < n2 * 4; it++) for(var g = 0; g < n2 * n2; g++){
+      if(!inside[g]) continue; var gx = g % n2, gy = (g / n2) | 0;
+      for(var ch = 0; ch < 3; ch++){ var h = hv[ch]; var v = (h[g - 1] + h[g + 1] + h[g - n2] + h[g + n2]) / 4; h[g] = h[g] + 1.85 * (v - h[g]); }
+    }
+    function hAt(ch, px, py){
+      var fx = Math.max(0, Math.min(n2 - 1.001, px / f - 0.5)), fy = Math.max(0, Math.min(n2 - 1.001, py / f - 0.5)), x0 = fx | 0, y0 = fy | 0, ax = fx - x0, ay = fy - y0, h = hv[ch];
+      return (h[y0*n2+x0] * (1-ax) + h[y0*n2+x0+1] * ax) * (1-ay) + (h[(y0+1)*n2+x0] * (1-ax) + h[(y0+1)*n2+x0+1] * ax) * ay;
+    }
+    var out = x.getImageData(tx, ty, size, size), O = out.data;
+    for(var yy = 0; yy < size; yy++) for(var xx = 0; xx < size; xx++){
+      var d = Math.hypot(xx - ox, yy - oy); if(d >= rm) continue;
+      var al = Math.min(1, (rm - d) / Math.max(1.5, r * 0.12)), p = (yy * size + xx) * 4;
+      for(var ch = 0; ch < 3; ch++){ var v = best[p+ch] + hAt(ch, xx, yy); O[p+ch] = T[p+ch] * (1 - al) + v * al; }
+    }
+    x.putImageData(out, tx, ty);
   });
 }
 
@@ -205,10 +229,24 @@ function exifDate(blob){
 window.__jmsFX2 = {pre:pre, post:post, active:active, summary:summary, exifDate:exifDate, get:get};
 
 /* ---------- image de travail pour les editeurs (apercu corrige, sans bandes sombres) ---------- */
+/* dimensions reelles de la photo ouverte : pour retrouver exactement la photo dans l'apercu (meme si ses bords sont sombres) */
+var nat = null;
+document.addEventListener("change", function(e){
+  var t = e.target; if(!t || t.type !== "file" || t.multiple || !t.files || !t.files[0]) return;
+  nat = null; var u = URL.createObjectURL(t.files[0]), im = new Image();
+  im.onload = function(){ nat = {w:im.naturalWidth, h:im.naturalHeight}; URL.revokeObjectURL(u); };
+  im.onerror = function(){ URL.revokeObjectURL(u); };
+  im.src = u;
+}, true);
 function photo(){
   var c = document.getElementById("filteredCanvas"); if(!c || c.style.display === "none" || c.width < 10) return null;
+  if(nat && nat.w && nat.h){
+    var k = Math.min(c.width / nat.w, c.height / nat.h), w = Math.round(nat.w * k), h = Math.round(nat.h * k);
+    var o = cvs(w, h); o.getContext("2d").drawImage(c, Math.round((c.width - w) / 2), Math.round((c.height - h) / 2), w, h, 0, 0, w, h); return o;
+  }
   return window.__jmsCrop ? window.__jmsCrop(c) : c;
 }
+window.__jmsPhoto = photo;
 function needPhoto(){ var p = photo(); if(!p) alert(T("Ouvre d'abord une image (bouton OUVRIR IMAGE en haut).", "First open an image (OPEN IMAGE button at the top).")); return p; }
 
 /* ---------- fenetre commune ---------- */

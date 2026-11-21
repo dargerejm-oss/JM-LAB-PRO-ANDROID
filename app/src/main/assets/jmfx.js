@@ -138,6 +138,7 @@ ov.addEventListener("click", function(e){ var b = e.target.closest("[data-f]"); 
 var oldBack = window.__jmsBack2; window.__jmsBack2 = function(){ if(ov.classList.contains("show")){ hide(); return true; } return oldBack ? oldBack() : false; };
 function sl(id, label, val, min, max, unit){ return '<label class="gL">'+label+' : <b id="'+id+'v">'+val+'</b> '+(unit||"%")+'</label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" value="'+val+'" style="width:100%">'; }
 function previewCanvas(){
+  if(window.__jmsPhoto){ var ph = window.__jmsPhoto(); if(ph) return ph; }
   var cv = document.querySelector(".fixed-top canvas"); if(!cv || cv.width < 10) return null;
   var x = cv.getContext("2d"), W = cv.width, Hh = cv.height, d = x.getImageData(0,0,W,Hh).data, bg = [d[0],d[1],d[2]], x0 = W, x1 = -1, y0 = Hh, y1 = -1;
   for(var yy = 0; yy < Hh; yy += 2) for(var xx = 0; xx < W; xx += 2){ var i = (yy*W+xx)*4; if(Math.abs(d[i]-bg[0])+Math.abs(d[i+1]-bg[1])+Math.abs(d[i+2]-bg[2]) > 18){ if(xx < x0) x0 = xx; if(xx > x1) x1 = xx; if(yy < y0) y0 = yy; if(yy > y1) y1 = yy; } }
