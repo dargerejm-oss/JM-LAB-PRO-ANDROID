@@ -27,7 +27,7 @@ document.addEventListener("change", function(e){ var t = e.target; if(t && t.typ
 function isLin(p){ return p.length === 2 && p[0][0] === 0 && p[0][1] === 0 && p[1][0] === 255 && p[1][1] === 255; }
 function curveOn(s){ return !(isLin(s.curve.m) && isLin(s.curve.r) && isLin(s.curve.g) && isLin(s.curve.b)); }
 function geoOn(){ return !!(geo.r90 || geo.flip || geo.rot || geo.crop); }
-function active(Q){ var s = get(); return curveOn(s) || lookOn(s) || !!(Q && Q.single && (geoOn() || heals.length)); }
+function active(Q){ var s = get(); return curveOn(s) || lookOn(s) || !!(Q && Q.single && (geoOn() || heals.length || localOn())); }
 function summary(){
   var s = get(), a = [];
   if(curveOn(s)) a.push(T("courbes", "curves"));
@@ -540,16 +540,236 @@ function paramTool(key){
   window.addEventListener("resize", layout); requestAnimationFrame(layout);
 }
 
+/* ================= SELECTION ET PINCEAU (retouche locale, photo ouverte seulement) =================
+   Les zones sont decrites en fractions de la photo : le meme reglage sert a l'apercu et a l'enregistrement en pleine taille. */
+var sels = [];      /* points de selection : {x, y, r, lum, con, sat, str} */
+var brushes = [];   /* traits de pinceau : {k, v, r, pts:[[x,y]...]} ; k = lum | temp | sat | str ; v = -100..100 ; v = 0 : gomme */
+document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple){ sels = []; brushes = []; } }, true);
+function localOn(){ return sels.some(function(p){ return p.lum || p.con || p.sat || p.str; }) || brushes.some(function(b){ return b.v; }); }
+
+/* applique un reglage a travers un masque (canvas de n'importe quelle taille ; l'opacite = la force) */
+function applyMasked(c, mask, kind, a){
+  if(!a) return;
+  var W = c.width, H = c.height, mn = Math.min(W, H), L;
+  if(kind === "lum") L = filtered(c, "brightness(" + (a > 0 ? 1 + 0.85 * a : 1 + 0.55 * a).toFixed(3) + ")");
+  else if(kind === "con") L = filtered(c, "contrast(" + Math.max(0.2, 1 + 0.8 * a).toFixed(3) + ")");
+  else if(kind === "sat") L = filtered(c, "saturate(" + Math.max(0, 1 + 1.2 * a).toFixed(3) + ")");
+  else if(kind === "temp"){ L = cvs(W, H); var lx = L.getContext("2d"); lx.drawImage(c, 0, 0); lx.globalCompositeOperation = "soft-light"; lx.globalAlpha = Math.min(1, Math.abs(a) * 0.8); lx.fillStyle = a > 0 ? "rgb(255,140,30)" : "rgb(30,110,255)"; lx.fillRect(0, 0, W, H); }
+  else if(kind === "str"){ if(a > 0){ L = cvs(W, H); L.getContext("2d").drawImage(c, 0, 0); blend(L, highpass(c, mn / 110), "overlay", a * 1.8); } else L = filtered(c, "blur(" + (mn / 220 * -a).toFixed(1) + "px)"); }
+  if(!L) return;
+  var x = L.getContext("2d"); x.save(); x.globalCompositeOperation = "destination-in"; x.globalAlpha = 1; x.imageSmoothingQuality = "high"; x.drawImage(mask, 0, 0, W, H); x.restore();
+  c.getContext("2d").drawImage(L, 0, 0);
+}
+/* petite copie de travail pour calculer les masques (rapide) */
+function smallCopy(c, max){ var k = Math.min(1, max / Math.max(c.width, c.height)), s = cvs(c.width * k, c.height * k); s.getContext("2d").drawImage(c, 0, 0, s.width, s.height); return s; }
+/* masque d'un point de selection : proche du point ET de couleur semblable */
+function pointMask(sm, p){
+  var W = sm.width, H = sm.height, R = Math.max(3, p.r * Math.min(W, H)), cx = p.x * W, cy = p.y * H;
+  var x = sm.getContext("2d"), all = x.getImageData(0, 0, W, H).data;
+  var sx = Math.max(0, Math.min(W - 1, Math.round(cx))), sy = Math.max(0, Math.min(H - 1, Math.round(cy))), cr = 0, cg = 0, cb = 0, n = 0;
+  for(var yy = Math.max(0, sy - 2); yy <= Math.min(H - 1, sy + 2); yy++) for(var xx = Math.max(0, sx - 2); xx <= Math.min(W - 1, sx + 2); xx++){ var i = (yy * W + xx) * 4; cr += all[i]; cg += all[i+1]; cb += all[i+2]; n++; }
+  cr /= n; cg /= n; cb /= n;
+  var m = cvs(W, H), mx = m.getContext("2d"), id = mx.createImageData(W, H), d = id.data;
+  var x0 = Math.max(0, Math.floor(cx - 2 * R)), x1 = Math.min(W, Math.ceil(cx + 2 * R)), y0 = Math.max(0, Math.floor(cy - 2 * R)), y1 = Math.min(H, Math.ceil(cy + 2 * R));
+  for(var y = y0; y < y1; y++) for(var x2 = x0; x2 < x1; x2++){
+    var dd = Math.hypot(x2 - cx, y - cy) / R; if(dd > 2) continue;
+    var j = (y * W + x2) * 4, dr = all[j] - cr, dg = all[j+1] - cg, db = all[j+2] - cb;
+    var dc = Math.sqrt(0.3 * dr * dr + 0.59 * dg * dg + 0.11 * db * db);
+    var w = Math.exp(-dd * dd * 1.3) * Math.exp(-dc * dc / (2 * 38 * 38));
+    d[j] = d[j+1] = d[j+2] = 255; d[j+3] = Math.round(w * 255);
+  }
+  mx.putImageData(id, 0, 0);
+  var b = cvs(W, H), bx = b.getContext("2d"); bx.filter = "blur(" + Math.max(0.6, Math.min(W, H) / 400).toFixed(1) + "px)"; bx.drawImage(m, 0, 0); return b;
+}
+function applySels(c, list){
+  if(!list.length) return; var sm = smallCopy(c, 900);
+  list.forEach(function(p){
+    if(!(p.lum || p.con || p.sat || p.str)) return; var m = pointMask(sm, p);
+    applyMasked(c, m, "lum", (p.lum || 0) / 100); applyMasked(c, m, "con", (p.con || 0) / 100);
+    applyMasked(c, m, "sat", (p.sat || 0) / 100); applyMasked(c, m, "str", (p.str || 0) / 100);
+  });
+}
+/* masques du pinceau : un par effet et par sens (+ / -), la gomme efface tout */
+function brushMasks2(W, H, list){
+  var k = Math.min(1, 1600 / Math.max(W, H)), MW = Math.max(8, Math.round(W * k)), MH = Math.max(8, Math.round(H * k)), mn = Math.min(MW, MH), M = {};
+  function get(key){ if(!M[key]){ M[key] = cvs(MW, MH); } return M[key]; }
+  list.forEach(function(s){
+    var keys = s.v ? [s.k + (s.v > 0 ? "+" : "-")] : Object.keys(M), r = Math.max(1.5, s.r * mn), a = Math.min(1, Math.abs(s.v) / 100);
+    keys.forEach(function(key){
+      var x = get(key).getContext("2d"); x.save();
+      if(!s.v) x.globalCompositeOperation = "destination-out";
+      var pts = s.pts.map(function(p){ return [p[0] * MW, p[1] * MH]; }), stamps = [pts[0]];
+      for(var i = 1; i < pts.length; i++){ var a0 = pts[i-1], a1 = pts[i], dist = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]), n = Math.ceil(dist / (r * 0.3)); for(var t = 1; t <= n; t++) stamps.push([a0[0] + (a1[0] - a0[0]) * t / n, a0[1] + (a1[1] - a0[1]) * t / n]); }
+      stamps.forEach(function(p){ var g = x.createRadialGradient(p[0], p[1], 0, p[0], p[1], r); g.addColorStop(0, "rgba(255,255,255," + (s.v ? 0.22 * a : 0.5) + ")"); g.addColorStop(0.6, "rgba(255,255,255," + (s.v ? 0.12 * a : 0.3) + ")"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.fillRect(p[0] - r, p[1] - r, 2 * r, 2 * r); });
+      x.restore();
+    });
+  });
+  return M;
+}
+function applyBrushes(c, list){
+  if(!list.length) return; var M = brushMasks2(c.width, c.height, list);
+  Object.keys(M).forEach(function(key){ applyMasked(c, M[key], key.slice(0, -1), key.slice(-1) === "+" ? 1 : -1); });
+}
+
+/* ---------- outils communs aux deux ecrans : affichage avec zoom / deplacement ---------- */
+function viewer(cv, wrap, getImg){
+  var V = {zoom:1, ox:0, oy:0, dpr:window.devicePixelRatio || 1};
+  V.fit = function(){ var im = getImg(); return Math.min(cv.width / im.width, cv.height / im.height); };
+  V.scale = function(){ return V.fit() * V.zoom; };
+  V.clamp = function(){ var im = getImg(), s = V.scale(), vw = cv.width / s, vh = cv.height / s;
+    V.ox = vw >= im.width ? (im.width - vw) / 2 : Math.max(0, Math.min(im.width - vw, V.ox)); V.oy = vh >= im.height ? (im.height - vh) / 2 : Math.max(0, Math.min(im.height - vh, V.oy)); };
+  V.size = function(){ var CW = Math.max(10, wrap.clientWidth), CH = Math.max(10, wrap.clientHeight); if(cv.width !== Math.round(CW * V.dpr) || cv.height !== Math.round(CH * V.dpr)){ cv.width = Math.round(CW * V.dpr); cv.height = Math.round(CH * V.dpr); } V.clamp(); };
+  V.draw = function(img){ var x = cv.getContext("2d"), s = V.scale(); x.setTransform(1, 0, 0, 1, 0, 0); x.fillStyle = "#111"; x.fillRect(0, 0, cv.width, cv.height); x.setTransform(s, 0, 0, s, -V.ox * s, -V.oy * s); x.imageSmoothingQuality = "high"; x.drawImage(img, 0, 0); x.setTransform(1, 0, 0, 1, 0, 0); };
+  V.toImg = function(e){ var r = cv.getBoundingClientRect(), s = V.scale(); return [V.ox + (e.clientX - r.left) * V.dpr / s, V.oy + (e.clientY - r.top) * V.dpr / s]; };
+  V.toScr = function(ix, iy){ var s = V.scale(); return [(ix - V.ox) * s, (iy - V.oy) * s]; };
+  V.pinchStart = function(a, b){ var r = cv.getBoundingClientRect(), mx = ((a.x + b.x) / 2 - r.left) * V.dpr, my = ((a.y + b.y) / 2 - r.top) * V.dpr; V.pin = {d:Math.hypot(a.x - b.x, a.y - b.y), z:V.zoom, ix:V.ox + mx / V.scale(), iy:V.oy + my / V.scale()}; };
+  V.pinchMove = function(a, b){ var r = cv.getBoundingClientRect(); V.zoom = Math.max(1, Math.min(10, V.pin.z * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(10, V.pin.d))); var mx = ((a.x + b.x) / 2 - r.left) * V.dpr, my = ((a.y + b.y) / 2 - r.top) * V.dpr, s = V.scale(); V.ox = V.pin.ix - mx / s; V.oy = V.pin.iy - my / s; V.clamp(); };
+  return V;
+}
+function localBase(){ var ph = needPhoto(); if(!ph) return null; var b = smallCopy(ph, 1100); var all = get(); if(curveOn(all)) applyCurves(b.getContext("2d"), b.width, b.height, all); return b; }
+var BTN = 'style="border:0;border-radius:10px;background:#3a3a3a;color:#fff;font-weight:900;padding:8px 10px;font-size:13px"';
+
+/* ================= ECRAN PINCEAU ================= */
+var BK = [["lum", T("Lumière", "Light")], ["temp", T("Température", "Temperature")], ["sat", T("Saturation", "Saturation")], ["str", T("Structure", "Structure")]];
+function brushTool(){
+  var base = localBase(); if(!base) return;
+  var list = brushes.slice(), redo = [], kind = "lum", val = 30, size = 22, showOrig = false, showMask = false, rendered = null;
+  show('<div class="x2Top"><div class="jmsTitle">🖌️ ' + T("PINCEAU", "BRUSH") + '</div>' +
+     '<button id="x2BEye" style="background:#3a3a3a">👁</button><button data-a="mask" id="x2BMk" style="background:#3a3a3a">▦</button>' +
+     '<button data-a="undo" style="background:#3a3a3a">↶</button><button data-a="redo" style="background:#3a3a3a">↷</button><button data-a="help" style="background:#3a3a3a">?</button></div>' +
+   '<div class="x2PvW" id="x2BW" style="position:relative;touch-action:none"><canvas id="x2BC" style="display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none"></canvas></div>' +
+   '<div class="x2Hint" id="x2BH" style="flex:none;margin:2px 0">' + T("Peins sur la photo. Deux doigts pour zoomer et se déplacer.", "Paint on the photo. Two fingers to zoom and move.") + '</div>' +
+   '<div class="x2Chips" id="x2BK">' + BK.map(function(k){ return '<button data-a="kind" data-k="' + k[0] + '">' + k[1] + '</button>'; }).join("") + '</div>' +
+   '<div class="x2Chips" id="x2BV">' + [-100, -50, -25, 0, 25, 50, 100].map(function(v){ return '<button data-a="val" data-v="' + v + '">' + (v ? (v > 0 ? "+" : "") + v : "🧽 " + T("Gomme", "Eraser")) + '</button>'; }).join("") + '</div>' +
+   '<div style="flex:none;display:flex;align-items:center;gap:10px;padding:4px 0">' +
+     '<button data-a="cancel" style="border:0;background:none;color:#fff;font-size:30px;width:52px">✕</button>' +
+     '<div style="flex:1"><div class="x2Lb" style="margin:0;text-align:center">' + T("Taille du pinceau", "Brush size") + ' : <b id="x2BSv">22</b></div><input type="range" id="x2BS" min="6" max="70" value="22" style="width:100%"></div>' +
+     '<button data-a="ok" style="border:0;background:none;color:#4CAF50;font-size:34px;width:52px">✓</button></div>', true);
+  var cv = $("x2BC"), wrap = $("x2BW"), V = viewer(cv, wrap, function(){ return base; }), trail = null;
+  function marks(){
+    Array.prototype.forEach.call($("x2BK").children, function(b){ var on = b.dataset.k === kind; b.style.background = on ? "#1E88E5" : ""; });
+    Array.prototype.forEach.call($("x2BV").children, function(b){ var on = +b.dataset.v === val; b.style.background = on ? (val > 0 ? "#43A047" : val < 0 ? "#C62828" : "#6D4C41") : ""; });
+    $("x2BMk").style.outline = showMask ? "3px solid #FFD600" : "";
+  }
+  function render(){ var c = cvs(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0); applyBrushes(c, list); rendered = c; draw(); }
+  function draw(){
+    if(!document.body.contains(cv)) return; V.size();
+    V.draw(showOrig ? base : (rendered || base));
+    var x = cv.getContext("2d");
+    if(showMask && list.length){ var M = brushMasks2(base.width, base.height, list), s = V.scale(); x.save(); x.setTransform(s, 0, 0, s, -V.ox * s, -V.oy * s); x.fillStyle = "rgba(0,0,0,.6)"; x.fillRect(0, 0, base.width, base.height);
+      Object.keys(M).forEach(function(k){ var t = cvs(M[k].width, M[k].height), tx = t.getContext("2d"); tx.drawImage(M[k], 0, 0); tx.globalCompositeOperation = "source-in"; tx.fillStyle = k.slice(-1) === "+" ? "rgb(255,30,30)" : "rgb(40,130,255)"; tx.fillRect(0, 0, t.width, t.height); x.drawImage(t, 0, 0, base.width, base.height); }); x.restore(); }
+    if(trail && trail.length){ var s2 = V.scale(); x.save(); x.setTransform(s2, 0, 0, s2, -V.ox * s2, -V.oy * s2); x.strokeStyle = x.fillStyle = val ? "rgba(255,60,60,.45)" : "rgba(255,255,255,.45)"; x.lineCap = x.lineJoin = "round"; x.lineWidth = 2 * trail.r;
+      x.beginPath(); x.moveTo(trail[0][0], trail[0][1]); for(var i = 1; i < trail.length; i++) x.lineTo(trail[i][0], trail[i][1]); if(trail.length === 1){ x.arc(trail[0][0], trail[0][1], trail.r, 0, 7); x.fill(); } else x.stroke(); x.restore(); }
+  }
+  var ptrs = {}, mode = null;
+  cv.onpointerdown = function(e){ cv.setPointerCapture(e.pointerId); ptrs[e.pointerId] = {x:e.clientX, y:e.clientY}; var k = Object.keys(ptrs);
+    if(k.length === 1){ mode = "paint"; trail = [V.toImg(e)]; trail.r = size * V.dpr / V.scale(); draw(); }
+    else if(k.length === 2){ mode = "pinch"; trail = null; V.pinchStart(ptrs[k[0]], ptrs[k[1]]); draw(); } };
+  cv.onpointermove = function(e){ if(!ptrs[e.pointerId]) return; ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+    if(mode === "paint" && trail){ var p = V.toImg(e), l = trail[trail.length - 1]; if(Math.hypot(p[0] - l[0], p[1] - l[1]) > trail.r * 0.25){ trail.push(p); draw(); } }
+    else if(mode === "pinch"){ var k = Object.keys(ptrs); if(k.length === 2){ V.pinchMove(ptrs[k[0]], ptrs[k[1]]); draw(); } } };
+  function up(e){ if(!ptrs[e.pointerId]) return; delete ptrs[e.pointerId];
+    if(mode === "paint" && trail && !Object.keys(ptrs).length){ list.push({k:kind, v:val, r:trail.r / Math.min(base.width, base.height), pts:trail.map(function(p){ return [p[0] / base.width, p[1] / base.height]; })}); redo = []; trail = null; render(); }
+    if(!Object.keys(ptrs).length) mode = null; }
+  cv.onpointerup = up; cv.onpointercancel = up;
+  $("x2BS").oninput = function(){ size = +this.value; $("x2BSv").textContent = this.value; };
+  var eye = $("x2BEye"); eye.onpointerdown = function(){ showOrig = true; draw(); }; eye.onpointerup = eye.onpointerleave = eye.onpointercancel = function(){ showOrig = false; draw(); };
+  HH.kind = function(b){ kind = b.dataset.k; if(!val) val = 30; marks(); };
+  HH.val = function(b){ val = +b.dataset.v; marks(); };
+  HH.mask = function(){ showMask = !showMask; marks(); draw(); };
+  HH.undo = function(){ if(list.length){ redo.push(list.pop()); render(); } };
+  HH.redo = function(){ var r = redo.pop(); if(r){ list.push(r); render(); } };
+  HH.help = function(){ var h = $("x2BH"); h.style.color = "#FFD600"; h.textContent = T("Choisis l'effet puis la force (+ / −), peins au doigt. 🧽 Gomme efface. ▦ montre les zones peintes (rouge = plus, bleu = moins). 👁 maintenu = sans pinceau.", "Pick the effect then the strength (+ / −), paint with your finger. 🧽 Eraser removes. ▦ shows painted areas (red = more, blue = less). Hold 👁 = without brush."); };
+  HH.cancel = hide;
+  HH.ok = function(){ brushes = list.slice(); hide(); if(localOn()) note("🖌️ " + T("Pinceau appliqué à l'enregistrement de cette photo", "Brush applied when this photo is saved")); };
+  marks(); window.addEventListener("resize", draw); requestAnimationFrame(render);
+}
+
+/* ================= ECRAN SELECTION (points) ================= */
+var SP = [["lum", T("Luminosité", "Brightness"), -100, 100], ["con", T("Contraste", "Contrast"), -100, 100], ["sat", T("Saturation", "Saturation"), -100, 100], ["str", T("Structure", "Structure"), -100, 100], ["r", T("Taille", "Size"), 3, 60]];
+function selTool(){
+  var base = localBase(); if(!base) return;
+  var list = sels.map(function(p){ return Object.assign({}, p); }), cur = list.length ? list.length - 1 : -1, idx = 0, adding = !list.length, showOrig = false, showMask = false, rendered = null;
+  show('<div class="x2Top"><div class="jmsTitle">🎯 ' + T("SÉLECTION", "SELECTIVE") + '</div>' +
+     '<button id="x2SEye" style="background:#3a3a3a">👁</button><button data-a="mask" id="x2SMk" style="background:#3a3a3a">▦</button><button data-a="help" style="background:#3a3a3a">?</button></div>' +
+   '<div class="x2PvW" id="x2SW" style="position:relative;touch-action:none"><canvas id="x2SC" style="display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none"></canvas>' +
+     '<div id="x2SL" style="position:absolute;left:50%;top:12px;transform:translateX(-50%);background:#000b;color:#fff;font-weight:900;font-size:17px;padding:8px 16px;border-radius:20px;white-space:nowrap;pointer-events:none"></div>' +
+     '<div id="x2SM" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000d;border-radius:14px;padding:6px 0;display:none;min-width:200px;pointer-events:none"></div></div>' +
+   '<div class="x2Hint" id="x2SH" style="flex:none;margin:2px 0"></div>' +
+   '<div style="flex:none;display:flex;gap:6px;margin:2px 0"><button data-a="add" id="x2SAdd" ' + BTN + '>＋ ' + T("Point", "Point") + '</button><button data-a="del" ' + BTN + '>🗑 ' + T("Supprimer", "Delete") + '</button><button data-a="pick" ' + BTN + '>☰</button>' +
+     '<div style="flex:1;font-weight:800;color:#ddd;align-self:center;text-align:right" id="x2SN"></div><div id="x2SV" style="font-weight:900;color:#FFD600;font-family:monospace;font-size:16px;align-self:center;min-width:40px;text-align:right"></div></div>' +
+   '<canvas id="x2SR" style="display:block;flex:none;width:100%;height:46px;touch-action:none"></canvas>' +
+   '<div style="display:flex;align-items:center;justify-content:space-between;flex:none;padding:6px 0">' +
+     '<button data-a="cancel" style="border:0;background:none;color:#fff;font-size:30px;width:52px">✕</button>' +
+     '<button data-a="ok" style="border:0;background:none;color:#4CAF50;font-size:34px;width:52px">✓</button></div>', true);
+  var cv = $("x2SC"), wrap = $("x2SW"), V = viewer(cv, wrap, function(){ return base; }), rul = $("x2SR"), rx = rul.getContext("2d"), menu = $("x2SM");
+  function pv(p, k){ return k === "r" ? Math.round(p.r * 100) : (p[k] || 0); }
+  function fmt(k, v){ return k === "r" ? v + " %" : (v > 0 ? "+" : "") + v; }
+  function labels(){
+    var p = list[cur], s = SP[idx];
+    $("x2SAdd").style.outline = adding ? "3px solid #FFD600" : ""; $("x2SMk").style.outline = showMask ? "3px solid #FFD600" : "";
+    $("x2SH").style.color = adding ? "#FFD600" : "";
+    $("x2SH").textContent = adding ? T("Touche la photo à l'endroit à modifier.", "Tap the photo where you want to adjust.") : T("Glisse ↕ : réglage • ↔ : valeur • fais glisser un point pour le déplacer.", "Swipe ↕: setting • ↔: value • drag a point to move it.");
+    $("x2SL").textContent = p ? s[1] + "  " + fmt(s[0], pv(p, s[0])) : T("Ajoute un point", "Add a point"); $("x2SN").textContent = s[1]; $("x2SV").textContent = p ? fmt(s[0], pv(p, s[0])) : "";
+    var dpr = V.dpr, W = rul.clientWidth * dpr, H = 46 * dpr; if(rul.width !== W) rul.width = W; rul.height = H; rx.clearRect(0, 0, W, H);
+    for(var i = 0; i <= 60; i++){ var xx = 8 * dpr + (W - 16 * dpr) * i / 60; rx.fillStyle = "#bbb"; rx.fillRect(xx - dpr, H * 0.35, 2 * dpr, H * 0.45); }
+    if(p){ var f = (pv(p, s[0]) - s[2]) / (s[3] - s[2]), z = Math.max(0, (0 - s[2]) / (s[3] - s[2])), zx = 8 * dpr + (W - 16 * dpr) * z, vx = 8 * dpr + (W - 16 * dpr) * f;
+      rx.fillStyle = "rgba(255,214,0,.35)"; rx.fillRect(Math.min(zx, vx), H * 0.35, Math.abs(vx - zx), H * 0.45); rx.fillStyle = "#FFD600"; rx.fillRect(vx - 2 * dpr, H * 0.2, 4 * dpr, H * 0.65); rx.beginPath(); rx.moveTo(vx - 8 * dpr, 0); rx.lineTo(vx + 8 * dpr, 0); rx.lineTo(vx, H * 0.2); rx.fill(); }
+  }
+  var pend = 0;
+  function render(){ var c = cvs(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0); applySels(c, list); rendered = c; draw(); }
+  function later(){ if(!pend) pend = requestAnimationFrame(function(){ pend = 0; render(); }); }
+  function draw(){
+    if(!document.body.contains(cv)) return; V.size(); V.draw(showOrig ? base : (rendered || base));
+    var x = cv.getContext("2d"), mn = Math.min(base.width, base.height), s = V.scale();
+    if(showMask && list[cur]){ var m = pointMask(smallCopy(base, 900), list[cur]), t = cvs(m.width, m.height), tx = t.getContext("2d"); tx.drawImage(m, 0, 0); tx.globalCompositeOperation = "source-in"; tx.fillStyle = "rgb(255,30,30)"; tx.fillRect(0, 0, t.width, t.height);
+      x.save(); x.setTransform(s, 0, 0, s, -V.ox * s, -V.oy * s); x.fillStyle = "rgba(0,0,0,.6)"; x.fillRect(0, 0, base.width, base.height); x.globalAlpha = 0.9; x.drawImage(t, 0, 0, base.width, base.height); x.restore(); }
+    list.forEach(function(p, i){ var q = V.toScr(p.x * base.width, p.y * base.height), on = i === cur;
+      if(on){ x.strokeStyle = "rgba(255,255,255,.55)"; x.lineWidth = 2 * V.dpr; x.setLineDash([6 * V.dpr, 6 * V.dpr]); x.beginPath(); x.arc(q[0], q[1], p.r * mn * s, 0, 7); x.stroke(); x.setLineDash([]); }
+      x.fillStyle = on ? "#1E88E5" : "rgba(255,255,255,.85)"; x.strokeStyle = "#000"; x.lineWidth = 2 * V.dpr; x.beginPath(); x.arc(q[0], q[1], 13 * V.dpr, 0, 7); x.fill(); x.stroke();
+      x.fillStyle = on ? "#fff" : "#000"; x.font = "bold " + (12 * V.dpr) + "px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.fillText(SP[idx][0] === "r" ? "○" : SP[idx][1][0], q[0], q[1] + V.dpr); });
+  }
+  function hit(e){ var r = cv.getBoundingClientRect(), mxp = (e.clientX - r.left) * V.dpr, myp = (e.clientY - r.top) * V.dpr, best = -1, bd = 26 * V.dpr;
+    list.forEach(function(p, i){ var q = V.toScr(p.x * base.width, p.y * base.height), d = Math.hypot(q[0] - mxp, q[1] - myp); if(d < bd){ bd = d; best = i; } }); return best; }
+  var g = null;
+  cv.onpointerdown = function(e){ cv.setPointerCapture(e.pointerId);
+    if(adding){ var ip = V.toImg(e); if(ip[0] >= 0 && ip[1] >= 0 && ip[0] <= base.width && ip[1] <= base.height){ list.push({x:ip[0] / base.width, y:ip[1] / base.height, r:0.12, lum:0, con:0, sat:0, str:0}); cur = list.length - 1; idx = 0; adding = false; labels(); render(); } return; }
+    var h = hit(e); g = {x:e.clientX, y:e.clientY, mode:h >= 0 ? "pt" : null, h:h, i0:idx, v0:list[cur] ? pv(list[cur], SP[idx][0]) : 0};
+    if(h >= 0){ cur = h; g.v0 = pv(list[cur], SP[idx][0]); labels(); draw(); } };
+  cv.onpointermove = function(e){
+    if(!g) return; var dx = e.clientX - g.x, dy = e.clientY - g.y;
+    if(g.mode === "pt"){ if(Math.hypot(dx, dy) > 6){ var ip = V.toImg(e), p = list[cur]; p.x = Math.max(0, Math.min(1, ip[0] / base.width)); p.y = Math.max(0, Math.min(1, ip[1] / base.height)); later(); } return; }
+    if(!list[cur]) return;
+    if(!g.mode && Math.hypot(dx, dy) > 10) g.mode = Math.abs(dy) > Math.abs(dx) ? "menu" : "value";
+    if(g.mode === "value"){ var s = SP[idx], v = Math.max(s[2], Math.min(s[3], Math.round(g.v0 + dx * (s[3] - s[2]) / (wrap.clientWidth * 2)))); if(s[0] === "r") list[cur].r = v / 100; else list[cur][s[0]] = v; labels(); later(); }
+    else if(g.mode === "menu"){ var i = Math.max(0, Math.min(SP.length - 1, g.i0 + Math.round(dy / 30))); if(i !== g.sel){ g.sel = i;
+      menu.innerHTML = SP.map(function(t, j){ return '<div style="padding:9px 18px;font-weight:900;font-size:15px;' + (j === i ? 'background:#1E88E5;color:#fff' : 'color:#ccc') + '">' + t[1] + '<span style="float:right;margin-left:14px;color:' + (j === i ? '#fff' : '#FFD600') + '">' + fmt(t[0], pv(list[cur], t[0])) + '</span></div>'; }).join(""); menu.style.display = "block"; } } };
+  function up(){ if(g && g.mode === "menu" && g.sel !== undefined){ idx = g.sel; labels(); draw(); } menu.style.display = "none"; g = null; }
+  cv.onpointerup = up; cv.onpointercancel = up;
+  function rulerSet(e){ var p = list[cur]; if(!p) return; var s = SP[idx], b = rul.getBoundingClientRect(), f = Math.max(0, Math.min(1, (e.clientX - b.left - 8) / (b.width - 16))), v = Math.round(s[2] + f * (s[3] - s[2])); if(s[0] === "r") p.r = v / 100; else p[s[0]] = v; labels(); later(); }
+  rul.onpointerdown = function(e){ rul.setPointerCapture(e.pointerId); rulerSet(e); rul.onpointermove = rulerSet; };
+  rul.onpointerup = rul.onpointercancel = function(){ rul.onpointermove = null; };
+  var eye = $("x2SEye"); eye.onpointerdown = function(){ showOrig = true; draw(); }; eye.onpointerup = eye.onpointerleave = eye.onpointercancel = function(){ showOrig = false; draw(); };
+  HH.add = function(){ adding = !adding; labels(); };
+  HH.del = function(){ if(cur >= 0){ list.splice(cur, 1); cur = list.length - 1; labels(); render(); } };
+  HH.pick = function(){ idx = (idx + 1) % SP.length; labels(); draw(); };
+  HH.mask = function(){ showMask = !showMask; labels(); draw(); };
+  HH.help = function(){ var h = $("x2SH"); h.style.color = "#FFD600"; h.textContent = T("＋ Point puis touche la photo. Glisse ↕ pour choisir (Luminosité, Contraste, Saturation, Structure, Taille), ↔ pour régler. ▦ montre la zone touchée. Plusieurs points possibles.", "＋ Point then tap the photo. Swipe ↕ to pick (Brightness, Contrast, Saturation, Structure, Size), ↔ to adjust. ▦ shows the affected area. Several points allowed."); };
+  HH.cancel = hide;
+  HH.ok = function(){ sels = list.filter(function(p){ return p.lum || p.con || p.sat || p.str; }); hide(); if(sels.length) note("🎯 " + T("Sélection appliquée à l'enregistrement de cette photo", "Selective edit applied when this photo is saved")); };
+  labels(); window.addEventListener("resize", draw); requestAnimationFrame(render);
+}
+
 /* ================= GRILLE OUTILS ================= */
 function tuneOn(){ var sl = tuneSliders(); return sl.slice(1).some(function(r){ return +r.value !== 0; }); }
 var GRID = [
   [T("Réglages", "Adjust"), [["tune", "🎛️", T("Retouches", "Tune"), function(){ return tuneOn(); }], ["details", "🔎", T("Détails", "Details"), function(s){ return detailsOn(s); }], ["curves", "📈", T("Courbes", "Curves"), function(s){ return curveOn(s); }], ["wb", "💧", T("Balance des blancs", "White balance"), function(s){ return wbOn(s); }], ["tone", "🌗", T("Contraste des tons", "Tonal contrast"), function(s){ return toneOn(s); }]]],
-  [T("Retouche locale", "Local"), [["heal", "🩹", T("Correcteur", "Healing"), function(){ return heals.length > 0; }]]],
+  [T("Retouche locale", "Local"), [["sel", "🎯", T("Sélection", "Selective"), function(){ return sels.some(function(p){ return p.lum || p.con || p.sat || p.str; }); }], ["brush", "🖌️", T("Pinceau", "Brush"), function(){ return brushes.some(function(b){ return b.v; }); }], ["heal", "🩹", T("Correcteur", "Healing"), function(){ return heals.length > 0; }]]],
   [T("Cadrage", "Framing"), [["crop", "✂️", T("Recadrer", "Crop"), function(){ return geoOn(); }]]],
   [T("Créatif", "Creative"), [["drama", "🎭", T("Théâtral", "Drama"), function(s){ return dramaOn(s); }], ["hdr", "🌄", "HDR", function(s){ return hdrOn(s); }], ["glow", "✨", T("Éclat glamour", "Glamour glow"), function(s){ return glowOn(s); }], ["fx", "🌤️", T("Effets (ciel, visage, grain, N&B)", "Effects (sky, face, grain, B&W)"), function(){ return !!(window.__jmsFX && window.__jmsFX.get && (function(f){ return f.sky || f.face || f.grad || f.grain || f.bw || f.sharp || f.smooth || f.denoise; })(window.__jmsFX.get())); }]]]
 ];
 function openTool(k){
-  if(k === "tune") return tune(); if(k === "crop") return crop(); if(k === "curves") return curves(); if(k === "heal") return healer();
+  if(k === "tune") return tune(); if(k === "crop") return crop(); if(k === "curves") return curves(); if(k === "heal") return healer(); if(k === "sel") return selTool(); if(k === "brush") return brushTool();
   if(k === "fx"){ if(window.__jmsX && window.__jmsX.x_fx) window.__jmsX.x_fx(); return; }
   paramTool(k);
 }
@@ -571,6 +791,8 @@ async function pre(bmp, Q){
   var s = get(), single = Q && Q.single, c = null;
   function base(){ if(!c){ c = cvs(bmp.width, bmp.height); c.getContext("2d").drawImage(bmp, 0, 0); } return c; }
   if(single && heals.length) healAll(base(), heals);
+  if(single && sels.length) applySels(base(), sels);
+  if(single && brushes.length) applyBrushes(base(), brushes);
   if(curveOn(s)){ var b = base(); applyCurves(b.getContext("2d"), b.width, b.height, s); }
   if(single && geoOn()) c = geometry(c || bmp, geo);
   if(lookOn(s)) c = looks(c || bmp, s);
