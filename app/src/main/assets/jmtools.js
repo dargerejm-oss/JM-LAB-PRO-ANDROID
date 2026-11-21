@@ -102,7 +102,7 @@ async function learn(){
   if(!L.before || !L.after){ alert("Choisis les deux photos."); return; }
   var name = ($("jtName").value || "Style").trim(); hideT();
   window.__jmsProgress.start(L.mode === "ref" ? "🎯 STYLE DE RÉFÉRENCE" : "🟡 APPRENTISSAGE DU STYLE");
-  var sl = sliders(); var def = sl.map(function(r,i){ return i === 0 ? 50 : 0; });
+  var sl = sliders(); var def = sl.map(function(r,i){ return i === 0 ? 65 : 0; });
   sl.forEach(function(r,i){ setVal(r, def[i]); });
   setFile(mainInput(), [L.before]);
   for(var t = 0; t < 40 && !(appCanvas() && window.__jmsBeforeOk); t++){ await wait(100); if(appCanvas() && t > 6) break; }

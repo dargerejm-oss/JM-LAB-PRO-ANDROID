@@ -11,14 +11,14 @@ function load(){ try{ return JSON.parse(localStorage.getItem(KEY)||"[]"); }catch
 function store(l){ localStorage.setItem(KEY, JSON.stringify(l)); }
 function sliders(){ var c = document.querySelector(".space-y-3.mb-4"); return c ? Array.prototype.slice.call(c.querySelectorAll('input[type="range"]')) : []; }
 function setVal(input, v){ Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(input, String(v)); input.dispatchEvent(new Event("input", {bubbles:true})); }
-function def(i){ return i === 0 ? 50 : 0; }
+function def(i){ return i === 0 ? 65 : 0; }
 function toCode(p){ var s = "JMLAB_PRESET:" + String(p.name||"style").replace(/\s+/g,"_"); LABELS.forEach(function(l){ if(p.values && p.values[l] !== undefined) s += " "+RMAP[l]+":"+p.values[l]; }); return s; }
 function mixValues(A, B, r, k){
   var out = {};
   LABELS.forEach(function(l,i){
     var d = def(i), va = A && A[l] !== undefined ? A[l] : d, vb = B && B[l] !== undefined ? B[l] : d;
     var m = B ? va*r + vb*(1-r) : va, v = d + (m - d)*k;
-    v = Math.round(v*10)/10; if(Math.abs(v - d) > 0.05 || i === 0 && v !== 50) out[l] = v;
+    v = Math.round(v*10)/10; if(Math.abs(v - d) > 0.05 || i === 0 && v !== 65) out[l] = v;
   });
   return out;
 }

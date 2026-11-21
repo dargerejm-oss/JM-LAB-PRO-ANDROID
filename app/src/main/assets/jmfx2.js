@@ -11,6 +11,9 @@ function $(id){ return document.getElementById(id); }
 function cvs(w, h){ var c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
 function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
 
+/* ---------- correction automatique ProLab : activee / desactivee (memorise) ---------- */
+try{ window.__jmsProLabOff = localStorage.getItem("jms_prolab") === "off"; }catch(e){ window.__jmsProLabOff = false; }
+
 /* ---------- etat ---------- */
 var KEY = "jms_fx2";
 var D = {curve:{m:[[0,0],[255,255]], r:[[0,0],[255,255]], g:[[0,0],[255,255]], b:[[0,0],[255,255]]}, halo:0, leak:0, leakPos:"tl", dust:0, border:"", date:false};
@@ -368,6 +371,12 @@ css.textContent =
 "#jx2Bar button .i{font-size:22px;line-height:1}#jx2Bar button.on{outline:3px solid #FFB300;outline-offset:1px}" +
 "#jx2Bar .b0{background:#1565C0}#jx2Bar .b1{background:#6D4C41}#jx2Bar .b2{background:#00897B}#jx2Bar .b3{background:#C62828}#jx2Bar .b4{background:#5E35B1}" +
 "body:not([data-tab=reg]) #jx2Bar{display:none!important}" +
+"body[data-tab=reg] .scroll-content>.space-y-3{display:none!important}" +
+"body:not([data-tab=reg]) #jx2Pro{display:none!important}" +
+"#jx2Pro{background:#1d1d1d;border:2px solid #C9A24A;border-radius:16px;padding:12px 14px;margin:0 0 10px;color:#fff}" +
+"#jx2Pro .pChk{display:flex;align-items:center;gap:10px;font-weight:900;font-size:15px}#jx2Pro .pChk input{width:26px;height:26px;accent-color:#C9A24A;flex:none}" +
+"#jx2Pro .pRow{display:flex;align-items:center;gap:10px;margin-top:10px}#jx2Pro .pRow input{flex:1;accent-color:#C9A24A}#jx2Pro .pRow b{min-width:52px;text-align:right;color:#FFD600;font-size:16px}" +
+"#jx2Pro.off .pRow{opacity:.35}#jx2Pro small{display:block;color:#aaa;font-weight:600;font-size:11px;margin-top:2px}" +
 "#jx2O{z-index:3370}#jx2O .jmsBoxG{max-width:440px}" +
 "#jx2O.full{padding:0}#jx2O.full .jmsBoxG{max-width:none;width:100%;height:100%;max-height:none;border-radius:0;padding:8px 10px;box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden}" +
 ".x2Top{display:flex;align-items:center;gap:8px;flex:none}.x2Top .jmsTitle{flex:1;margin:0;text-align:left}.x2Top button{border:0;border-radius:12px;padding:10px 16px;font-weight:900;font-size:15px;color:#fff;background:#2E9E3F}" +
@@ -399,7 +408,7 @@ var TUNE = [
   [1, T("Luminosité", "Brightness")], [2, T("Contraste", "Contrast")], [8, T("Saturation", "Saturation")], [7, T("Ambiance", "Ambiance")],
   [5, T("Hautes lumières", "Highlights")], [6, T("Ombres", "Shadows")], [3, T("Chaleur", "Warmth")], [4, T("Teinte", "Tint")],
   [9, T("Structure", "Structure")], [10, T("Noirs", "Blacks")], [11, T("Blancs", "Whites")], [12, T("Anti-voile", "Dehaze")],
-  [13, T("Vignette", "Vignette")], [0, T("Intensité du profil", "Profile strength")]
+  [13, T("Vignette", "Vignette")]
 ];
 var tuneIdx = 0;
 function tune(){
@@ -431,7 +440,7 @@ function tune(){
   }
   function ruler(){
     var r = inp(); if(!r) return; var W = rul.clientWidth * dpr, H = 46 * dpr; if(rul.width !== W) rul.width = W; rul.height = H;
-    var mn = +r.min, mx = +r.max, v = +r.value, f = (v - mn) / (mx - mn), z = TUNE[tuneIdx][0] === 0 ? 0.5 : (0 - mn) / (mx - mn);
+    var mn = +r.min, mx = +r.max, v = +r.value, f = (v - mn) / (mx - mn), z = (0 - mn) / (mx - mn);
     rx.clearRect(0, 0, W, H); var n = 60;
     for(var i = 0; i <= n; i++){ var x = 8 * dpr + (W - 16 * dpr) * i / n; rx.fillStyle = "#bbb"; rx.fillRect(x - dpr, H * 0.35, 2 * dpr, H * 0.45); }
     var zx = 8 * dpr + (W - 16 * dpr) * z, vx = 8 * dpr + (W - 16 * dpr) * f;
@@ -626,6 +635,27 @@ function crop(){
 /* ---------- message ---------- */
 function note(t){ if(window.__jmsNote) window.__jmsNote(t, "ok", 3500); }
 
+/* ---------- carte ProLab : case activee / desactivee + pourcentage (curseur Dosage de l'appli) ---------- */
+function dosage(){ return tuneSliders()[0]; }
+function rerender(){ var d = dosage(); if(!d) return; var v = +d.value; tuneSet(d, v >= +d.max ? v - 1 : v + 1); tuneSet(d, v); }
+function proLab(bar){
+  var c = $("jx2Pro");
+  if(!c){
+    c = document.createElement("div"); c.id = "jx2Pro";
+    c.innerHTML = '<label class="pChk"><input type="checkbox" id="x2PL"><span>✨ ' + T("Correction automatique ProLab", "ProLab auto correction") + '<small>' + T("Exposition automatique + rendu LABO PRO", "Automatic exposure + LABO PRO look") + '</small></span></label>' +
+      '<div class="pRow"><span style="font-weight:800;font-size:13px;color:#ccc">' + T("Intensité", "Strength") + '</span><input type="range" id="x2PD" min="0" max="100" step="1"><b id="x2PDv"></b></div>';
+    c.querySelector("#x2PL").onchange = function(){
+      window.__jmsProLabOff = !this.checked; try{ localStorage.setItem("jms_prolab", this.checked ? "on" : "off"); }catch(e){}
+      c.classList.toggle("off", !this.checked); rerender();
+    };
+    c.querySelector("#x2PD").oninput = function(){ var d = dosage(); if(d){ tuneSet(d, this.value); } c.querySelector("#x2PDv").textContent = this.value + " %"; };
+  }
+  if(c.previousSibling !== bar) bar.parentNode.insertBefore(c, bar.nextSibling);
+  var d = dosage(), r = c.querySelector("#x2PD"), ck = c.querySelector("#x2PL");
+  if(d){ r.min = d.min; r.max = d.max; r.step = d.step || 1; if(document.activeElement !== r && r.value !== d.value){ r.value = d.value; } c.querySelector("#x2PDv").textContent = d.value + " %"; }
+  ck.checked = !window.__jmsProLabOff; c.classList.toggle("off", !!window.__jmsProLabOff);
+}
+
 /* ---------- barre d'outils dans RÉGLAGES ---------- */
 function bar(){
   var c = document.querySelector(".space-y-3.mb-4"); if(!c) return;
@@ -640,6 +670,7 @@ function bar(){
   }
   var anchor = $("jxFav") && $("jxFav").parentNode === c.parentNode ? $("jxFav") : c;
   if(b.nextSibling !== anchor || b.parentNode !== anchor.parentNode) anchor.parentNode.insertBefore(b, anchor);
+  proLab(b);
   var s = get();
   b.querySelector('[data-t="crop"]').classList.toggle("on", geoOn());
   b.querySelector('[data-t="curves"]').classList.toggle("on", curveOn(s));

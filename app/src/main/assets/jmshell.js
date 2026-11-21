@@ -117,7 +117,7 @@ function styleSummary(){
   var L = ["Dosage","Exposition","Contraste","Temperature","Teinte","Hautes","Ombres","Vibrance","Saturation","Clarté","Noir","Blanc","Dehaze","Vignette"];
   var c = document.querySelector(".space-y-3.mb-4"), out = [];
   if(c) Array.prototype.forEach.call(c.querySelectorAll('input[type="range"]'), function(r,i){
-    var v = Number(r.value), d = (i===0) ? 50 : 0;
+    var v = Number(r.value), d = (i===0) ? 65 : 0;
     if(v !== d) out.push(L[i]+" "+(v>0&&i>0?"+":"")+v);
   });
   return out.length ? out.join(" • ") : "Aucun réglage modifié (image d'origine)";
