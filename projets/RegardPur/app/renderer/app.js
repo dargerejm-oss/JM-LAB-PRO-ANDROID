@@ -268,6 +268,7 @@ function pump() {
 }
 function onResult(w, e) {
   var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (r.dev !== undefined) { var cbd = devWait[r.id]; delete devWait[r.id]; if (cbd) cbd(r); return; }
   if (r.full !== undefined) { var cb = fullWait[r.id]; delete fullWait[r.id]; if (cb) cb(r.full); return; }
   if (w.jobs[r.id] == null) return;
   var rid = w.jobs[r.id]; delete w.jobs[r.id]; w.inflight--;
@@ -872,6 +873,49 @@ function xmpMerge(old, p) {
   setAttr("Rating", rating); setAttr("Label", label);
   return s;
 }
+/* ---------------- rendu JM LAB PRO a l'export ---------------- */
+var PROFS = [["LABO PRO EV5", "ProLab (neutre)"], ["Velvia+", "Éclat Intense+"], ["Velvia", "Éclat Intense"], ["Provia", "Naturel"], ["Astia", "Doux Portrait"], ["Classic Chrome", "Chrome Doux"], ["Classic Chrome+", "Chrome Doux+"], ["Eterna", "Cinéma"], ["Eterna Bleach", "Cinéma Délavé"], ["Acros", "Noir & Blanc"], ["Acros+R", "Noir & Blanc Rouge"], ["Superia", "Pellicule Couleur"], ["Natura", "Lumière Naturelle"]];
+var RKEY = {Expo: "Exposition", Contrast: "Contraste", Temp: "Temperature", Tint: "Teinte", High: "Hautes SANS GRIS", Shadow: "Ombres", Vibr: "Vibrance", Sat: "Saturation", Clarity: "Clarte", Black: "Noir", White: "Blanc", Dehaze: "Dehaze", Vign: "Vignette", Dose: "Dosage"};
+var REND = (function () { try { return JSON.parse(localStorage.getItem("rp_render")) || {}; } catch (e) { return {}; } })();
+function parseStyle(t) {
+  var v = {}, m, re = /([A-Za-z]+):([+-]?\d+(?:\.\d+)?)/g, name = (t.match(/JMLAB_PRESET:(\S+)/) || [])[1];
+  while ((m = re.exec(t))) if (RKEY[m[1]]) v[RKEY[m[1]]] = +m[2];
+  return Object.keys(v).length ? {name: name ? name.replace(/_/g, " ") : "style", v: v} : null;
+}
+function renderUI() {
+  return "<label class='opt'><input type='checkbox' id='rOn'" + (REND.on ? " checked" : "") + "><div><b>🎨 Retoucher avec le rendu JM LAB PRO</b> (même moteur que l'appli) : les photos exportées sont développées en JPEG. Les originaux ne sont jamais modifiés.</div></label>" +
+    "<div id='rBox' style='display:" + (REND.on ? "grid" : "none") + ";grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:4px 0 8px 26px'>" +
+    "<span>Profil</span><select id='rProf'>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'" + ((REND.profile || "LABO PRO EV5") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+    "<span>ProLab automatique</span><label class='ck' style='margin:0'><input type='checkbox' id='rAuto'" + (REND.off ? "" : " checked") + "> exposition corrigée photo par photo</label>" +
+    "<span>Intensité</span><div style='display:flex;gap:8px;align-items:center'><input type='range' id='rDose' min='0' max='100' value='" + (REND.dose == null ? 65 : REND.dose) + "'><b id='rDoseV' style='width:42px'>" + (REND.dose == null ? 65 : REND.dose) + " %</b></div>" +
+    "<span>Protection hautes lumières</span><div style='display:flex;gap:8px;align-items:center'><input type='range' id='rHp' min='0' max='100' value='" + (REND.hp == null ? 30 : REND.hp) + "'><b id='rHpV' style='width:42px'>" + (REND.hp == null ? 30 : REND.hp) + " %</b></div>" +
+    "<span>Code de style<br><small class='small'>(facultatif)</small></span><div><input type='text' id='rCode' style='width:100%' placeholder='Collez un code JMLAB_PRESET:… de l&#39;appli (Styles › Partager)' value='" + esc(REND.code || "") + "'><div id='rCodeI' class='small'></div></div>" +
+    "<span></span><label class='ck' style='margin:0'><input type='checkbox' id='rOrig'" + (REND.orig ? " checked" : "") + "> joindre aussi l'original</label>" +
+    "</div>";
+}
+function renderWire() {
+  var upd = function () {
+    $("rBox").style.display = $("rOn").checked ? "grid" : "none"; $("rDoseV").textContent = $("rDose").value + " %"; $("rHpV").textContent = $("rHp").value + " %";
+    var st = parseStyle($("rCode").value || ""); $("rCodeI").textContent = $("rCode").value ? (st ? "Style « " + st.name + " » : " + Object.keys(st.v).map(function (k) { return k.replace("Hautes SANS GRIS", "Hautes") + " " + st.v[k]; }).join(", ") : "Code non reconnu") : "Sans code : seuls le profil et ProLab s'appliquent.";
+  };
+  ["rOn", "rDose", "rHp", "rCode"].forEach(function (id) { $(id).addEventListener("input", upd); $(id).addEventListener("change", upd); }); upd();
+}
+function renderRead() {
+  REND = {on: $("rOn").checked, profile: $("rProf").value, off: !$("rAuto").checked, dose: +$("rDose").value, hp: +$("rHp").value, code: $("rCode").value.trim(), orig: $("rOrig").checked};
+  try { localStorage.setItem("rp_render", JSON.stringify(REND)); } catch (e) {}
+  if (!REND.on) return null;
+  var st = parseStyle(REND.code) || {v: {}}, dose = st.v.Dosage != null ? st.v.Dosage : REND.dose;
+  return {profile: REND.profile, off: REND.off, dose: dose, hp: REND.hp, v: st.v, q: 92};
+}
+var devWait = {};
+function developOne(p, style) {
+  return readBytes(p).then(function (b) {
+    if (!b) throw new Error("aperçu introuvable");
+    ensurePool(); var w = pool[0], key = "dev:" + p.id + ":" + Date.now(), c = b.buffer.byteLength === b.byteLength ? b : b.slice();
+    return new Promise(function (res, rej) { devWait[key] = function (r) { if (r.dev) res(r.dev); else rej(new Error(r.err || "échec")); }; w.postMessage({id: key, buf: c, heic: !!p.heic, develop: true, style: style}, [c.buffer]); });
+  });
+}
+
 function openExport() {
   var nP = S.photos.filter(function (p) { return p.status === "P"; }).length, nX = S.photos.filter(function (p) { return p.status === "X"; }).length, nS = S.photos.filter(function (p) { return p.stars > 0; }).length;
   if (!N) { dialog("<h3>📤 Exporter</h3><p>L'export (copie des photos, fichiers XMP) se fait dans la version PC de Regard Pur.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>"); return; }
@@ -880,15 +924,18 @@ function openExport() {
     "<label class='opt'><input type='radio' name='eW' value='PT'><div><b>Les gardées et les « à voir »</b> (tout sauf les rejetées)</div></label>" +
     "<label class='opt'><input type='radio' name='eW' value='S'><div><b>Avec au moins <select id='eS'><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> étoile(s)</b> (" + nS + " avec étoiles)</div></label>" +
     "<div style='display:flex;gap:8px;align-items:center;margin:10px 0'><select id='eA'><option value='copy'>Copier</option><option value='move'>Déplacer</option></select> dans le sous-dossier <input type='text' id='eD' value='Retenues' style='flex:1'></div>" +
+    renderUI() +
     "<label class='opt'><input type='checkbox' id='eRej'><div>Ranger aussi les <b>rejetées</b> (" + nX + ") dans le sous-dossier « Rejetées » (rien n'est effacé)</div></label>" +
     "<label class='opt'><input type='checkbox' id='eX' checked><div><b>Écrire les fichiers XMP</b> à côté de toutes les photos : étoiles, vert = gardée, rouge = rejetée. Lus par <b>Lightroom</b>, <b>Capture One</b>, <b>DxO</b>, <b>Bridge</b>.</div></label>" +
     "<div class='row'><button data-c='cancel'>Annuler</button><button class='pri' data-c='go'>Exporter</button></div>",
     function (c) { if (c === "go") doExport(); });
+  renderWire();
 }
 async function doExport() {
   var w = document.querySelector("input[name=eW]:checked").value, minS = +$("eS").value, move = $("eA").value === "move", sub = ($("eD").value || "Retenues").replace(/[\\\/:*?"<>|]/g, "_"), rej = $("eRej").checked, xmp = $("eX").checked;
   var pick = S.photos.filter(function (p) { return w === "P" ? p.status === "P" : w === "PT" ? p.status !== "X" : p.stars >= minS; });
   var rejs = rej ? S.photos.filter(function (p) { return p.status === "X"; }) : [];
+  var style = renderRead(), withOrig = !style || REND.orig;
   closeDialog();
   var tot = (xmp ? S.photos.length : 0) + pick.length + rejs.length, k = 0, err = 0;
   S.analysing = true; totalN = tot; doneN = 0; prog(); $("progTxt").textContent = "Export…";
@@ -899,10 +946,18 @@ async function doExport() {
     step();
   }
   var dest = join(S.dir, sub);
-  for (i = 0; i < pick.length; i++) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } step(); }
+  for (i = 0; i < pick.length; i++) {
+    if (style) {
+      // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
+      $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
+      try { var jpg = await developOne(pick[i], style); await N.writeBin(join(dest, pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO.jpg"), jpg); } catch (e) { err++; }
+    }
+    if (withOrig) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
+    step();
+  }
   for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }
   S.analysing = false; prog(); saveSoon();
-  dialog("<h3>✔ Export terminé</h3><p>" + pick.length + " photo(s) " + (move ? "déplacée(s)" : "copiée(s)") + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +
+  dialog("<h3>✔ Export terminé</h3><p>" + pick.length + " photo(s) " + (style ? "retouchée(s) avec le rendu JM LAB PRO" + (withOrig ? (move ? " (originaux déplacés)" : " (originaux copiés)") : "") : (move ? "déplacée(s)" : "copiée(s)")) + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +
     (xmp ? "<p class='small'>Dans Lightroom : sélectionnez les photos puis « Métadonnées › Lire les métadonnées à partir des fichiers ». Les JPEG gardent leurs notes dans Lightroom uniquement s'ils sont importés après l'export.</p>" : "") +
     "<div class='row'><button data-c='open'>📂 Ouvrir le dossier</button><button class='pri' data-c='ok'>OK</button></div>",
     function (c) { if (c === "open") N.openPath(dest); });

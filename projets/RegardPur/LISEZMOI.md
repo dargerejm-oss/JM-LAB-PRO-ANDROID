@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 2.6 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 2.7 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Ce que fait l'appli
 - Ouvre un dossier ou une carte SD (sous-dossiers compris) : JPEG, HEIC (iPhone), PNG, TIFF et RAW (aperçu intégré au RAW).
@@ -22,6 +22,7 @@ Version 2.6 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - Grille de vignettes, **vue en grand** avec zoom à 100 % sur les yeux, **comparaison** de 2 à 6 photos avec zoom synchronisé.
 - **Raccourcis** : P, X, U, 1 à 5, flèches, Entrée, Échap, Z, F, C, Espace, G, Ctrl+Z.
 - **Export** : copier ou déplacer les photos retenues, ranger les rejetées (rien n'est effacé), fichiers **XMP** (étoiles, vert = gardée, rouge = rejetée) lus par Lightroom, Capture One, DxO et Bridge.
+- **🎨 Rendu JM LAB PRO à l'export** (2.7) : profils, ProLab automatique, intensité, protection des hautes lumières et code de style `JMLAB_PRESET:…` de l'appli ; même moteur que JM LAB PRO (extrait de `app/src/main/assets` par `tools/jmlab_core.js` à chaque fabrication) ; fichiers `_JMD_LAB_PRO.jpg` avec EXIF conservé ; originaux jamais modifiés.
 - **Session** enregistrée dans le dossier (`.regardpur/`) : en rouvrant le dossier, tout est repris tout de suite.
 
 ## Fabrication

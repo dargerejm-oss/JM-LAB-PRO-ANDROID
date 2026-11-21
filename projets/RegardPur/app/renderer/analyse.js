@@ -291,9 +291,58 @@ async function analyse(msg) {
   return out;
 }
 
+/* ---------- rendu JM LAB PRO (meme moteur que l'appli : profils, ProLab, curseurs) ---------- */
+var JMC = false;
+function exifOf(buf) {
+  // segment EXIF de la photo d'origine (JPEG), avec l'orientation remise a 1 (l'image est deja redressee)
+  if (buf[0] !== 0xFF || buf[1] !== 0xD8) return null;
+  var i = 2;
+  while (i < buf.length - 4 && buf[i] === 0xFF) {
+    var m = buf[i + 1], len = buf[i + 2] << 8 | buf[i + 3];
+    if (m === 0xE1 && buf[i + 4] === 0x45 && buf[i + 5] === 0x78 && buf[i + 6] === 0x69 && buf[i + 7] === 0x66) {
+      var seg = buf.slice(i, i + 2 + len), t = 10, le = seg[t] === 0x49;
+      var r16 = function (o) { return le ? seg[o] | seg[o + 1] << 8 : seg[o] << 8 | seg[o + 1]; };
+      var r32 = function (o) { return le ? (seg[o] | seg[o + 1] << 8 | seg[o + 2] << 16 | seg[o + 3] << 24) >>> 0 : ((seg[o] << 24) | seg[o + 1] << 16 | seg[o + 2] << 8 | seg[o + 3]) >>> 0; };
+      try { var ifd = t + r32(t + 4), n = r16(ifd); for (var k = 0; k < n; k++) { var e = ifd + 2 + k * 12; if (r16(e) === 0x0112) { if (le) { seg[e + 8] = 1; seg[e + 9] = 0; } else { seg[e + 8] = 0; seg[e + 9] = 1; } } } } catch (x) {}
+      return seg;
+    }
+    if (m === 0xDA) break; i += 2 + len;
+  }
+  return null;
+}
+async function develop(m) {
+  if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; }
+  var S = m.style, bmp = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+  var W = bmp.width, H = bmp.height, c = canvas(W, H), x = c.getContext("2d", {willReadFrequently: true}); x.drawImage(bmp, 0, 0);
+  // exposition automatique ProLab : meme mesure que l'appli (image reduite a 256 px, un point sur 16)
+  var aw = Math.min(256, W), ah = Math.min(256, H), ac = canvas(aw, ah), ax = ac.getContext("2d", {willReadFrequently: true}); ax.drawImage(bmp, 0, 0, aw, ah);
+  var d = ax.getImageData(0, 0, aw, ah).data, K = 0, he = 0;
+  for (var i = 0; i < d.length; i += 64) { K += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]; he++; }
+  var ze = he ? K / he : 128, dn = S.off ? 0 : Math.max(-5, Math.min(5, (128 - ze) / 38)), v = S.v || {};
+  var g = function (k) { return +v[k] || 0; }, Z = (S.dose == null ? 65 : S.dose) / 100;
+  var P = {off: !!S.off, hp: S.hp || 0, fe: Math.pow(2, (dn + g("Exposition") * 20 / 100 * 2.5) * Z * 0.85), le: 1 + g("Contraste") / 100 * Z * 0.9,
+    Qe: g("Temperature") / 100 * 28 * Z, se: g("Teinte") / 100 * 22 * Z, c: g("Teinte"), I: g("Hautes SANS GRIS") / 100 * Z, O: g("Ombres") / 100 * Z, R: g("Vibrance") / 100 * Z,
+    On: 1 + g("Saturation") / 100 * Z, He: g("Clarte") / 100 * Z, Zb: g("Noir") / 100 * Z, Zw: g("Blanc") / 100 * Z, Zd: g("Dehaze") / 100 * Z, Zv: g("Vignette") / 100 * Z,
+    In: S.profile || "LABO PRO EV5", Z: Z, w: W, h: H, y0: 0};
+  // par bandes, pour ne pas reserver trop de memoire d'un coup sur les grandes photos
+  var band = Math.max(1, Math.floor(4000000 / W));
+  for (var y = 0; y < H; y += band) {
+    var bh = Math.min(band, H - y), id = x.getImageData(0, y, W, bh); P.px = id.data; P.y0 = y; JMRUN(P); x.putImageData(id, 0, y);
+  }
+  bmp.close();
+  var out = new Uint8Array(await (await c.convertToBlob({type: "image/jpeg", quality: (S.q || 92) / 100})).arrayBuffer());
+  var ex = m.heic ? null : exifOf(new Uint8Array(m.buf));
+  if (ex) { var r = new Uint8Array(out.length + ex.length); r.set(out.subarray(0, 2), 0); r.set(ex, 2); r.set(out.subarray(2), 2 + ex.length); out = r; }
+  return out;
+}
+
 var queue = Promise.resolve();
 self.onmessage = function (e) {
   var m = e.data;
+  if (m.develop) {
+    queue = queue.then(function () { return develop(m); }).then(function (b) { self.postMessage({id: m.id, dev: b}, [b.buffer]); }, function (err) { self.postMessage({id: m.id, dev: null, err: String(err && err.message || err)}); });
+    return;
+  }
   if (m.full) { // image en grand pour une photo HEIC
     queue = queue.then(function () { return heicCanvas(m.buf).then(function (c) { return c.convertToBlob({type: "image/jpeg", quality: 0.92}); }); })
       .then(function (b) { self.postMessage({id: m.id, full: b}); }, function (err) { self.postMessage({id: m.id, full: null, err: String(err && err.message || err)}); });

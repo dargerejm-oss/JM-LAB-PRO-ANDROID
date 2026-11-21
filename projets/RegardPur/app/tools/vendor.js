@@ -24,3 +24,4 @@ function get(u, out, n) {
 }
 if (fs.existsSync(MODEL) && fs.statSync(MODEL).size > 1e6) console.log('modele visages deja present');
 else get(URL, MODEL, 0);
+require('./jmlab_core.js');

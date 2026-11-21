@@ -3,7 +3,7 @@ name: Regard Pur (PC Windows)
 on:
   push:
     branches: [main, master, 'claude/**']
-    paths: ['projets/RegardPur/**', '.github/workflows/regardpur.yml']
+    paths: ['projets/RegardPur/**', '.github/workflows/regardpur.yml', 'app/src/main/assets/index.html', 'app/src/main/assets/jmwork.js']
   workflow_dispatch:
 
 permissions:
