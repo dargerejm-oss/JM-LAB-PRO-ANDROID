@@ -222,7 +222,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; if (o.a && o.sz === p.size) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -238,7 +238,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -301,6 +301,7 @@ function pump() {
 }
 function onResult(w, e) {
   var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (r.prev !== undefined) { var cbp = prevWait[r.id]; delete prevWait[r.id]; if (cbp) cbp(r); return; }
   if (r.dev !== undefined) { var cbd = devWait[r.id]; delete devWait[r.id]; if (cbd) cbd(r); return; }
   if (r.full !== undefined) { var cb = fullWait[r.id]; delete fullWait[r.id]; if (cb) cb(r.full); return; }
   if (w.jobs[r.id] == null) return;
@@ -768,6 +769,94 @@ function adjSet() {
 $("lpEv").addEventListener("input", adjSet); $("lpWb").addEventListener("input", adjSet);
 $("lpAdj0").onclick = function () { $("lpEv").value = 0; $("lpWb").value = 0; adjSet(); };
 
+/* ---------------- RETOUCHE PORTRAIT (dans la vue en grand) ---------------- */
+var RP_GROUPS = [
+  ["Peau", [["peau", "Lissage (garde le grain)"], ["acne", "Acné / boutons"], ["taches", "Taches"], ["rousseur", "Taches de rousseur"]]],
+  ["Rides", [["cernes", "Cernes"], ["sourire", "Rides du sourire"], ["front", "Rides du front"]]],
+  ["Yeux", [["yeux", "Blanc des yeux"], ["iris", "Iris (netteté, éclat)"]]],
+  ["Bouche", [["dents", "Blanchir les dents"], ["levres", "Couleur des lèvres"]]],
+  ["Visage", [["eclat", "Éclat du visage"]]],
+  ["Arrière-plan", [["fondFlou", "Flouter le fond"], ["fondSombre", "Assombrir le fond"], ["fondGris", "Désaturer le fond"]]]
+];
+var RP_PRESETS = {
+  "naturel":  {nom: "Naturel", v: {peau: 35, acne: 60, taches: 35, rousseur: 0, cernes: 30, sourire: 15, front: 15, yeux: 25, iris: 20, dents: 25, levres: 10, eclat: 15}},
+  "eclat":    {nom: "Éclat (Face Pop)", v: {peau: 30, acne: 55, taches: 30, cernes: 35, sourire: 15, front: 15, yeux: 40, iris: 45, dents: 30, levres: 25, eclat: 55}},
+  "glamour":  {nom: "Glamour", v: {peau: 65, acne: 80, taches: 60, rousseur: 40, cernes: 60, sourire: 45, front: 45, yeux: 45, iris: 40, dents: 45, levres: 30, eclat: 35}},
+  "mariage":  {nom: "Mariage", v: {peau: 45, acne: 75, taches: 45, rousseur: 15, cernes: 45, sourire: 30, front: 30, yeux: 35, iris: 30, dents: 45, levres: 20, eclat: 25}},
+  "homme":    {nom: "Homme (léger)", v: {peau: 15, acne: 60, taches: 25, cernes: 30, sourire: 0, front: 10, yeux: 25, iris: 30, dents: 20, eclat: 25}},
+  "enfant":   {nom: "Enfant (très léger)", v: {peau: 10, acne: 30, taches: 10, cernes: 15, yeux: 15, iris: 15, eclat: 10}}
+};
+var RPL = (function () { try { return JSON.parse(localStorage.getItem("rp_ret")) || {}; } catch (e) { return {}; } })();
+var rp = {open: false, cur: null, t: 0, busy: 0, url: null};
+function rpDefault(p) { var k = adjKeys(p); for (var i = 0; i < k.length; i++) if (RPL[k[i]]) return JSON.parse(JSON.stringify(RPL[k[i]])); return {preset: "naturel", str: 80, v: JSON.parse(JSON.stringify(RP_PRESETS.naturel.v))}; }
+function rpEff(r) { if (!r) return null; var o = {}, n = 0; Object.keys(r.v).forEach(function (k) { o[k] = Math.round((r.v[k] || 0) * r.str / 100); n += o[k]; }); return n ? o : null; }
+function rpDraw() {
+  var p = S.byId[S.view[S.cur]], box = $("rpPanel"); if (!p) return;
+  var r = p.ret || rp.cur || rpDefault(p); rp.cur = r;
+  var faces = bigFaces(p.a).length;
+  box.innerHTML = "<h3>💄 Retouche portrait</h3>" +
+    (faces ? "" : "<div class='note' style='color:var(--doubt)'>Aucun visage assez grand sur cette photo : seuls les réglages d'arrière-plan peuvent agir.</div>") +
+    "<label class='sel full'>Préréglage<select id='rpPre'><option value=''>Personnalisé</option>" + Object.keys(RP_PRESETS).map(function (k) { return "<option value='" + k + "'" + (r.preset === k ? " selected" : "") + ">" + RP_PRESETS[k].nom + "</option>"; }).join("") + "</select></label>" +
+    "<div class='rl'><span>Intensité</span><input type='range' id='rpStr' min='0' max='100' value='" + r.str + "'><b>" + r.str + "</b></div>" +
+    RP_GROUPS.map(function (g) { return "<h5>" + g[0] + "</h5>" + g[1].map(function (it) { var v = r.v[it[0]] || 0; return "<div class='rl'><span>" + it[1] + "</span><input type='range' data-k='" + it[0] + "' min='0' max='100' value='" + v + "'><b>" + v + "</b></div>"; }).join(""); }).join("") +
+    "<div id='rpBusy'></div>" +
+    "<h5>Appliquer à</h5><div class='apply'><button data-a='photo' class='pri'>Cette photo</button><button data-a='person'" + (faces && bigFaces(p.a)[0].pid != null ? "" : " disabled") + ">Cette personne</button><button data-a='serie'" + (p.g >= 0 ? "" : " disabled") + ">Cette série</button><button data-a='all'>Toutes avec visage</button></div>" +
+    "<div class='apply'><button data-a='none'>Retirer la retouche</button><button data-a='hold' title='Maintenez pour voir l avant'>👁 Avant (maintenir)</button></div>" +
+    "<div class='note'>" + (p.ret ? "✔ Cette photo est retouchée (appliqué à l'export)." : "Aperçu seulement : touchez « Appliquer à » pour garder la retouche.") + "</div>";
+}
+function rpPreview() {
+  var p = S.byId[S.view[S.cur]]; if (!p || !rp.open) return;
+  var eff = rpEff(rp.cur), id = p.id;
+  clearTimeout(rp.t);
+  rp.t = setTimeout(function () {
+    if (!eff) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
+    var busy = $("rpBusy"); if (busy) busy.textContent = "⏳ Calcul de l'aperçu…";
+    var my = ++rp.busy;
+    readBytes(p).then(function (b) {
+      if (!b) return; ensurePool(); var w = pool[0], key = "prev:" + id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
+      prevWait[key] = function (r) {
+        if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
+        if (busy) busy.textContent = r.prev ? (r.faces ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
+        if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
+      };
+      w.postMessage({id: key, buf: c, heic: !!p.heic, preview: true, max: 2400, ret: eff}, [c.buffer]);
+    });
+  }, 300);
+}
+var prevWait = {};
+function rpToggle() {
+  rp.open = !rp.open; $("rpPanel").classList.toggle("show", rp.open); $("loupe").classList.toggle("rp", rp.open); $("lpRet").classList.toggle("on", rp.open);
+  rp.cur = null; if (rp.open) { rpDraw(); rpPreview(); } else { var p = S.byId[S.view[S.cur]]; if (p) fullUrl(p).then(function (u) { $("lpImg").src = u; }); }
+}
+$("lpRet").onclick = rpToggle;
+$("rpPanel").addEventListener("input", function (e) {
+  var t = e.target, r = rp.cur; if (!r) return;
+  if (t.id === "rpStr") { r.str = +t.value; t.nextElementSibling.textContent = t.value; }
+  else if (t.dataset.k) { r.v[t.dataset.k] = +t.value; t.nextElementSibling.textContent = t.value; r.preset = ""; $("rpPre").value = ""; }
+  rpPreview();
+});
+$("rpPanel").addEventListener("change", function (e) {
+  if (e.target.id !== "rpPre" || !e.target.value) return;
+  rp.cur = {preset: e.target.value, str: rp.cur ? rp.cur.str : 80, v: JSON.parse(JSON.stringify(RP_PRESETS[e.target.value].v))}; rpDraw(); rpPreview();
+});
+$("rpPanel").addEventListener("click", function (e) {
+  var b = e.target.closest("button[data-a]"); if (!b || b.dataset.a === "hold") return;
+  var p = S.byId[S.view[S.cur]], a = b.dataset.a, list = [p];
+  if (a === "person") { var pid = bigFaces(p.a)[0].pid, o = PERS[pid]; list = o ? S.photos.filter(function (q) { return o.ids[q.id]; }) : [p]; }
+  if (a === "serie" && p.g >= 0) list = S.groups[p.g].map(function (id) { return S.byId[id]; });
+  if (a === "all") list = S.photos.filter(function (q) { return bigFaces(q.a).length; });
+  var r = a === "none" ? null : JSON.parse(JSON.stringify(rp.cur));
+  list.forEach(function (q) { q.ret = r ? JSON.parse(JSON.stringify(r)) : null; });
+  if (r) { adjKeys(p).forEach(function (k) { RPL[k] = r; }); try { localStorage.setItem("rp_ret", JSON.stringify(RPL)); } catch (x) {} }
+  saveSoon(); rpDraw(); if (a === "none") { rp.cur = null; rpDraw(); }
+  toast(r ? "Retouche portrait appliquée à " + list.length + " photo" + (list.length > 1 ? "s" : "") + " (faite à l'export)." : "Retouche retirée.");
+});
+(function () {
+  var holding = false;
+  $("rpPanel").addEventListener("mousedown", function (e) { var b = e.target.closest("button[data-a=hold]"); if (!b) return; holding = true; var p = S.byId[S.view[S.cur]]; fullUrl(p).then(function (u) { if (holding) $("lpImg").src = u; }); });
+  window.addEventListener("mouseup", function () { if (holding) { holding = false; if (rp.url) $("lpImg").src = rp.url; } });
+})();
+
 /* ---------------- vue en grand (loupe) ---------------- */
 var full = {cache: new Map(), zoom: false, sc: 1, tx: 0, ty: 0}, fullWait = {};
 function fullUrl(p) {
@@ -784,7 +873,7 @@ function fullUrl(p) {
   return pr;
 }
 function openLoupe() { if (S.cur < 0) return; $("loupe").classList.add("show"); showLoupe(); }
-function closeLoupe() { $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
+function closeLoupe() { if (rp.open) rpToggle(); $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
 function fit() {
   var v = $("lpView"), img = $("lpImg"); if (!img.naturalWidth) return;
   var s = Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight, 1);
@@ -816,6 +905,7 @@ function showLoupe() {
     var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
   } else drawLoupeMarks(p);
   drawFaces($("lpFaces"), p); adjShow(p);
+  if (rp.open && $("rpPanel").dataset.for !== p.id) { $("rpPanel").dataset.for = p.id; rp.cur = null; rpDraw(); rpPreview(); }
   var w = p.why || {rej: [], warn: [], good: []};
   $("lpInfo").innerHTML = (p.a && !p.a.err ? "<b style='font-size:18px;color:" + colOf(p.score) + "'>" + p.score + "</b> / 100 · " + (p.status === "P" ? "<span style='color:var(--keep)'>✔ gardée</span>" : p.status === "X" ? "<span style='color:var(--rej)'>✖ rejetée</span>" : "à voir") + "<br>" : "") +
     w.rej.map(function (t) { return "<span style='color:var(--rej)'>✖ " + esc(t) + "</span>"; }).concat(w.warn.map(function (t) { return "<span style='color:var(--doubt)'>⚠ " + esc(t) + "</span>"; }), w.good.map(function (t) { return "<span style='color:var(--keep)'>✔ " + esc(t) + "</span>"; })).join("<br>");
@@ -992,6 +1082,7 @@ function styleFor(p, base) {
   else o.skin = 0.85;
   if (o.profile === "cat") o.profile = cat.prof;
   if (REND.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
+  if (p.ret) o.ret = rpEff(p.ret);
   var ad = p.adj || adjBias(p);
   if (ad) { o.v = o.v || {}; o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100) / 0.85 * 0.85; o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   return o;
@@ -1038,13 +1129,14 @@ async function doExport() {
   }
   var dest = join(S.dir, sub);
   for (i = 0; i < pick.length; i++) {
-    if (style) {
+    var st2 = style ? styleFor(pick[i], style) : (pick[i].ret ? {jm: false, ret: rpEff(pick[i].ret), q: 92} : null);
+    if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
       var nm = REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
-      try { var jpg = await developOne(pick[i], styleFor(pick[i], style)); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
+      try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
     }
-    if (withOrig) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
+    if (withOrig || !st2) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
     step();
   }
   for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }

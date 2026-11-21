@@ -24,4 +24,8 @@ function get(u, out, n) {
 }
 if (fs.existsSync(MODEL) && fs.statSync(MODEL).size > 1e6) console.log('modele visages deja present');
 else get(URL, MODEL, 0);
+// separation personne / fond (peau du visage, peau du corps, cheveux, vetements, fond) pour la retouche portrait
+const SEG = path.join(V, 'selfie_multiclass.tflite');
+if (fs.existsSync(SEG) && fs.statSync(SEG).size > 1e6) console.log('modele separation deja present');
+else get('https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite', SEG, 0);
 require('./jmlab_core.js');

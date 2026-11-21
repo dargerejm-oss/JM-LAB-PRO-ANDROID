@@ -12,6 +12,8 @@ var MP = null, faceLM = null, faceReady = null;
 var MPERR = ""; try { importScripts("vendor/vision_bundle.js"); MP = module.exports; } catch (e) { MP = null; MPERR = String(e && e.message || e); }
 
 /* photos HEIC (iPhone) : decodees par libheif, charge seulement si besoin */
+var PORT = false;
+function needPortrait() { if (!PORT) { importScripts("portrait.js"); PORT = true; } }
 var HEIF = null;
 async function heifLib() {
   if (HEIF) return HEIF;
@@ -363,6 +365,7 @@ async function develop(m) {
     x.putImageData(id, 0, y);
   }
   bmp.close();
+  if (S.ret) { needPortrait(); try { await portraitRetouch(c, S.ret); } catch (e) { self.postMessage({log: "retouche portrait : " + e.message}); } }
   // horizon penche : on tourne et on recadre juste ce qu'il faut pour ne pas voir de coins vides
   if (S.tilt) {
     var th = S.tilt * Math.PI / 180, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W * cs + H * sn) / W, (W * sn + H * cs) / H);
@@ -380,6 +383,16 @@ self.onmessage = function (e) {
   var m = e.data;
   if (m.develop) {
     queue = queue.then(function () { return develop(m); }).then(function (b) { self.postMessage({id: m.id, dev: b}, [b.buffer]); }, function (err) { self.postMessage({id: m.id, dev: null, err: String(err && err.message || err)}); });
+    return;
+  }
+  if (m.preview) { // apercu de la retouche portrait
+    queue = queue.then(async function () {
+      needPortrait();
+      var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+      var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)), cv = canvas(bm.width * k2, bm.height * k2); cv.getContext("2d").drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
+      var n = await portraitRetouch(cv, m.ret);
+      return {b: await cv.convertToBlob({type: "image/jpeg", quality: 0.9}), n: n};
+    }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
     return;
   }
   if (m.full) { // image en grand pour une photo HEIC
