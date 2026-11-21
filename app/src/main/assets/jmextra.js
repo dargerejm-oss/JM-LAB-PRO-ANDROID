@@ -352,7 +352,8 @@ window.__jmsX.x_auto = function(){
 };
 
 /* ---------- mode cours : montre le reglage touche ---------- */
-function courseOn(){ return localStorage.getItem("jms_course") === "on"; }
+try{ localStorage.removeItem("jms_course"); }catch(e){}
+function courseOn(){ return false; }
 var cb = document.createElement("div"); cb.id = "jxCourse"; document.body.appendChild(cb); var ct = 0;
 document.addEventListener("input", function(e){
   var r = e.target; if(!courseOn() || !r || r.type !== "range") return;

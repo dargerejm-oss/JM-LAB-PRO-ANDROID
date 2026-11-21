@@ -73,14 +73,12 @@ function menu(){
   '<button class="hubB b3" data-a="x_big"><span class="i">🔠</span><span>GRAND TEXTE (on / off)<small>Agrandit toute l\'interface</small></span></button>'+
   '<button class="hubB b2" data-a="x_dup"><span class="i">📂</span><span>STYLE → PLUSIEURS DOSSIERS<small>Associer un style à plusieurs noms de dossier d\'un coup</small></span></button>'+
   '<button class="hubB b2" data-a="x_int"><span class="i">🎚️</span><span>INTENSITÉ & MÉLANGE<small>Un style à 60 %, ou 2 styles mélangés</small></span></button>'+
-  '<button class="hubB b3" data-a="x_ba"><span class="i">↔️</span><span>AVANT / APRÈS<small>Curseur glissant sur ta photo</small></span></button>'+
   '<button class="hubB b5" data-a="x_ref"><span class="i">🎯</span><span>STYLE DEPUIS UNE RÉFÉRENCE<small>Une photo dont tu aimes le rendu</small></span></button>'+
   '<button class="hubB b1" data-a="x_qrm"><span class="i">🔳</span><span>QR DE PLUSIEURS STYLES<small>Un ou plusieurs QR pour tout transférer</small></span></button>'+
   '<button class="hubB b4" data-a="x_bak"><span class="i">💾</span><span>SAUVEGARDE AUTO DES STYLES<small id="bakSt"></small></span></button>'+
   '<button class="hubB b2" data-a="x_fav"><span class="i">⭐</span><span>MES FAVORIS<small>Tes styles préférés en boutons dans RÉGLAGES</small></span></button>'+
   '<button class="hubB b3" data-a="x_hist"><span class="i">🕘</span><span>HISTORIQUE DES LOTS<small>Tes derniers lots, dossiers et styles</small></span></button>'+
   '<button class="hubB b5" data-a="x_auto"><span class="i">✨</span><span>AUTO : CORRIGER LA LUMIÈRE<small>Exposition / contraste adaptés à ta photo</small></span></button>'+
-  '<button class="hubB b4" data-a="x_course"><span class="i">🎓</span><span>MODE COURS (on / off)<small>Affiche en grand le réglage que tu bouges</small></span></button>'+
   '<button class="hubB b6" data-a="snap"><span class="i">🔳</span><span>LIRE UN QR SNAPSEED<small>Depuis une capture d\'écran du QR</small></span></button>'+
   '<button class="hubClose" data-a="close">FERMER</button>';
 }
