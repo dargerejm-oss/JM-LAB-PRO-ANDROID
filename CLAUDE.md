@@ -19,3 +19,9 @@ Version 4.11 : tous les outils demandés sont faits (grille OUTILS : Retouches, 
 Contraste des tons, Sélection, Pinceau, Correcteur, Recadrer, Théâtral, HDR, Double exposition, Éclat glamour, Effets),
 vue en grand, mode d'emploi FR + EN à jour (16 pages, sources dans `store/manuel`, `PAGES` dans `jmabout.js`).
 Ne PAS ajouter : Perspective, Noir et blanc complet.
+
+## Configuration (déjà en place, rien à refaire)
+- Dépôt GitHub : `dargerejm-oss/JM-LAB-PRO-ANDROID`. Branche de travail des sessions Claude, puis publication sur `main`.
+- GitHub construit l'APK et l'AAB à chaque envoi (`.github/workflows/build.yml`) ; la clé de signature est dans les secrets GitHub.
+- Tests dans le navigateur (Playwright) : ouvrir `app/src/main/assets/index.html` ; pour le lot et l'enregistrement,
+  simuler `window.JMNative` (la partie Android) et servir le dossier assets en local (`python3 -m http.server`).
