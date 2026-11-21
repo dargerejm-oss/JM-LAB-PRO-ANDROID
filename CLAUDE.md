@@ -38,4 +38,5 @@ Code dans `projets/RegardPur/app` (Electron ; interface HTML/JS dans `renderer/`
 dans `projets/RegardPur/LISEZMOI.md`. Le .exe est fabriqué par `.github/workflows/regardpur.yml` (tags `regardpur-test` /
 `regardpur`, jamais « latest » pour ne pas casser le lien de JM LAB PRO). Tests : servir `renderer/` (python3 -m http.server)
 et Playwright, ou le vrai programme avec `xvfb-run` + `_electron` (dialogue de dossier remplacé dans le test).
-Suite : Android, lien vers JM LAB PRO, HEIC.
+Le dépôt est public : l'utilisateur a refusé un dépôt privé séparé pour Regard Pur (ne pas le reproposer).
+Suite : vérifier yeux fermés / HEIC / 24 Mpx sur vraies photos, mode d'emploi, Android, lien vers JM LAB PRO.
