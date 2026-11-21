@@ -294,3 +294,12 @@ body.tab-exporter #side,body.tab-exporter #panel{display:none}
 #rtTop .aiBtns button{padding:5px 2px;font-size:11px}
 #rtTop .aiBtns button:disabled{opacity:.45}
 .sigRow{display:flex;gap:4px;align-items:center;margin:6px 0;flex-wrap:wrap}.sigRow #sigInfo{font-size:11px;color:var(--mut)}
+#abWrap{position:absolute;left:0;top:0;bottom:0;overflow:hidden;display:none;pointer-events:none;z-index:2}
+#abWrap img{position:absolute;transform-origin:0 0;max-width:none}
+#abLine{position:absolute;top:0;bottom:0;width:0;display:none;z-index:3;cursor:ew-resize}
+#abLine i{position:absolute;top:0;bottom:0;left:-1px;width:2px;background:var(--gold,#d4af37);box-shadow:0 0 6px #000}
+#abLine::after{content:"⇆";position:absolute;top:50%;left:-16px;width:32px;height:32px;margin-top:-16px;border-radius:50%;background:var(--gold,#d4af37);color:#000;font:bold 16px/32px sans-serif;text-align:center}
+#abLine span{position:absolute;top:10px;font-size:11px;background:#000a;color:#fff;padding:2px 6px;border-radius:4px;white-space:nowrap}
+#abLine span:first-of-type{right:8px}#abLine span:last-of-type{left:8px}
+#lpView.ab #abWrap,#lpView.ab #abLine{display:block}
+body:not(.tab-retoucher) .rtOnly{display:none}

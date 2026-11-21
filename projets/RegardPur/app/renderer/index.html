@@ -137,8 +137,9 @@
     <label class="ck expert" data-tip="Montrer les cadres des visages et la zone la plus nette (F)"><input type="checkbox" id="lpMarks" checked> Repères <kbd>F</kbd></label>
     <button id="lpZoom" data-tip="Zoom 100 % sur les yeux ou la zone nette (Z)"><svg class="ic"><use href="#i-zoom"/></svg>100 % <kbd>Z</kbd></button>
     <button id="lpRet" style="display:none"></button>
+    <button id="lpAB" class="rtOnly" data-tip="Comparer avant / après : glissez la ligne sur la photo (touche B)"><svg class="ic"><use href="#i-compare"/></svg>Avant / Après <kbd>B</kbd></button>
   </div>
-  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas><div id="tuneHud"><div id="tuneList"></div><div id="tuneVal"></div></div>
+  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="abWrap"><img id="abImg" alt="" draggable="false"></div><div id="abLine"><span>Avant</span><i></i><span>Après</span></div><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas><div id="tuneHud"><div id="tuneList"></div><div id="tuneVal"></div></div>
     <div id="healBar"><b>🩹 Correcteur</b><span>Peignez sur ce qu'il faut enlever (tache, fil, panneau…). Z : zoom, clic droit glissé : se déplacer.</span>
       <label>Taille <input type="range" id="healSize" min="4" max="80" value="18"></label><button id="healUndo">↶ Annuler</button><button id="healClear">Tout effacer</button><i id="healMsg"></i></div></div>
   <div id="lpInfo"></div>

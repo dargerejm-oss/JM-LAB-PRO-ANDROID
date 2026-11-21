@@ -1449,6 +1449,31 @@ function fullUrl(p) {
 }
 function openLoupe() { if (S.cur < 0) return; $("loupe").classList.add("show"); showLoupe(); }
 function closeLoupe() { if ($("loupe").classList.contains("rmode")) { setTab("trier"); return; } if (rp.open) rpToggle(); if (heal.on) healToggle(); $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
+/* avant / apres : l'original (sans IA ni reglages) a gauche de la ligne, la photo corrigee a droite */
+var AB = {on: false, x: 0.5, id: null, url: null};
+function abPlace() {
+  var img = $("lpImg"), b = $("abImg"), v = $("lpView");
+  b.style.width = img.naturalWidth + "px"; b.style.height = img.naturalHeight + "px"; b.style.transform = img.style.transform;
+  var x = Math.round(v.clientWidth * AB.x); $("abWrap").style.width = x + "px"; $("abLine").style.left = x + "px";
+}
+function abLoad() {
+  var p = S.byId[S.view[S.cur]]; if (!p || AB.id === p.id) { abPlace(); return; }
+  AB.id = p.id; $("abImg").removeAttribute("src");
+  readBytes(p, true).then(function (b) {
+    if (!b || AB.id !== p.id) return;
+    var done = function (u) { if (AB.url) URL.revokeObjectURL(AB.url); AB.url = u; $("abImg").onload = abPlace; $("abImg").src = u; };
+    if (!p.heic) { done(URL.createObjectURL(new Blob([b], {type: "image/jpeg"}))); return; }
+    ensurePool(); var w = pool[pool.length - 1], key = "full:ab:" + Date.now(), c = b.slice(); fullWait[key] = function (bl) { if (bl) done(URL.createObjectURL(bl)); }; w.postMessage({id: key, buf: c.buffer, full: true}, [c.buffer]);
+  });
+}
+function abToggle(on) { AB.on = on == null ? !AB.on : on; $("lpView").classList.toggle("ab", AB.on); $("lpAB").classList.toggle("on", AB.on); if (AB.on) abLoad(); }
+$("lpAB").onclick = function () { abToggle(); };
+$("abLine").addEventListener("mousedown", function (e) {
+  e.preventDefault(); e.stopPropagation(); var v = $("lpView"), r = v.getBoundingClientRect();
+  var mv = function (ev) { AB.x = Math.max(0.02, Math.min(0.98, (ev.clientX - r.left) / r.width)); abPlace(); };
+  var up = function () { window.removeEventListener("mousemove", mv); window.removeEventListener("mouseup", up); };
+  window.addEventListener("mousemove", mv); window.addEventListener("mouseup", up);
+});
 function fit() {
   var v = $("lpView"), img = $("lpImg"); if (!img.naturalWidth) return;
   var s = Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight, 1);
@@ -1456,6 +1481,7 @@ function fit() {
 }
 function apply() {
   var img = $("lpImg"); img.style.transform = "translate(" + full.tx + "px," + full.ty + "px) scale(" + full.sc + ")";
+  if (AB.on) abPlace();
   $("lpView").classList.toggle("zoom", full.zoom);
   var o = $("lpOver"), W = img.naturalWidth * full.sc, H = img.naturalHeight * full.sc, wm = $("lpWarm");
   wm.style.left = full.tx + "px"; wm.style.top = full.ty + "px"; wm.style.width = W + "px"; wm.style.height = H + "px";
@@ -1470,6 +1496,7 @@ function drawLoupeMarks(p) {
 }
 function showLoupe() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
+  if (AB.on) { AB.id = null; abLoad(); }
   $("lpName").textContent = p.rel + "  —  " + (S.cur + 1) + " / " + S.view.length;
   $("lpStars").innerHTML = starsHtml(p.stars);
   var img = $("lpImg"), id = p.id;
@@ -1898,6 +1925,7 @@ document.addEventListener("keydown", function (e) {
       else if (/^[0-5]$/.test(k)) setStars(+k);
       else if (l === "c") openCompare();
       else if (l === "z") { if (!inLp) openLoupe(); $("lpZoom").click(); }
+      else if (l === "b" && S.tab === "retoucher") { abToggle(); }
       else if (l === "f") { $("lpMarks").checked = !$("lpMarks").checked; if (inLp) showLoupe(); }
       else if (l === "g") { $("cGroup").checked = !$("cGroup").checked; S.openGroup = -1; refresh(); }
       else return;
