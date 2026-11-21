@@ -15,12 +15,9 @@
 - Dire clairement ce qui est publié et ce qui ne l'est pas encore.
 
 ## Travail en cours (à reprendre)
-Version 4.8 publiée (grille OUTILS, Détails, Théâtral, Éclat glamour, Balance des blancs pipette, HDR,
-Contraste des tons, Sélection, Pinceau). Reste à faire, dans cet ordre :
-1. Vérifier l'affichage de la zone (photo assombrie, zone en rouge) dans Sélection et Pinceau.
-2. Outil **Double exposition** (2ᵉ photo placée avec les doigts, mélange, opacité ; photo ouverte seulement).
-3. **Rangement** de l'ancien écran « Effets » dans la grille OUTILS (vieux pinceau remplacé par le nouveau,
-   netteté dans Détails).
-4. **Mode d'emploi** FR + EN mis à jour à la toute fin (sources dans `store/manuel`, `PAGES` dans `jmabout.js`).
-5. Publier sur `main` quand l'utilisateur le demande.
+Version 4.9 prête (pas encore publiée) : grille OUTILS complète (Retouches, Détails, Courbes, Balance des blancs,
+Contraste des tons, Sélection, Pinceau, Correcteur, Recadrer, Théâtral, HDR, Double exposition, Éclat glamour, Effets).
+Reste à faire :
+1. **Mode d'emploi** FR + EN mis à jour (sources dans `store/manuel`, `PAGES` dans `jmabout.js`).
+2. Publier sur `main` quand l'utilisateur le demande.
 Ne PAS ajouter : Perspective, Noir et blanc complet.

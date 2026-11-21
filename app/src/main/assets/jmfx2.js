@@ -27,7 +27,7 @@ document.addEventListener("change", function(e){ var t = e.target; if(t && t.typ
 function isLin(p){ return p.length === 2 && p[0][0] === 0 && p[0][1] === 0 && p[1][0] === 255 && p[1][1] === 255; }
 function curveOn(s){ return !(isLin(s.curve.m) && isLin(s.curve.r) && isLin(s.curve.g) && isLin(s.curve.b)); }
 function geoOn(){ return !!(geo.r90 || geo.flip || geo.rot || geo.crop); }
-function active(Q){ var s = get(); return curveOn(s) || lookOn(s) || !!(Q && Q.single && (geoOn() || heals.length || localOn())); }
+function active(Q){ var s = get(); return curveOn(s) || lookOn(s) || !!(Q && Q.single && (geoOn() || heals.length || localOn() || dblOn())); }
 function summary(){
   var s = get(), a = [];
   if(curveOn(s)) a.push(T("courbes", "curves"));
@@ -760,16 +760,93 @@ function selTool(){
   labels(); window.addEventListener("resize", draw); requestAnimationFrame(render);
 }
 
+/* ================= DOUBLE EXPOSITION (photo ouverte seulement) =================
+   La 2e photo est gardee en memoire (fichier) : apercu reduit pendant le reglage, pleine taille a l'enregistrement.
+   Placement en fractions de la photo principale : centre (x, y), echelle s (1 = couvre la photo), rotation rot (radians). */
+var dbl = null;   /* {blob, prev (canvas reduit), w, h, x, y, s, rot, op, mode} */
+document.addEventListener("change", function(e){ var t = e.target; if(t && t.type === "file" && !t.multiple){ dbl = null; } }, true);
+var DBLM = [["source-over", T("Normal", "Normal")], ["screen", T("Éclaircir", "Lighten")], ["multiply", T("Assombrir", "Darken")], ["overlay", T("Superposition", "Overlay")], ["lighter", T("Ajouter", "Add")]];
+function dblOn(){ return !!(dbl && dbl.op > 0); }
+function dblDraw(c, img, d){
+  var W = c.width, H = c.height, iw = img.width, ih = img.height, cover = Math.max(W / iw, H / ih), x = c.getContext("2d");
+  x.save(); x.globalAlpha = Math.max(0, Math.min(1, d.op / 100)); x.globalCompositeOperation = d.mode; x.imageSmoothingQuality = "high";
+  x.translate(d.x * W, d.y * H); x.rotate(d.rot || 0); x.scale(cover * d.s, cover * d.s); x.drawImage(img, -iw / 2, -ih / 2); x.restore();
+}
+async function applyDbl(c, d){ var bmp = await createImageBitmap(d.blob); try{ dblDraw(c, bmp, d); } finally { if(bmp.close) bmp.close(); } }
+function pickImage(){ return new Promise(function(res){ var i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.onchange = function(){ res(i.files && i.files[0] || null); }; i.click(); }); }
+async function loadLayer(f){ var bmp = await createImageBitmap(f), k = Math.min(1, 1400 / Math.max(bmp.width, bmp.height)), p = cvs(bmp.width * k, bmp.height * k); p.getContext("2d").drawImage(bmp, 0, 0, p.width, p.height); if(bmp.close) bmp.close(); return p; }
+function dblTool(){
+  var base = localBase(); if(!base) return;
+  var d = dbl ? Object.assign({}, dbl) : null, showOrig = false;
+  show('<div class="x2Top"><div class="jmsTitle">🖼️ ' + T("DOUBLE EXPOSITION", "DOUBLE EXPOSURE") + '</div>' +
+     '<button id="x2DEye" style="background:#3a3a3a">👁</button><button data-a="help" style="background:#3a3a3a">?</button></div>' +
+   '<div class="x2PvW" id="x2DW" style="position:relative;touch-action:none"><canvas id="x2DC" style="display:block;position:absolute;inset:0;width:100%;height:100%;touch-action:none"></canvas>' +
+     '<div id="x2DMsg" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000c;color:#fff;font-weight:900;padding:12px 18px;border-radius:14px;text-align:center;display:none"></div></div>' +
+   '<div class="x2Hint" id="x2DH" style="flex:none;margin:2px 0">' + T("Un doigt : déplacer la 2ᵉ photo • deux doigts : agrandir et tourner.", "One finger: move the 2nd photo • two fingers: resize and rotate.") + '</div>' +
+   '<div class="x2Chips" id="x2DM">' + DBLM.map(function(m){ return '<button data-a="mode" data-m="' + m[0] + '">' + m[1] + '</button>'; }).join("") + '</div>' +
+   '<div style="flex:none;display:flex;align-items:center;gap:10px;padding:2px 0"><button data-a="photo" ' + BTN + '>📷 ' + T("Photo", "Photo") + '</button>' +
+     '<div style="flex:1"><div class="x2Lb" style="margin:0;text-align:center">' + T("Opacité", "Opacity") + ' : <b id="x2DOv">50</b> %</div><input type="range" id="x2DO" min="0" max="100" value="50" style="width:100%"></div>' +
+     '<button data-a="center" ' + BTN + '>⌖</button></div>' +
+   '<div style="display:flex;align-items:center;justify-content:space-between;flex:none;padding:4px 0">' +
+     '<button data-a="cancel" style="border:0;background:none;color:#fff;font-size:30px;width:52px">✕</button>' +
+     '<button data-a="remove" style="border:0;background:#3a3a3a;color:#fff;border-radius:22px;padding:10px 18px;font-weight:900">' + T("Retirer", "Remove") + '</button>' +
+     '<button data-a="ok" style="border:0;background:none;color:#4CAF50;font-size:34px;width:52px">✓</button></div>', true);
+  var cv = $("x2DC"), wrap = $("x2DW"), V = viewer(cv, wrap, function(){ return base; }), pend = 0;
+  function marks(){
+    Array.prototype.forEach.call($("x2DM").children, function(b){ b.style.background = d && b.dataset.m === d.mode ? "#1E88E5" : ""; });
+    if(d){ $("x2DO").value = d.op; $("x2DOv").textContent = d.op; }
+    var m = $("x2DMsg"); m.style.display = d ? "none" : "block"; m.textContent = T("Touchez 📷 Photo pour choisir la 2ᵉ photo", "Tap 📷 Photo to choose the 2nd photo");
+  }
+  function draw(){
+    if(!document.body.contains(cv)) return; V.size();
+    var c = cvs(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0);
+    if(d && !showOrig) dblDraw(c, d.prev, d);
+    V.draw(c);
+  }
+  function later(){ if(!pend) pend = requestAnimationFrame(function(){ pend = 0; draw(); }); }
+  async function choose(){
+    var f = await pickImage(); if(!f) return;
+    try{ var prev = await loadLayer(f); }catch(e){ alert(T("Photo illisible (format non pris en charge).", "Unreadable photo (unsupported format).")); return; }
+    d = Object.assign({x:0.5, y:0.5, s:1, rot:0, op:50, mode:"screen"}, d || {}, {blob:f, prev:prev}); marks(); draw();
+  }
+  /* gestes : un doigt deplace, deux doigts agrandissent et tournent */
+  var ptrs = {}, g = null;
+  function two(){ var k = Object.keys(ptrs); return [ptrs[k[0]], ptrs[k[1]]]; }
+  cv.onpointerdown = function(e){
+    if(!d) return; cv.setPointerCapture(e.pointerId); ptrs[e.pointerId] = {x:e.clientX, y:e.clientY}; var n = Object.keys(ptrs).length;
+    if(n === 1) g = {m:"move", x:e.clientX, y:e.clientY, dx:d.x, dy:d.y};
+    else if(n === 2){ var p = two(); g = {m:"pinch", dist:Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y), ang:Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x), s:d.s, rot:d.rot}; }
+  };
+  cv.onpointermove = function(e){
+    if(!d || !ptrs[e.pointerId] || !g) return; ptrs[e.pointerId] = {x:e.clientX, y:e.clientY};
+    if(g.m === "move" && Object.keys(ptrs).length === 1){ var sc = V.scale() / V.dpr; d.x = g.dx + (e.clientX - g.x) / sc / base.width; d.y = g.dy + (e.clientY - g.y) / sc / base.height; later(); }
+    else if(g.m === "pinch" && Object.keys(ptrs).length === 2){ var p = two(); d.s = Math.max(0.1, Math.min(6, g.s * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / Math.max(10, g.dist))); d.rot = g.rot + Math.atan2(p[1].y - p[0].y, p[1].x - p[0].x) - g.ang; later(); }
+  };
+  function up(e){ delete ptrs[e.pointerId]; var k = Object.keys(ptrs); if(k.length === 1 && d){ var q = ptrs[k[0]]; g = {m:"move", x:q.x, y:q.y, dx:d.x, dy:d.y}; } else if(!k.length) g = null; }
+  cv.onpointerup = up; cv.onpointercancel = up;
+  $("x2DO").oninput = function(){ if(d){ d.op = +this.value; $("x2DOv").textContent = this.value; later(); } };
+  var eye = $("x2DEye"); eye.onpointerdown = function(){ showOrig = true; draw(); }; eye.onpointerup = eye.onpointerleave = eye.onpointercancel = function(){ showOrig = false; draw(); };
+  HH.photo = function(){ choose(); };
+  HH.mode = function(b){ if(d){ d.mode = b.dataset.m; marks(); later(); } };
+  HH.center = function(){ if(d){ d.x = 0.5; d.y = 0.5; d.s = 1; d.rot = 0; later(); } };
+  HH.remove = function(){ d = null; marks(); draw(); };
+  HH.help = function(){ var h = $("x2DH"); h.style.color = "#FFD600"; h.textContent = T("📷 choisir la 2ᵉ photo • un doigt : déplacer • deux doigts : agrandir / tourner • mode de mélange et opacité en bas • ⌖ recentrer • 👁 maintenu : sans la 2ᵉ photo.", "📷 choose the 2nd photo • one finger: move • two fingers: resize / rotate • blend mode and opacity below • ⌖ recenter • hold 👁: without the 2nd photo."); };
+  HH.cancel = hide;
+  HH.ok = function(){ dbl = d; hide(); if(dblOn()) note("🖼️ " + T("Double exposition appliquée à l'enregistrement de cette photo", "Double exposure applied when this photo is saved")); };
+  marks(); window.addEventListener("resize", draw); requestAnimationFrame(draw);
+  if(!d) setTimeout(choose, 80);
+}
+
 /* ================= GRILLE OUTILS ================= */
 function tuneOn(){ var sl = tuneSliders(); return sl.slice(1).some(function(r){ return +r.value !== 0; }); }
 var GRID = [
   [T("Réglages", "Adjust"), [["tune", "🎛️", T("Retouches", "Tune"), function(){ return tuneOn(); }], ["details", "🔎", T("Détails", "Details"), function(s){ return detailsOn(s); }], ["curves", "📈", T("Courbes", "Curves"), function(s){ return curveOn(s); }], ["wb", "💧", T("Balance des blancs", "White balance"), function(s){ return wbOn(s); }], ["tone", "🌗", T("Contraste des tons", "Tonal contrast"), function(s){ return toneOn(s); }]]],
   [T("Retouche locale", "Local"), [["sel", "🎯", T("Sélection", "Selective"), function(){ return sels.some(function(p){ return p.lum || p.con || p.sat || p.str; }); }], ["brush", "🖌️", T("Pinceau", "Brush"), function(){ return brushes.some(function(b){ return b.v; }); }], ["heal", "🩹", T("Correcteur", "Healing"), function(){ return heals.length > 0; }]]],
   [T("Cadrage", "Framing"), [["crop", "✂️", T("Recadrer", "Crop"), function(){ return geoOn(); }]]],
-  [T("Créatif", "Creative"), [["drama", "🎭", T("Théâtral", "Drama"), function(s){ return dramaOn(s); }], ["hdr", "🌄", "HDR", function(s){ return hdrOn(s); }], ["glow", "✨", T("Éclat glamour", "Glamour glow"), function(s){ return glowOn(s); }], ["fx", "🌤️", T("Effets (ciel, visage, grain, N&B)", "Effects (sky, face, grain, B&W)"), function(){ return !!(window.__jmsFX && window.__jmsFX.get && (function(f){ return f.sky || f.face || f.grad || f.grain || f.bw || f.sharp || f.smooth || f.denoise; })(window.__jmsFX.get())); }]]]
+  [T("Créatif", "Creative"), [["drama", "🎭", T("Théâtral", "Drama"), function(s){ return dramaOn(s); }], ["hdr", "🌄", "HDR", function(s){ return hdrOn(s); }], ["dbl", "🖼️", T("Double exposition", "Double exposure"), function(){ return dblOn(); }], ["glow", "✨", T("Éclat glamour", "Glamour glow"), function(s){ return glowOn(s); }], ["fx", "🌤️", T("Effets (ciel, visage, peau, grain, N&B…)", "Effects (sky, face, skin, grain, B&W…)"), function(){ return !!(window.__jmsFX && window.__jmsFX.get && (function(f){ return f.sky || f.face || f.grad || f.grain || f.bw || f.smooth || f.denoise || f.crop || f.wm; })(window.__jmsFX.get())); }]]]
 ];
 function openTool(k){
-  if(k === "tune") return tune(); if(k === "crop") return crop(); if(k === "curves") return curves(); if(k === "heal") return healer(); if(k === "sel") return selTool(); if(k === "brush") return brushTool();
+  if(k === "tune") return tune(); if(k === "crop") return crop(); if(k === "curves") return curves(); if(k === "heal") return healer(); if(k === "sel") return selTool(); if(k === "dbl") return dblTool(); if(k === "brush") return brushTool();
   if(k === "fx"){ if(window.__jmsX && window.__jmsX.x_fx) window.__jmsX.x_fx(); return; }
   paramTool(k);
 }
@@ -793,6 +870,7 @@ async function pre(bmp, Q){
   if(single && heals.length) healAll(base(), heals);
   if(single && sels.length) applySels(base(), sels);
   if(single && brushes.length) applyBrushes(base(), brushes);
+  if(single && dblOn()) await applyDbl(base(), dbl);
   if(curveOn(s)){ var b = base(); applyCurves(b.getContext("2d"), b.width, b.height, s); }
   if(single && geoOn()) c = geometry(c || bmp, geo);
   if(lookOn(s)) c = looks(c || bmp, s);

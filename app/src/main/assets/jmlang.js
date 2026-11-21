@@ -426,6 +426,7 @@ var D = EN ? {
 "PROFILS FILM":"FILM PROFILES","GAMME ETENDUE":"EXTENDED RANGE","SANS GRIS":"NO GREY",
 "Touchez OUVRIR IMAGE en haut":"Tap OPEN IMAGE at the top",
 "MODE D'EMPLOI":"USER GUIDE","Le guide illustré de l'appli, et son PDF":"The illustrated app guide, and its PDF",
+"EFFETS":"EFFECTS",
 "PARTAGE":"SHARE"
 } : {};
 

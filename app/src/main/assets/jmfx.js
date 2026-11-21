@@ -9,6 +9,8 @@ function wait(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
 function get(){ try{ var o = JSON.parse(localStorage.getItem(KEY)||"{}"); return Object.assign({}, D, o); }catch(e){ return Object.assign({}, D); } }
 function put(o){ localStorage.setItem(KEY, JSON.stringify(o)); }
 var strokes = [];
+/* la nettete est maintenant dans l'outil Details : on y reprend l'ancien reglage */
+(function(){ try{ var o = JSON.parse(localStorage.getItem(KEY) || "{}"); if(o.sharp){ var f = JSON.parse(localStorage.getItem("jms_fx2") || "{}"); f.details = f.details || {s:0, n:0}; if(!f.details.n) f.details.n = o.sharp; localStorage.setItem("jms_fx2", JSON.stringify(f)); o.sharp = 0; localStorage.setItem(KEY, JSON.stringify(o)); } }catch(e){} })();
 function active(Q){ var s = get(); return !!(s.smooth || s.sharp || s.denoise || s.crop || s.wm || s.sky || s.face || s.grad || s.grain || s.bw || (Q && Q.single && strokes.length)) || !!(window.__jmsFX2 && window.__jmsFX2.active(Q)); }
 function summary(){
   var s = get(), a = [];
@@ -146,21 +148,20 @@ function previewCanvas(){
 }
 function screen(){
   var s = get();
-  show('<div class="jmsTitle">✨ EFFETS & RETOUCHE LOCALE</div><div class="jtSub">Appliqués aux photos du lot et à l\'export HD. Mets à 0 pour désactiver.</div>'+
+  show('<div class="jmsTitle">🌤️ EFFETS</div><div class="jtSub">Appliqués aux photos du lot et à l\'export HD. Mets à 0 pour désactiver.</div>'+
    sl("fxSky","🌤️ Assombrir le ciel (auto)",s.sky,0,100)+sl("fxFace","🙂 Éclaircir visage / peau (auto)",s.face,0,100)+sl("fxGrad","🌓 Dégradé sombre en haut",s.grad,0,100)+sl("fxGrain","🎞️ Grain argentique",s.grain,0,100)+
    '<label class="gL">⚫ Noir & blanc</label><select class="gIn" id="fxBw" style="width:100%"><option value="">Couleur (désactivé)</option><option value="n">Noir & blanc neutre</option><option value="red">N&B filtre rouge (ciel sombre)</option><option value="yellow">N&B filtre jaune</option><option value="green">N&B filtre vert</option><option value="blue">N&B filtre bleu</option></select>'+
-   sl("fxSm","💆 Peau lissée (visage)",s.smooth,0,100)+sl("fxSh","🔍 Netteté",s.sharp,0,100)+sl("fxDn","🌫️ Réduction du bruit",s.denoise,0,100)+
+   sl("fxSm","💆 Peau lissée (visage)",s.smooth,0,100)+sl("fxDn","🌫️ Réduction du bruit",s.denoise,0,100)+
    '<label class="gL">📱 Recadrage prêt à publier</label><select class="gIn" id="fxCr" style="width:100%"><option value="">Aucun</option><option value="1:1">Carré 1:1</option><option value="4:5">Instagram 4:5</option><option value="9:16">Story 9:16</option><option value="16:9">Paysage 16:9</option><option value="3:2">3:2</option><option value="2:3">2:3</option></select>'+
    '<label class="gL">©️ Filigrane de protection (texte, vide = aucun)</label><input class="gIn" id="fxWm" type="text" style="width:100%" value="'+esc(s.wm)+'">'+sl("fxWo","Opacité du filigrane",s.wmop,5,80)+
    '<button class="jmsBtn go" data-f="prev">👁️ VOIR LE RÉSULTAT SUR MA PHOTO</button>'+
-   '<button class="jmsBtn go" data-f="brush">🖌️ PINCEAU : ÉCLAIRCIR / ASSOMBRIR AU DOIGT</button>'+
    '<button class="jmsBtn close" data-f="close">TERMINÉ</button>');
   $("fxBw").value = s.bw === "" ? "" : (["red","yellow","green","blue"].indexOf(s.bw) >= 0 ? s.bw : "n");
   $("fxCr").value = s.crop;
-  function save(){ var o = get(); o.smooth = +$("fxSm").value; o.sharp = +$("fxSh").value; o.denoise = +$("fxDn").value; o.crop = $("fxCr").value; o.wm = $("fxWm").value.trim(); o.wmop = +$("fxWo").value; $("fxSmv").textContent = o.smooth; $("fxShv").textContent = o.sharp; $("fxDnv").textContent = o.denoise; $("fxWov").textContent = o.wmop; o.sky = +$("fxSky").value; o.face = +$("fxFace").value; o.grad = +$("fxGrad").value; o.grain = +$("fxGrain").value; var b = $("fxBw").value; o.bw = b === "n" ? "gray" : b; put(o);
+  function save(){ var o = get(); o.smooth = +$("fxSm").value; o.denoise = +$("fxDn").value; o.crop = $("fxCr").value; o.wm = $("fxWm").value.trim(); o.wmop = +$("fxWo").value; $("fxSmv").textContent = o.smooth; $("fxDnv").textContent = o.denoise; $("fxWov").textContent = o.wmop; o.sky = +$("fxSky").value; o.face = +$("fxFace").value; o.grad = +$("fxGrad").value; o.grain = +$("fxGrain").value; var b = $("fxBw").value; o.bw = b === "n" ? "gray" : b; put(o);
     $("fxSkyv").textContent = o.sky; $("fxFacev").textContent = o.face; $("fxGradv").textContent = o.grad; $("fxGrainv").textContent = o.grain; }
-  ["fxSky","fxFace","fxGrad","fxGrain","fxBw","fxSm","fxSh","fxDn","fxCr","fxWm","fxWo"].forEach(function(id){ $(id).oninput = save; $(id).onchange = save; });
-  HH.close = function(){ save(); hide(); }; HH.prev = function(){ save(); preview(); }; HH.brush = function(){ save(); brush(); };
+  ["fxSky","fxFace","fxGrad","fxGrain","fxBw","fxSm","fxDn","fxCr","fxWm","fxWo"].forEach(function(id){ $(id).oninput = save; $(id).onchange = save; });
+  HH.close = function(){ save(); hide(); }; HH.prev = function(){ save(); preview(); };
 }
 async function preview(){
   var pc = previewCanvas(); if(!pc){ alert("Choisis d'abord une image (onglet RÉGLAGES)."); return; }
