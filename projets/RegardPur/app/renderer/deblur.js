@@ -88,11 +88,24 @@ var DEBLUR = (function () {
     return a;
   }
   function sharpen(Y, w, h, amt, mx) { var B = blur(Y, w, h, 1), o = new Float32Array(w * h); for (var i = 0; i < o.length; i++) o[i] = clamp(Y[i] + clamp((Y[i] - B[i]) * amt, -mx, mx), 0, 255); return o; }
-  function denoise(Y, w, h, wt) { // bilateral 5x5 leger sur la luminance
-    var st = clamp(wt / 0.12, 0, 1); if (st <= 0.02) return Y; var sc = 12 + st * 45, ss = 5 + st * 6, o = new Float32Array(w * h), R = 2;
-    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { var c = Y[y * w + x], s = 0, n = 0;
-      for (var dy = -R; dy <= R; dy++) { var yy = clamp(y + dy, 0, h - 1); for (var dx = -R; dx <= R; dx++) { var v = Y[yy * w + clamp(x + dx, 0, w - 1)], d = v - c, f = Math.exp(-(dx * dx + dy * dy) / (2 * ss * ss) - d * d / (2 * sc * sc)); s += v * f; n += f; } }
-      o[y * w + x] = s / n; }
+  function denoise(Y, w, h, wt) { // bilateral 5x5 leger sur la luminance (poids precalcules : pas d'exponentielle par pixel)
+    var st = clamp(wt / 0.12, 0, 1); if (st <= 0.02) return Y; var sc = 12 + st * 45, ss = 5 + st * 6, o = new Float32Array(w * h), R = 2, dy, dx;
+    var SP = new Float32Array(25), RG = new Float32Array(512);
+    for (dy = -R; dy <= R; dy++) for (dx = -R; dx <= R; dx++) SP[(dy + R) * 5 + dx + R] = Math.exp(-(dx * dx + dy * dy) / (2 * ss * ss));
+    for (var q = 0; q < 512; q++) RG[q] = Math.exp(-q * q / 4 / (2 * sc * sc)); // difference mesuree au demi-niveau
+    for (var y = 0; y < h; y++) {
+      var inner = y >= R && y < h - R;
+      for (var x = 0; x < w; x++) {
+        var c = Y[y * w + x], s = 0, n = 0;
+        if (inner && x >= R && x < w - R) {
+          for (dy = -R; dy <= R; dy++) { var rb = (y + dy) * w + x, sb = (dy + R) * 5 + R;
+            for (dx = -R; dx <= R; dx++) { var v = Y[rb + dx], d = v - c; d = d < 0 ? -d : d; var f = SP[sb + dx] * RG[d > 255 ? 511 : (d * 2) | 0]; s += v * f; n += f; } }
+        } else {
+          for (dy = -R; dy <= R; dy++) { var yy = clamp(y + dy, 0, h - 1); for (dx = -R; dx <= R; dx++) { var v2 = Y[yy * w + clamp(x + dx, 0, w - 1)], d2 = Math.abs(v2 - c), f2 = SP[(dy + R) * 5 + dx + R] * RG[d2 > 255 ? 511 : (d2 * 2) | 0]; s += v2 * f2; n += f2; } }
+        }
+        o[y * w + x] = s / n;
+      }
+    }
     return o;
   }
   // classement : score (variance du Laplacien a 900 px), sujet net malgre un grand fond plat, direction du bouge

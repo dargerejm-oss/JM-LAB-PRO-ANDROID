@@ -863,7 +863,7 @@ function devShow(p) {
 /* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
 function devStyle(p) {
   if (!p.dev && !p.adj && !p.ret && !p.heals) return null;
-  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, deblur: d.deblur && d.deblur.amt > 0 ? d.deblur : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
+  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }

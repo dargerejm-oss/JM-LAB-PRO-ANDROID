@@ -1,0 +1,41 @@
+name: Regard Pur - modeles IA
+# prepare les modeles d'IA locale (format ONNX) et les depose dans la publication « regardpur-modeles »
+on:
+  workflow_dispatch:
+  push:
+    paths: ['.github/workflows/rp-modeles.yml', 'projets/RegardPur/app/tools/esrgan_export.py']
+permissions:
+  contents: write
+jobs:
+  modeles:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - name: Real-ESRGAN (officiel) vers ONNX
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install onnx onnxruntime
+          mkdir -p m
+          curl -fL -o m/realesr-general-x4v3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth
+          curl -fL -o m/realesr-general-wdn-x4v3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-wdn-x4v3.pth
+          python projets/RegardPur/app/tools/esrgan_export.py m/realesr-general-x4v3.pth m/realesr-general-x4v3.onnx
+          python projets/RegardPur/app/tools/esrgan_export.py m/realesr-general-wdn-x4v3.pth m/realesr-general-wdn-x4v3.onnx
+      - name: NAFNet (OpenCV) et fiches des modeles
+        run: |
+          curl -fL -o m/deblurring_nafnet.onnx https://huggingface.co/opencv/deblurring_nafnet/resolve/main/deblurring_nafnet_2025may.onnx || true
+          curl -fL -o m/nafnet_LISEZMOI.md https://huggingface.co/opencv/deblurring_nafnet/resolve/main/README.md || true
+          curl -fL -o m/nafnet_LICENSE https://huggingface.co/opencv/deblurring_nafnet/resolve/main/LICENSE || true
+          python - <<'PY'
+          import onnxruntime as ort, glob
+          for f in sorted(glob.glob('m/*.onnx')):
+              s = ort.InferenceSession(f)
+              print(f, [(i.name, i.shape, i.type) for i in s.get_inputs()], [(o.name, o.shape) for o in s.get_outputs()])
+          PY
+          ls -la m
+      - name: Publication regardpur-modeles
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view regardpur-modeles >/dev/null 2>&1 || gh release create regardpur-modeles --prerelease --title "Regard Pur - modeles IA" --notes "Modeles d'IA locale pour Regard Pur (Real-ESRGAN BSD-3, NAFNet MIT via OpenCV)." --target ${{ github.sha }}
+          gh release upload regardpur-modeles m/*.onnx m/nafnet_* --clobber
