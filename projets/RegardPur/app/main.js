@@ -118,6 +118,26 @@ ipcMain.handle('join', (e, ...a) => path.join(...a));
 ipcMain.handle('openPath', (e, p) => shell.openPath(p));
 ipcMain.handle('showItem', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('aiOk', () => AI.available());
+// carte SD / telephone : premier lecteur qui contient un dossier DCIM (repris d'ARCHIVAGE_TRI_PRO)
+ipcMain.handle('sdCard', () => { if (process.platform !== 'win32') return null; for (const l of 'DEFGHIJKLMNOPQRSTUVWXYZ') { const r = l + ':\\'; try { if (fs.existsSync(r + 'DCIM')) return r; } catch (e) {} } return null; });
+// lieux : GPS -> « Ville-Pays » avec OpenStreetMap (Nominatim), seulement si l'utilisateur l'active ; 1 demande par seconde, reponses memorisees
+let placeCache = null, placeLast = 0, placeFail = 0;
+ipcMain.handle('placeName', async (e, lat, lon) => {
+  const f = path.join(app.getPath('userData'), 'lieux.json');
+  if (!placeCache) { try { placeCache = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (x) { placeCache = {}; } }
+  const k = lat.toFixed(2) + ',' + lon.toFixed(2); if (k in placeCache) return placeCache[k];
+  if (placeFail >= 3) return null;
+  const wait = 1100 - (Date.now() - placeLast); if (wait > 0) await new Promise(r => setTimeout(r, wait)); placeLast = Date.now();
+  try {
+    const {net} = require('electron');
+    const u = 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&accept-language=fr&lat=' + lat.toFixed(2) + '&lon=' + lon.toFixed(2);
+    const r = await net.fetch(u, {headers: {'User-Agent': 'RegardPur/3.9 (tri de photos, usage personnel)'}}); const j = await r.json(), a = j.address || {};
+    const v = ['city', 'town', 'village', 'municipality', 'city_district', 'suburb', 'county', 'state_district', 'state'].map(c => a[c]).find(Boolean) || '';
+    const res = [v, a.country || ''].filter(Boolean).join('-'); placeCache[k] = res; placeFail = 0;
+    try { fs.writeFileSync(f, JSON.stringify(placeCache)); } catch (x) {}
+    return res;
+  } catch (x) { placeFail++; return null; }
+});
 // l'IA tourne dans un processus a part (Node), relance automatiquement s'il s'arrete
 let aiProc = null, aiSeq = 0; const aiWait = {};
 function aiChild() {

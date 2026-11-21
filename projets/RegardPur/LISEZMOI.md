@@ -99,3 +99,12 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - Signature / filigrane : « Ma signature… » (Options expert) puis recherche dans les coins et en bas ; filtres « Avec / Sans ma signature ».
 - « Corriger les problèmes » utilise l'IA si utile, dans l'ordre bruit → flou → pixels/compression → visages (option),
   mesure avant / après (annule une correction qui n'améliore pas), et ne propose plus d'office ce que vous annulez souvent.
+
+### Après 3.8 (pas encore publié : la prochaine version regroupera tout)
+- Correction : la vérification avant / après ne rejette plus le débruitage par IA à tort.
+- Avant / Après : ligne à glisser sur la photo (touche B). Déflouter (IA) seulement les personnes (fond flou gardé).
+- TRI_YEUX_LUNETTES_PRO : lunettes repérées (« vérifiez les reflets ») ; verres teintés = yeux non lisibles (pas de rejet).
+- TRI_SHOOTING_PRO : rubrique « Séances » (découpage par pauses réglable, séance de pose / portraits / paysages).
+- VISIONNEUSE_ENREGISTRE : rotation [ et ] (appliquée à l'export), Suppr = corbeille, S = copie rapide (Maj+S : autre dossier).
+- ARCHIVAGE_TRI_PRO : carte SD proposée à l'import, lieux GPS en option (OpenStreetMap, internet), contrôle avant tirage
+  (dpi effectifs de 10×15 à 50×75, visage coupé par le recadrage). Analyse version 5.

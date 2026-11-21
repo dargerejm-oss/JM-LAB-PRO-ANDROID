@@ -393,7 +393,7 @@ async function load(dir, items, label) {
   if (N && dir) {
     try {
       var t = await N.readText(sessPath("session.json"));
-      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; p.rot = o.rot || 0; p.qc = o.qc || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
+      if (t) { var ss = JSON.parse(t); persNames = ss.persons || {}; if (ss.cat && CATS[ss.cat] || ss.cat === "auto") $("sCat").value = ss.cat; $("tClient").value = ss.client || ""; Object.keys(ss.photos || {}).forEach(function (k) { var p = S.byId[k], o = ss.photos[k]; if (!p) return; p.status = o.st || ""; p.auto = !!o.au; p.stars = o.s || 0; p.adj = o.adj || null; p.ret = o.ret || null; p.heals = o.heals || null; p.ov = o.ov || null; p.dev = o.dev || null; p.ai = o.ai || null; p.sig = o.sig == null ? null : o.sig; p.rot = o.rot || 0; p.qc = o.qc || null; p.place = o.place || null; if (o.a && o.sz === p.size && o.a.v === AVER) { p.a = o.a; p.cached = true; } }); }
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
@@ -409,7 +409,7 @@ function saveSoon() {
   clearTimeout(S.saveT);
   S.saveT = setTimeout(function () {
     var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined}; });
+    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined, place: p.place || undefined}; });
     N.writeText(sessPath("session.json"), JSON.stringify(o));
   }, 700);
 }
@@ -916,6 +916,8 @@ function showPanel() {
   var cv = $("pvHist"), x = cv.getContext("2d"); x.clearRect(0, 0, cv.width, cv.height);
   if (a.hist) { var mx = Math.max.apply(null, a.hist.slice(1, 63)) || 1; x.fillStyle = "#9aa3b2"; a.hist.forEach(function (v, i) { var hh = Math.min(1, v / mx) * (cv.height - 4); x.fillRect(i * cv.width / 64, cv.height - hh, cv.width / 64 + 0.5, hh); }); }
   $("pvExif").innerHTML = (exifTxt(a) || "⚠ Aucune information de prise de vue (EXIF)") + (a.w ? "<br>🖼️ " + a.w + " × " + a.h + " px · " + String(a.mp || "").replace(".", ",") + " Mpx" + (a.jq ? " · JPEG qualité " + a.jq : "") + (p.raw ? " (aperçu du RAW)" : "") : "");
+  if (p.place) $("pvExif").innerHTML += "<br>📍 " + esc(p.place.replace(/-/g, " · "));
+  $("pvExif").innerHTML += printCheck(p);
 }
 $("pvCal").addEventListener("click", function (e) { var b = e.target.closest("button[data-cal]"); if (!b) return; var p = S.byId[S.view[S.cur]]; if (p) calAdd(p, b.dataset.cal); });
 $("pvBtns").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) setStatus(b.dataset.st); });
@@ -1832,7 +1834,8 @@ function ymd(t) { var d = new Date(t); return d.getFullYear() + "-" + pad(d.getM
 function hms(t) { var d = new Date(t); return pad(d.getHours(), 2) + "-" + pad(d.getMinutes(), 2) + "-" + pad(d.getSeconds(), 2); }
 async function openImport() {
   if (!N) { dialog("<h3>📥 Importer une carte</h3><p>L'import depuis une carte SD se fait dans la version PC de Regard Pur.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>"); return; }
-  var src = await N.pickDir("Choisir la carte SD (ou le dossier à importer)"); if (!src) return;
+  var card = N.sdCard ? await N.sdCard() : null; if (card) toast("Carte détectée : " + card);
+  var src = await N.pickDir("Choisir la carte SD (ou le dossier à importer)", card || undefined); if (!src) return;
   var list = await N.list(src); if (!list.length) { toast("Aucune photo sur cette carte."); return; }
   if (!IMP.dest) IMP.dest = join(await N.picturesDir(), "Regard Pur");
   var done = IMP.seen || {}, fresh = list.filter(function (o) { return !done[o.name + "|" + o.size]; }).length;
@@ -1957,6 +1960,33 @@ async function quickCopy() {
       else await N.copyAs(p.path, join(QC, p.name));
       p.qc = true; n++; updCard(p); } catch (e) {} }
   saveSoon(); toast((n ? n + " copiée" + (n > 1 ? "s" : "") + " vers « " + QC.split(/[\\/]/).pop() + " »" : "") + (dj ? (n ? " · " : "") + dj + " déjà copiée" + (dj > 1 ? "s" : "") : "") + " (touche S ; Maj+S pour changer de dossier)");
+}
+/* lieux (repris d'ARCHIVAGE_TRI_PRO), seulement a la demande : GPS -> Ville-Pays */
+async function placesRun() {
+  if (!N || !N.placeName) return; var L = S.photos.filter(function (p) { return p.a && p.a.exif && p.a.exif.gps && !p.place; });
+  if (!L.length) { $("placeInfo").textContent = "Aucune photo avec position GPS à nommer."; return; }
+  dialog("<h3>Nommer les lieux ?</h3><p>" + L.length + " photo(s) ont une position GPS. Regard Pur va demander la ville et le pays à OpenStreetMap (gratuit). <b>Internet est utilisé</b> : seules les coordonnées arrondies à environ 1 km sont envoyées, une demande par seconde ; les réponses sont gardées sur votre PC.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='yes' class='pri'>Nommer les lieux</button></div>", async function (c) {
+    if (c !== "yes") return; var n = 0;
+    for (var i = 0; i < L.length; i++) { var g = L[i].a.exif.gps; $("placeInfo").textContent = "⏳ " + (i + 1) + " / " + L.length;
+      var v = await N.placeName(g[0], g[1]); if (v) { L[i].place = v; n++; } else if (v === null && i > 2 && !n) break; }
+    $("placeInfo").textContent = n ? n + " lieu(x) trouvé(s)" : "Lieux indisponibles (pas d'internet ?)"; saveSoon(); drawFilters(); showPanel();
+  });
+}
+$("bPlaces").onclick = placesRun;
+/* controle avant impression (repris d'ARCHIVAGE_TRI_PRO) : resolution effective a chaque format apres recadrage centre au
+   bon rapport (bon >= 250 dpi, juste >= 150, trop petite en dessous), et visage coupe par ce recadrage */
+var PRINTF = [[10, 15], [13, 18], [15, 20], [20, 30], [30, 40], [30, 45], [40, 60], [50, 75]];
+function printCheck(p) {
+  var a = p.a; if (!a || !a.w) return "";
+  var w = a.w, h = a.h; if (p.rot === 90 || p.rot === 270) { var t = w; w = h; h = t; }
+  var land = w >= h, f = bigFaces(a), out = [];
+  PRINTF.forEach(function (fm) {
+    var zw = land ? fm[1] : fm[0], zh = land ? fm[0] : fm[1], rz = zw / zh, rp = w / h, bx;
+    if (rp > rz) { var nw = h * rz; bx = [(w - nw) / 2 / w, 0, (w + nw) / 2 / w, 1]; } else { var nh = w / rz; bx = [0, (h - nh) / 2 / h, 1, (h + nh) / 2 / h]; }
+    var dpi = Math.round((bx[2] - bx[0]) * w / (zw / 2.54)), cut = f.some(function (x) { return x.x < bx[0] - 0.01 || x.y < bx[1] - 0.01 || x.x + x.w > bx[2] + 0.01 || x.y + x.h > bx[3] + 0.01; });
+    out.push("<span title='" + dpi + " dpi effectifs" + (cut ? " — un visage serait coupé par le recadrage" : "") + "' style='color:" + (dpi >= 250 ? "#5fd068" : dpi >= 150 ? "#e0b84a" : "#ff6b6b") + "'>" + fm[0] + "×" + fm[1] + (dpi >= 250 ? " ✓" : dpi >= 150 ? " ≈" : " ✗") + (cut ? " ✂" : "") + "</span>");
+  });
+  return "<div class='expert' style='margin-top:4px'>🖨️ Tirage (cm) : " + out.join(" · ") + "<br><small>✓ bon (≥ 250 dpi) · ≈ juste · ✗ trop petite · ✂ visage coupé par le recadrage</small></div>";
 }
 function dialog(html, cb) { $("dlgBox").innerHTML = html; $("dlg").classList.add("show"); dlgCb = cb || null; }
 function closeDialog() { $("dlg").classList.remove("show"); }

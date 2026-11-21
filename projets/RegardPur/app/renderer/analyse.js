@@ -323,6 +323,7 @@ async function analyse(msg) {
       out.exif = {date: dt instanceof Date ? dt.getTime() + (ex.SubSecTimeOriginal ? Number("0." + ex.SubSecTimeOriginal) * 1000 : 0) : null, make: ex.Make || "", model: ex.Model || "", lens: ex.LensModel || "", iso: ex.ISO || null, speed: ex.ExposureTime || null, f: ex.FNumber || null, focal: ex.FocalLength || null};
     }
   } catch (e) {}
+  try { var gp = await exifr.gps(msg.buf); if (gp && isFinite(gp.latitude) && isFinite(gp.longitude)) { out.exif = out.exif || {}; out.exif.gps = [Math.round(gp.latitude * 1e4) / 1e4, Math.round(gp.longitude * 1e4) / 1e4]; } } catch (e) {}
   var bmp;
   try { bmp = msg.heic ? await createImageBitmap(await heicCanvas(msg.buf)) : await createImageBitmap(blob, {imageOrientation: "from-image"}); }
   catch (e) { out.err = "Image illisible"; return out; }

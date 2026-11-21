@@ -51,12 +51,11 @@ puis EN DERNIER mode d'emploi PDF + aide intégrée en FRANÇAIS ET ANGLAIS. PAS
 ### Regard Pur — PAS DE VERSIONS INTERMÉDIAIRES (demande de l'utilisateur)
 Ne plus fabriquer/publier de version de test à chaque étape : envoyer le travail avec « [skip ci] » dans le message de commit
 (sauf les modèles : `.github/rp_modeles` / rp-modeles.yml). Fabriquer une version seulement quand tout est fini ou quand il la demande.
-Fait après 3.6 : 3.7 = IA locale (ai.js, onnxruntime-node) NAFNet + Real-ESRGAN ; SCUNet (bruit) et GFPGAN (visages) codés, à tester.
+3.8 PUBLIÉE (IA NAFNet/Real-ESRGAN/SCUNet/GFPGAN dans ai_child.js, doublons, cadre, signature, corrections auto). Depuis : voir LISEZMOI « Après 3.8 » (outils Python 1 à 4 faits : lunettes, séances, rotation/corbeille/copie rapide, lieux GPS/SD/tirage).
 
 ### Regard Pur — à faire ensuite (validé par l'utilisateur)
 1. Déflouter plus rapide (FFT optimisée, bougé via a.motion au lieu du tenseur : l'horizon trompe la détection).
 2. IA locale façon Topaz (accord donné) : Real-ESRGAN (dépixeliser/agrandir) + NAFNet (déflouter), puis SCUNet (bruit), GFPGAN (visages, en option avec avant/après).
-3. Idées d'AUDIT_PHOTOS_PRO.py : cadre ajouté, signature, doublons tolérant la rotation, taille différente dans un groupe, choix de l'original.
-4. Outils Python : lunettes (TRI_YEUX_LUNETTES_PRO), séances par écarts de temps (TRI_SHOOTING_PRO), rotation + corbeille (VISIONNEUSE), lieux GPS en option, contrôle d'impression (ARCHIVAGE_TRI_PRO).
+3-4. FAITS (AUDIT_PHOTOS_PRO et les 4 autres outils Python).
 5. Outils selon le type de photo, « garder les N meilleures », ciel + recadrage auto, style Lightroom (XMP) ET DxO (.dop, attendre des exemples), vrais RAW, version anglaise, puis manuel PDF + aide FR/EN.
 Les outils Python de l'utilisateur ne vont JAMAIS dans le dépôt (public) : les redemander s'ils ne sont plus dans le dossier temporaire.
