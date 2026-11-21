@@ -303,3 +303,4 @@ body.tab-exporter #side,body.tab-exporter #panel{display:none}
 #abLine span:first-of-type{right:8px}#abLine span:last-of-type{left:8px}
 #lpView.ab #abWrap,#lpView.ab #abLine{display:block}
 body:not(.tab-retoucher) .rtOnly{display:none}
+#sessions .flt small{display:block;color:var(--mut);font-size:10.5px}

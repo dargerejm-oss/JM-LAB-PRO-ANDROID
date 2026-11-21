@@ -365,7 +365,7 @@ $("fSig").addEventListener("change", function () {
 $("bSigScan").onclick = function () { sigScan(); };
 function sigUi() { $("bSigScan").style.display = SIG ? "" : "none"; if (SIG && !/⏳|trouvée/.test($("sigInfo").textContent)) $("sigInfo").textContent = SIG.name; }
 sigUi();
-function rescore() { S.photos.forEach(function (p) { p.score = score(p); }); buildGroups(); buildDups(); S.photos.forEach(function (p) { p.why = reasons(p); }); }
+function rescore() { S.photos.forEach(function (p) { p.score = score(p); }); buildGroups(); buildDups(); buildSessions(); S.photos.forEach(function (p) { p.why = reasons(p); }); }
 
 /* ---------------- ouverture d'un dossier ---------------- */
 async function openFolder() {
@@ -627,6 +627,32 @@ function buildPersons() {
     return {i: i, cen: c.cen, ids: ids, n: Object.keys(ids).length, ic: rep.f.ic, name: name || "Personne " + (i + 1)};
   });
 }
+/* seances (repris de TRI_SHOOTING_PRO) : decoupage par pauses ; une seance riche en personnes = seance de pose */
+var SESS = [], SGAP = 60; try { SGAP = +localStorage.getItem("rp_sgap") || 60; } catch (e) {}
+function buildSessions() {
+  // date de prise de vue (EXIF), sinon date du fichier (comme TRI SHOOTING PRO)
+  var L = S.photos.filter(function (p) { p.sess = -1; return p.a && !p.a.err && when(p); }).sort(function (a, b) { return when(a) - when(b); });
+  SESS = []; var cur = null;
+  L.forEach(function (p) {
+    var t = when(p);
+    if (!cur || t - cur.end > SGAP * 60000 || t - cur.start > 180 * 60000) { cur = {start: t, end: t, ids: []}; SESS.push(cur); }
+    cur.end = t; cur.ids.push(p.id); p.sess = SESS.length - 1;
+  });
+  SESS.forEach(function (o) {
+    var posed = o.ids.filter(function (id) { return bigFaces(S.byId[id].a).length > 0; }).length, r = posed / o.ids.length;
+    o.posed = posed; o.kind = posed >= 10 && r >= 0.6 ? "Séance de pose" : r >= 0.6 ? "Portraits" : r < 0.2 ? "Paysages, détails" : "Mixte";
+  });
+}
+function drawSessions() {
+  var el = $("sessions"); if (!el) return;
+  if (!SESS.length) { el.innerHTML = '<div class="note">Aucune photo datée (EXIF) : pas de séance à afficher.</div>'; return; }
+  var hm = function (t) { var d = new Date(t); return ("0" + d.getHours()).slice(-2) + "h" + ("0" + d.getMinutes()).slice(-2); };
+  el.innerHTML = SESS.map(function (o, i) { var d = new Date(o.start);
+    return '<div class="flt' + (S.filter === "sess:" + i ? " on" : "") + '" data-f="sess:' + i + '"><span>' + d.toLocaleDateString("fr-FR") + " " + hm(o.start) + "–" + hm(o.end) + "<small>" + o.kind + (o.posed ? " · " + o.posed + " avec personnes" : "") + "</small></span><span>" + o.ids.length + "</span></div>"; }).join("");
+}
+$("sessGap").value = SGAP; $("sessGapV").textContent = SGAP + " min";
+$("sessGap").addEventListener("input", function () { SGAP = +this.value; $("sessGapV").textContent = SGAP + " min"; try { localStorage.setItem("rp_sgap", SGAP); } catch (e) {} buildSessions(); drawSessions(); });
+$("sessions").addEventListener("click", function () { setTimeout(drawSessions, 0); });
 function drawPersons() {
   var box = $("persons");
   if (!PERS.length) { box.innerHTML = '<div class="note">' + (S.photos.some(function (p) { return bigFaces(p.a).length; }) ? "Reconnaissance des personnes…" : "Aucun visage reconnu pour l'instant.") + "</div>"; return; }
@@ -676,10 +702,12 @@ var ISSUES = [
 ];
 function has(p, re) { var w = p.why; if (!w) return false; return w.rej.concat(w.warn).some(function (t) { return re.test(t); }); }
 function fnOf(k) {
+  if (/^sess:/.test(k)) { var so = SESS[+k.slice(5)]; return function (p) { return !!so && so.ids.indexOf(p.id) >= 0; }; }
   if (/^person:/.test(k)) { var o = PERS[+k.slice(7)]; return function (p) { return !!(o && o.ids[p.id]); }; }
   if (/^similar:/.test(k)) { var ref = S.byId[k.slice(8)]; return function (p) { return !!ref && simDist(ref, p) <= 26; }; }
   var f = FILTERS.concat(ISSUES).filter(function (x) { return x[0] === k; })[0]; return f ? f[2] : FILTERS[0][2]; }
 function drawFilters() {
+  drawSessions();
   function row(f) { var n = S.photos.filter(f[2]).length; return '<div class="flt' + (S.filter === f[0] ? " on" : "") + '" data-f="' + f[0] + '"><span>' + f[1] + "</span><span>" + n + "</span></div>"; }
   $("filters").innerHTML = FILTERS.map(row).join("");
   $("issues").innerHTML = ISSUES.map(row).join("") + (S.dups && S.dups.some(function (g) { return g.some(function (id) { var q = S.byId[id]; return q && !q.dupOrig && q.status !== "R"; }); }) ? '<button id="bRejDup" class="mini" style="width:100%;margin-top:4px" data-tip="Rejette toutes les versions en double et garde l\'original de chaque photo (sans cadre, la plus grande, puis la plus ancienne)">Rejeter les doublons (garder les originaux)</button>' : "");

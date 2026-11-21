@@ -71,6 +71,9 @@
   <aside id="side">
     <details open><summary>Afficher</summary><div id="filters"></div></details>
     <details open><summary>Problèmes repérés <i class="tip" data-tip="Photos où Regard Pur a trouvé un défaut. Cliquez pour les voir.">?</i></summary><div id="issues"></div></details>
+    <details><summary>Séances <i class="tip" data-tip="Repris de TRI SHOOTING PRO : les photos sont découpées en séances selon les pauses (plus de X minutes sans photo, ou plus de 3 h). Une séance avec beaucoup de personnes est une séance de pose. Clic : ses photos.">?</i></summary>
+      <div class="rl" style="grid-template-columns:auto 1fr auto"><span>Pause</span><input type="range" id="sessGap" min="10" max="240" step="10" value="60"><b id="sessGapV">60 min</b></div>
+      <div id="sessions"><div class="note">Les séances apparaissent après l'analyse (photos datées).</div></div></details>
     <details open><summary>Personnes <small id="persHint"></small> <i class="tip" data-tip="Les mêmes visages sont regroupés. Clic : ses photos. Double-clic : lui donner un nom.">?</i></summary>
       <div id="persons"><div class="note">Les personnes apparaissent ici après l'analyse.</div></div></details>
     <details open><summary>Séance</summary>
