@@ -180,6 +180,12 @@
         <div id="aiState" class="dbInfo"></div>
         <button id="aiOff" style="display:none;width:100%">Revenir à l'original (sans IA)</button>
       </div>
+      <h5>Ciel <i class="tip" data-tip="Le ciel est repéré tout seul (zone claire ou bleue, peu détaillée, reliée au haut de la photo) : seul le ciel change.">?</i></h5>
+      <div class="rl"><span>Assombrir</span><input type="range" data-sky="dark" min="-100" max="100" value="0"><b>0</b></div>
+      <div class="rl"><span>Bleu</span><input type="range" data-sky="blue" min="-100" max="100" value="0"><b>0</b></div>
+      <div class="rl"><span>Relief</span><input type="range" data-sky="clar" min="-100" max="100" value="0"><b>0</b></div>
+      <h5>Recadrage <i class="tip" data-tip="Recadrage auto : le sujet (visage, sinon la zone la plus nette) est placé sur les lignes des tiers, sans couper de visage, en enlevant au plus 20 %.">?</i></h5>
+      <div class="row3"><select id="crRatio"><option value="orig">D'origine</option><option value="1.5">3:2</option><option value="0.8">4:5</option><option value="1">Carré</option><option value="1.7778">16:9</option></select><button id="crAuto">Recadrage auto</button><button id="crOff">Sans</button></div>
       <h5>Détail et effets</h5>
       <div class="rl"><span>Clarté</span><input type="range" data-dv="Clarte" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Voile (dehaze)</span><input type="range" data-dv="Dehaze" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Vignette</span><input type="range" data-dv="Vignette" min="-100" max="100" value="0"><b>0</b></div>
       <details class="tools" open><summary>Outils de JM LAB PRO</summary>

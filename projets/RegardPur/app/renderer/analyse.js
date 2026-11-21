@@ -476,6 +476,39 @@ function exifOf(buf) {
 /* rendu « JM LAB PRO » d'une image (en place) : correction de categorie, profil + ProLab + curseurs, peau protegee, courbe.
    Utilise a l'export (pleine resolution) ET pour l'apercu de l'etape Retoucher : meme resultat. */
 var DBI = null;
+/* ciel : repere sans modele (clair ou bleu, peu de details, relie au haut de l'image), puis assombri / bleui / plus de relief */
+function skyMask(c) {
+  var s = Math.min(1, 256 / Math.max(c.width, c.height)), w = Math.max(8, Math.round(c.width * s)), h = Math.max(8, Math.round(c.height * s));
+  var t = canvas(w, h), x = t.getContext("2d", {willReadFrequently: true}); x.drawImage(c, 0, 0, w, h);
+  var d = x.getImageData(0, 0, w, h).data, L = new Float32Array(w * h), ok = new Uint8Array(w * h), m = new Uint8Array(w * h), i;
+  for (i = 0; i < w * h; i++) L[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
+  for (var y = 1; y < h - 1; y++) for (var xx = 1; xx < w - 1; xx++) {
+    i = y * w + xx; var r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2], gr = Math.abs(L[i + 1] - L[i - 1]) + Math.abs(L[i + w] - L[i - w]);
+    var blue = b > r + 8 && b >= g * 0.92 && L[i] > 70, white = L[i] > 185 && Math.max(r, g, b) - Math.min(r, g, b) < 40;
+    ok[i] = (blue || white) && gr < 18 && y < h * 0.75 ? 1 : 0;
+  }
+  var st = []; for (xx = 0; xx < w; xx++) { i = w + xx; if (ok[i]) { m[i] = 1; st.push(i); } }
+  while (st.length) { i = st.pop(); [i - 1, i + 1, i - w, i + w].forEach(function (j) { if (j > 0 && j < w * h && ok[j] && !m[j]) { m[j] = 1; st.push(j); } }); }
+  var n = 0; for (i = 0; i < m.length; i++) n += m[i]; if (n < w * h * 0.04) return null;
+  var mc = canvas(w, h), mx = mc.getContext("2d"), id = mx.createImageData(w, h); for (i = 0; i < m.length; i++) { id.data[i * 4 + 3] = m[i] ? 255 : 0; } mx.putImageData(id, 0, 0);
+  var big = canvas(c.width, c.height), bx = big.getContext("2d", {willReadFrequently: true}); bx.filter = "blur(" + Math.max(2, Math.round(c.width / 120)) + "px)"; bx.drawImage(mc, 0, 0, c.width, c.height);
+  return bx.getImageData(0, 0, c.width, c.height).data;
+}
+function skyApply(c, k) {
+  if (!k || !(k.dark || k.blue || k.clar)) return; var M = skyMask(c); if (!M) return;
+  var x = c.getContext("2d", {willReadFrequently: true}), id = x.getImageData(0, 0, c.width, c.height), d = id.data, dk = (k.dark || 0) / 100, bl = (k.blue || 0) / 100, cl = (k.clar || 0) / 100, sum = 0, nn = 0, i;
+  for (i = 0; i < d.length; i += 16) if (M[i + 3] > 128) { sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; nn++; }
+  var mean = nn ? sum / nn : 128;
+  for (i = 0; i < d.length; i += 4) { var a = M[i + 3] / 255; if (!a) continue;
+    var f = 1 - dk * 0.45 * a, ct = 1 + cl * 0.6 * a;
+    for (var q = 0; q < 3; q++) { var v = d[i + q] * f; v = mean * f + (v - mean * f) * ct; d[i + q] = v; }
+    d[i] -= bl * 18 * a; d[i + 1] -= bl * 4 * a; d[i + 2] += bl * 22 * a; }
+  x.putImageData(id, 0, 0);
+}
+function cropC(c, b) { // recadrage (valeurs de 0 a 1)
+  if (!b) return c; var X = Math.round(b.x * c.width), Y = Math.round(b.y * c.height), W = Math.max(8, Math.round(b.w * c.width)), H = Math.max(8, Math.round(b.h * c.height));
+  var o = canvas(W, H); o.getContext("2d").drawImage(c, X, Y, W, H, 0, 0, W, H); return o;
+}
 function rotQ(c, deg) { // quart de tour dans le sens des aiguilles d'une montre (90 / 180 / 270)
   deg = ((deg % 360) + 360) % 360; if (!deg) return c;
   var sw = deg === 180, W = sw ? c.width : c.height, H = sw ? c.height : c.width, o = canvas(W, H), x = o.getContext("2d");
@@ -483,6 +516,9 @@ function rotQ(c, deg) { // quart de tour dans le sens des aiguilles d'une montre
 }
 function renderStyle(c, S) {
   if (S.rotOnly) return;
+  renderStyle0(c, S); if (S.sky) try { skyApply(c, S.sky); } catch (e) {}
+}
+function renderStyle0(c, S) {
   if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; }
   // defloutage (CORRECTION FLOU PRO) : avant les reglages de tons, sur les pixels d'origine
   DBI = null;
@@ -583,6 +619,7 @@ async function develop(m) {
     var c2 = canvas(W, H), x2 = c2.getContext("2d"); x2.imageSmoothingQuality = "high";
     x2.translate(W / 2, H / 2); x2.rotate(-th); x2.scale(kz, kz); x2.drawImage(c, -W / 2, -H / 2); c = c2;
   }
+  if (S.crop) c = cropC(c, S.crop);
   if (S.rot) c = rotQ(c, S.rot);
   var out = new Uint8Array(await (await c.convertToBlob({type: "image/jpeg", quality: (S.q || 92) / 100})).arrayBuffer());
   var ex = m.heic ? null : exifOf(new Uint8Array(m.buf));
@@ -606,6 +643,7 @@ self.onmessage = function (e) {
       DBI = null; if (m.style) renderStyle(cv, m.style);
       var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;
       if (m.style && m.style.tilt) { var th = m.style.tilt * Math.PI / 180, W2 = cv.width, H2 = cv.height, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W2 * cs + H2 * sn) / W2, (W2 * sn + H2 * cs) / H2), c3 = canvas(W2, H2), x3 = c3.getContext("2d"); x3.imageSmoothingQuality = "high"; x3.translate(W2 / 2, H2 / 2); x3.rotate(-th); x3.scale(kz, kz); x3.drawImage(cv, -W2 / 2, -H2 / 2); cv = c3; }
+      if (m.style && m.style.crop) cv = cropC(cv, m.style.crop);
       if (m.style && m.style.rot) cv = rotQ(cv, m.style.rot);
       return {b: await cv.convertToBlob({type: "image/jpeg", quality: 0.9}), n: n};
     }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n, db: DBI}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });

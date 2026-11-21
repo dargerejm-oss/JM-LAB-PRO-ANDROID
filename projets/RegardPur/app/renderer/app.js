@@ -1035,6 +1035,8 @@ function devShow(p) {
   var db = d.deblur || {}; $("dbAmt").value = db.amt || 0; $("dbAmt").nextElementSibling.textContent = db.amt || 0; $("dbKind").value = db.kind || "auto"; if (!(db.amt > 0)) $("dbInfo").textContent = "";
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-lv]"), function (r) { var v = +((d.levels || {})[r.dataset.lv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 && r.dataset.lv === "g" ? "+" + v : v; });
   aiShow(p); typeShow(p);
+  Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-sky]"), function (rg) { var v = +((d.sky || {})[rg.dataset.sky] || 0); rg.value = v; rg.nextElementSibling.textContent = v; });
+  $("crRatio").value = d.crop && d.crop.r ? d.crop.r : "orig"; $("crOff").disabled = !d.crop;
   $("dvFixed").textContent = d.fix && d.fix.length ? "🩺 Corrigé : " + d.fix.join(", ") : "";
   var lk = d.looks || {};
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop [data-lk]"), function (r) { var k = r.dataset.lk.split("."), v = +((lk[k[0]] || {})[k[1]] || 0); r.value = v; if (r.tagName === "INPUT") r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
@@ -1042,7 +1044,7 @@ function devShow(p) {
 /* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
 function devStyle(p) {
   if (!p.dev && !p.adj && !p.ret && !p.heals) return p.rot ? {rotOnly: true, rot: p.rot, q: 95} : null;
-  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
+  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, sky: d.sky || null, crop: d.crop || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
@@ -1057,8 +1059,8 @@ var TYPE_TOOLS = {
   mariage: [["Retouche mariage", "rp:mariage"], ["Lumière douce", {v: {Contraste: -12, Ombres: 15}, lk: {glow: {g: 30, sat: 0, w: 10}}}], ["Blancs propres", {v: {Blanc: 15}, lk: {wb: {t: -8, ti: 0}}}], ["Visages (IA)", "ai:face"]],
   famille: [["Visages éclaircis", {v: {Ombres: 30}}], ["Peau naturelle", "rp:naturel"], ["Netteté de groupe", {lk: {details: {s: 10, n: 30}}}]],
   "contre-jour": [["Déboucher le sujet", {v: {Ombres: 55, "Hautes SANS GRIS": -40}}], ["HDR personnes", {lk: {hdr: {st: 1, f: 35, b: 0, sat: 0}}}], ["Ciel récupéré", {lk: {tone: {hi: -35, mid: 0, lo: 10}}}]],
-  plage: [["Mer et ciel", {v: {Vibrance: 20, Dehaze: 10}, lk: {tone: {hi: -20, mid: 0, lo: 0}}}], ["Horizon droit", "tilt"], ["Peau protégée", {v: {Vibrance: 8}}]],
-  paysage: [["Détails", {lk: {details: {s: 30, n: 25}}}], ["Ciel et relief", {v: {Dehaze: 15}, lk: {tone: {hi: -25, mid: 5, lo: 20}}}], ["HDR nature", {lk: {hdr: {st: 0, f: 40, b: 0, sat: 10}}}], ["Horizon droit", "tilt"]],
+  plage: [["Ciel plus profond", {sky: {dark: 25, blue: 30, clar: 15}}], ["Mer et ciel", {v: {Vibrance: 20, Dehaze: 10}, lk: {tone: {hi: -20, mid: 0, lo: 0}}}], ["Horizon droit", "tilt"], ["Peau protégée", {v: {Vibrance: 8}}]],
+  paysage: [["Ciel plus profond", {sky: {dark: 30, blue: 25, clar: 20}}], ["Recadrage auto", "crop"], ["Détails", {lk: {details: {s: 30, n: 25}}}], ["Ciel et relief", {v: {Dehaze: 15}, lk: {tone: {hi: -25, mid: 5, lo: 20}}}], ["HDR nature", {lk: {hdr: {st: 0, f: 40, b: 0, sat: 10}}}], ["Horizon droit", "tilt"]],
   nuit: [["Débruiter (IA)", "ai:scu"], ["Ombres", {v: {Ombres: 30, Noir: -10}}], ["Lumières maîtrisées", {v: {"Hautes SANS GRIS": -35}}], ["Lissage du grain", {lk: {details: {s: -30, n: 0}}}]]
 };
 function typeShow(p) {
@@ -1073,15 +1075,42 @@ $("typeTools").addEventListener("click", function (e) {
   var t = TYPE_TOOLS[catOf(p)][+b.dataset.tt], a = t[1];
   if (typeof a === "string" && a.indexOf("ai:") === 0) { aiRun(a.slice(3)); return; }
   if (typeof a === "string" && a.indexOf("rp:") === 0) { var k = a.slice(3); p.ret = {preset: k, str: 100, v: JSON.parse(JSON.stringify(RP_PRESETS[k].v))}; rp.cur = p.ret; }
+  else if (a === "crop") { var cc = autoCrop(p, "orig"); if (!cc) { toast("Le cadrage est déjà bon."); return; } devGet(p).crop = cc; }
   else if (a === "tilt") { if (!p.a.tilt) { toast("L'horizon de cette photo est déjà droit."); return; } devGet(p).tilt = true; }
-  else { var d = devGet(p); if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
+  else { var d = devGet(p); if (a.sky) d.sky = JSON.parse(JSON.stringify(a.sky)); if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
   var d2 = devGet(p); d2.tt = (d2.tt || []).filter(function (x) { return x !== t[0]; }).concat([t[0]]);
   devShow(p); devChanged(p); toast("« " + t[0] + " » appliqué — affinez avec les curseurs si besoin.");
 });
+/* recadrage automatique : sujet sur les tiers, aucun visage coupe, au plus 20 % enleve */
+function autoCrop(p, ratio) {
+  var a = p.a; if (!a || !a.w) return null;
+  var W = a.w, H = a.h, R0 = W / H, R1 = ratio === "orig" ? R0 : +ratio, f = bigFaces(a), sx, sy;
+  if (f.length) { var big = f.slice().sort(function (u, v) { return v.w * v.h - u.w * u.h; })[0]; sx = big.x + big.w / 2; sy = big.y + big.h * 0.4; }
+  else if (a.zone) { sx = a.zone.x + a.zone.w / 2; sy = a.zone.y + a.zone.h / 2; } else { sx = 0.5; sy = 0.5; }
+  var best = null;
+  [1, 0.95, 0.9, 0.85, 0.8].forEach(function (s) {
+    var cw, ch; if (R1 >= R0) { cw = s; ch = s * R0 / R1; } else { ch = s; cw = s * R1 / R0; }
+    if (cw > 1 || ch > 1) return;
+    [1 / 3, 0.5, 2 / 3].forEach(function (tx) { [1 / 3, 0.5, 2 / 3].forEach(function (ty) {
+      var x = Math.max(0, Math.min(1 - cw, sx - tx * cw)), y = Math.max(0, Math.min(1 - ch, sy - ty * ch));
+      var px = (sx - x) / cw, py = (sy - y) / ch, cut = f.some(function (q) { return q.x < x - 0.005 || q.y < y - 0.005 || q.x + q.w > x + cw + 0.005 || q.y + q.h > y + ch + 0.005; });
+      var dth = Math.min(Math.abs(px - 1 / 3), Math.abs(px - 2 / 3)) + Math.min(Math.abs(py - 1 / 3), Math.abs(py - 2 / 3)) * (f.length ? 1.2 : 1);
+      var cost = dth + (1 - s) * 0.9 + (cut ? 5 : 0) + (tx === 0.5 ? 0.04 : 0);
+      if (!best || cost < best.cost) best = {cost: cost, x: x, y: y, w: cw, h: ch};
+    }); });
+  });
+  if (!best) return null;
+  if (ratio === "orig" && best.w > 0.995 && best.h > 0.995) return null;
+  return {x: Math.round(best.x * 1e4) / 1e4, y: Math.round(best.y * 1e4) / 1e4, w: Math.round(best.w * 1e4) / 1e4, h: Math.round(best.h * 1e4) / 1e4, r: ratio};
+}
+$("crAuto").onclick = function () { fixTargets().forEach(function (p) { var c = autoCrop(p, $("crRatio").value); if (c) devGet(p).crop = c; }); var p = S.byId[S.view[S.cur]]; if (p) { devShow(p); devChanged(p); } toast("Recadrage auto appliqué (bouton « Sans » pour revenir)."); };
+$("crRatio").addEventListener("change", function () { $("crAuto").click(); });
+$("crOff").onclick = function () { fixTargets().forEach(function (p) { if (p.dev) delete p.dev.crop; }); var p = S.byId[S.view[S.cur]]; if (p) { devShow(p); devChanged(p); } };
 function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
 $("rtTop").addEventListener("input", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
   if (t.id === "dbAmt" || t.id === "dbKind") { var dd = devGet(p); dd.deblur = dd.deblur || {}; if (t.id === "dbAmt") { dd.deblur.amt = +t.value; t.nextElementSibling.textContent = t.value; } else dd.deblur.kind = t.value; devChanged(p); return; }
+  if (t.dataset.sky) { var dsk = devGet(p); dsk.sky = dsk.sky || {}; dsk.sky[t.dataset.sky] = +t.value; t.nextElementSibling.textContent = t.value; devChanged(p); return; }
   if (t.dataset.lv) { var dl = devGet(p); dl.levels = dl.levels || {}; dl.levels[t.dataset.lv] = +t.value; t.nextElementSibling.textContent = t.value; devChanged(p); return; }
   if (t.dataset.lk) { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; if (t.tagName === "INPUT") t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); return; }
   if (t.dataset.dv) { devGet(p).v[t.dataset.dv] = +t.value; t.nextElementSibling.textContent = +t.value > 0 ? "+" + t.value : t.value; devChanged(p); }
@@ -1603,7 +1632,7 @@ function apply() {
 }
 function drawLoupeMarks(p) {
   var o = $("lpOver"); o.innerHTML = "";
-  if (!$("lpMarks").checked || !p.a || p.a.err) return;
+  if (!$("lpMarks").checked || !p.a || p.a.err || p.rot || (p.dev && (p.dev.crop || p.dev.tilt))) return; // reperes inexacts sur une photo recadree ou tournee
   var img = $("lpImg"), fake = {clientWidth: img.naturalWidth * full.sc, clientHeight: img.naturalHeight * full.sc, offsetLeft: full.tx, offsetTop: full.ty, naturalWidth: 1};
   marks(o, fake, p.a, true);
 }
