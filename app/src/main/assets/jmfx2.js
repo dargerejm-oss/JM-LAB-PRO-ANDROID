@@ -4,7 +4,8 @@
    Les courbes s'appliquent aussi au lot ; correcteur et recadrage seulement a la photo ouverte. */
 (function(){
 "use strict";
-var EN = window.__jmsLang === "en";
+/* meme choix de langue que jmlang.js (ce fichier est charge avant lui) */
+var EN = !/^fr/i.test(navigator.language || "fr"); try{ var fl = localStorage.getItem("jms_lang"); if(fl === "fr" || fl === "en") EN = fl === "en"; }catch(e){}
 function T(fr, en){ return EN ? en : fr; }
 function $(id){ return document.getElementById(id); }
 function cvs(w, h){ var c = document.createElement("canvas"); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
