@@ -16,7 +16,7 @@ jobs:
         with: { python-version: '3.11' }
       - name: Real-ESRGAN (officiel) vers ONNX
         run: |
-          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install onnx onnxruntime
           mkdir -p m
           curl -fL -o m/realesr-general-x4v3.pth https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-general-x4v3.pth
