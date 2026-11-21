@@ -118,9 +118,21 @@ ipcMain.handle('join', (e, ...a) => path.join(...a));
 ipcMain.handle('openPath', (e, p) => shell.openPath(p));
 ipcMain.handle('showItem', (e, p) => shell.showItemInFolder(p));
 ipcMain.handle('aiOk', () => AI.available());
-ipcMain.handle('aiRun', async (e, m, rgba, w, h, tw, th) => {
-  let last = 0;
-  const r = await AI.run(m, rgba, w, h, tw, th, (f, ep) => { const t = Date.now(); if (t - last > 300 || f >= 1) { last = t; e.sender.send('aiProg', f, ep); } });
-  return r;
-});
+// l'IA tourne dans un processus a part (Node), relance automatiquement s'il s'arrete
+let aiProc = null, aiSeq = 0; const aiWait = {};
+function aiChild() {
+  if (aiProc && aiProc.connected) return aiProc;
+  const {fork} = require('child_process');
+  aiProc = fork(path.join(__dirname, 'ai_child.js'), [], {env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}, serialization: 'advanced', stdio: ['ignore', 'ignore', 'ignore', 'ipc']});
+  aiProc.send({init: true, dir: AI.dir()});
+  aiProc.on('message', (r) => { const w = aiWait[r.id]; if (!w) return; if (r.prog != null) { w.prog(r.prog, r.ep); return; } delete aiWait[r.id]; if (r.err) w.rej(new Error(r.err)); else w.res(r.res); });
+  aiProc.on('exit', (c) => { aiProc = null; Object.keys(aiWait).forEach(k => { aiWait[k].rej(new Error("le calcul IA s'est arrêté (mémoire insuffisante ?)")); delete aiWait[k]; }); });
+  return aiProc;
+}
+ipcMain.handle('aiRun', (e, m, rgba, w, h, tw, th) => new Promise((res, rej) => {
+  let last = 0; const id = ++aiSeq;
+  aiWait[id] = {res, rej, prog: (f, ep) => { const t = Date.now(); if (t - last > 300 || f >= 1) { last = t; e.sender.send('aiProg', f, ep); } }};
+  aiChild().send({id, m, rgba, w, h, tw, th});
+}));
+app.on('before-quit', () => { if (aiProc) aiProc.kill(); });
 ipcMain.handle('trash', async (e, p) => { await shell.trashItem(p); return true; });

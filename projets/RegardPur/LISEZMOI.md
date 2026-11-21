@@ -87,3 +87,12 @@ Version 3.7 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
     s'appliquent par-dessus ; « Revenir à l'original » annule. À l'export sans autre réglage : fichier « _IA.jpg ».
 - Déflouter (classique) deux fois plus rapide ; le bougé est repéré par l'analyse (l'horizon ne le trompe plus).
 - Modèles préparés par `.github/workflows/rp-modeles.yml` (publication « regardpur-modeles »).
+
+### Après 3.7 (pas encore publié : la prochaine version regroupera tout)
+- IA : « Débruiter (IA) » (SCUNet, Apache-2.0) et « Visages (IA) » (GFPGAN v1.4, Apache-2.0 ; force Naturel / Marqué / Complet
+  en Expert ; l'IA redessine le visage, à comparer avec l'original). L'IA tourne dans un processus à part (ai_child.js) :
+  la fenêtre reste fluide et SCUNet fonctionne (il plantait dans le processus principal d'Electron).
+- AUDIT PHOTOS PRO : cadre ajouté de n'importe quelle couleur, doublons (même photo dans un autre fichier : réexport,
+  retouche, recadrage, redressée, encadrée, plus petite) avec choix de l'original (sans cadre, la plus grande, la plus
+  ancienne), filtres « Doublons », « Doublons de taille différente », « Cadre ajouté », bouton « Rejeter les doublons ».
+  Analyse version 4 (les photos sont réanalysées une fois ; les choix sont gardés).

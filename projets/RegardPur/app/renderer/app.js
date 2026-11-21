@@ -406,6 +406,7 @@ function pump() {
 }
 function onResult(w, e) {
   var r = e.data; if (r.log) { console.log(r.log); return; } if (r.ready) return;
+  if (r.faces5 !== undefined) { var cbf = prevWait[r.id]; delete prevWait[r.id]; if (cbf) cbf(r); return; }
   if (r.joined !== undefined) { var cbj = prevWait[r.id]; delete prevWait[r.id]; if (cbj) cbj(r); return; }
   if (r.prev !== undefined) { var cbp = prevWait[r.id]; delete prevWait[r.id]; if (cbp) cbp(r); return; }
   if (r.dev !== undefined) { var cbd = devWait[r.id]; delete devWait[r.id]; if (cbd) cbd(r); return; }
@@ -1192,6 +1193,7 @@ function simil(src, dst) { // similitude (echelle, rotation, deplacement) au sen
   var a = num1 / den, b = num2 / den; return {a: a, b: b, tx: dx - (a * sx - b * sy), ty: dy - (b * sx + a * sy)};
 }
 async function aiFace(p, nb, of) {
+  $("aiState").textContent = "⏳ Recherche des visages…";
   var cur = await readBytes(p); if (!cur) throw new Error("photo illisible");
   var hc = heicOf(p), blob;
   var f5 = await new Promise(function (res) { ensurePool(); var w = pool[0], key = "f5:" + Date.now(), c = cur.slice(); prevWait[key] = function (r) { res(r.faces5 || []); }; w.postMessage({id: key, buf: c.buffer, heic: hc, faces5: true}, [c.buffer]); });
@@ -1220,7 +1222,8 @@ async function aiRun(kind) {
   for (var i = 0; i < list.length; i++) { try { await aiOne(list[i], kind, i + 1, list.length); ok++; updCard(list[i]); } catch (e) { errs.push(e.message || String(e)); } }
   AI.busy = false; saveSoon();
   var p = S.byId[S.view[S.cur]]; aiShow(p); if (p) rpPreview();
-  toast(ok ? ok + " photo" + (ok > 1 ? "s" : "") + " " + AIK[kind].replace(/^./, function (c) { return c.toLowerCase(); }).replace("ée ", ok > 1 ? "ées " : "ée ") + " en " + Math.round((Date.now() - t0) / 1000) + " s." + (errs.length ? " Échec : " + errs[0] : "") : "Échec de l'IA : " + (errs[0] || ""), 5000);
+  var VB = {naf: ["défloutée", "défloutées"], esr: ["restaurée", "restaurées"], x2: ["agrandie ×2", "agrandies ×2"], scu: ["débruitée", "débruitées"], face: ["aux visages réparés", "aux visages réparés"]}[kind];
+  toast(ok ? ok + " photo" + (ok > 1 ? "s " + VB[1] : " " + VB[0]) + " par IA en " + Math.round((Date.now() - t0) / 1000) + " s." + (errs.length ? " Échec : " + errs[0] : "") : "Échec de l'IA : " + (errs[0] || ""), 5000);
 }
 $("aiNaf").onclick = function () { aiRun("naf"); };
 $("aiEsr").onclick = function () { aiRun("esr"); };

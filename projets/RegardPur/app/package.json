@@ -26,6 +26,7 @@
       "main.js",
       "preload.js",
       "ai.js",
+      "ai_child.js",
       "renderer/**/*",
       "!node_modules/onnxruntime-node/bin/napi-v6/{linux,darwin}/**",
       "!node_modules/onnxruntime-node/bin/napi-v6/win32/arm64/**"
