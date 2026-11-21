@@ -31,6 +31,9 @@ function active(Q){ var s = get(); return curveOn(s) || lookOn(s) || !!(Q && Q.s
 function summary(){
   var s = get(), a = [];
   if(curveOn(s)) a.push(T("courbes", "curves"));
+  if(wbOn(s)) a.push(T("balance des blancs", "white balance"));
+  if(toneOn(s)) a.push(T("contraste des tons", "tonal contrast"));
+  if(hdrOn(s)) a.push("HDR");
   if(detailsOn(s)) a.push(T("détails", "details"));
   if(dramaOn(s)) a.push(T("théâtral", "drama"));
   if(glowOn(s)) a.push(T("éclat glamour", "glamour glow"));
@@ -335,12 +338,15 @@ function healer(){
 /* ================= DETAILS, THEATRAL, ECLAT GLAMOUR =================
    Calcules avec les operations de dessin accelerees du telephone (flous, melanges, filtres) :
    rapides, meme en pleine taille. Ils s'appliquent a la photo enregistree et au lot. */
-var LD = {details:{s:0, n:0}, drama:{f:0, sat:0, st:0}, glow:{g:0, sat:0, w:0}};
+var LD = {details:{s:0, n:0}, drama:{f:0, sat:0, st:0}, glow:{g:0, sat:0, w:0}, wb:{t:0, ti:0}, tone:{hi:0, mid:0, lo:0, ps:0, ph:0}, hdr:{f:0, b:0, sat:0, st:0}};
 function lookGet(s, k){ return Object.assign({}, LD[k], s[k] || {}); }
 function detailsOn(s){ var d = lookGet(s, "details"); return !!(d.s || d.n); }
 function dramaOn(s){ return lookGet(s, "drama").f > 0; }
 function glowOn(s){ var g = lookGet(s, "glow"); return !!(g.g || g.sat || g.w); }
-function lookOn(s){ return detailsOn(s) || dramaOn(s) || glowOn(s); }
+function wbOn(s){ var w = lookGet(s, "wb"); return !!(w.t || w.ti); }
+function toneOn(s){ var t = lookGet(s, "tone"); return !!(t.hi || t.mid || t.lo); }
+function hdrOn(s){ return lookGet(s, "hdr").f > 0; }
+function lookOn(s){ return wbOn(s) || toneOn(s) || hdrOn(s) || detailsOn(s) || dramaOn(s) || glowOn(s); }
 /* passe-haut centre sur le gris : base de la structure et de la nettete */
 function highpass(src, r){
   var w = src.width, h = src.height, hp = cvs(w, h), hx = hp.getContext("2d"), inv = cvs(w, h), ix = inv.getContext("2d");
@@ -357,6 +363,9 @@ function looks(src, s){
   if(!lookOn(s)) return src;
   var c = cvs(src.width, src.height); c.getContext("2d").drawImage(src, 0, 0);
   var mn = Math.min(c.width, c.height);
+  if(wbOn(s)) wbApply(c, lookGet(s, "wb"));
+  if(toneOn(s)) toneApply(c, lookGet(s, "tone"));
+  if(hdrOn(s)) hdrApply(c, lookGet(s, "hdr"));
   var d = lookGet(s, "details");
   if(d.s > 0) blend(c, highpass(c, mn / 110), "overlay", d.s / 100 * 1.1);
   if(d.s < 0){ var bl = filtered(c, "blur(" + (mn / 260).toFixed(1) + "px)"); blend(c, bl, "source-over", -d.s / 100 * 0.6); }
@@ -379,11 +388,66 @@ function looks(src, s){
   return c;
 }
 
+/* ---------- balance des blancs : gains R/V/B (temperature, teinte) ---------- */
+var KT = 0.5, KM = 0.4;   /* amplitude en diaphragmes pour +/-100 */
+function wbGains(w){
+  var t = (w.t || 0) / 100, m = (w.ti || 0) / 100;
+  var gr = Math.pow(2, KT * t + KM * m / 2), gb = Math.pow(2, -KT * t + KM * m / 2), gg = Math.pow(2, -KM * m);
+  var n = 0.2126 * gr + 0.7152 * gg + 0.0722 * gb; return [gr / n, gg / n, gb / n];
+}
+/* pipette : la couleur touchee devient neutre */
+function wbFromColor(r, g, b){
+  r = Math.max(1, r); g = Math.max(1, g); b = Math.max(1, b);
+  var t = 100 * Math.log2(b / r) / (2 * KT), ti = 100 * Math.log2(g / Math.sqrt(r * b)) / (1.5 * KM);
+  return {t:Math.max(-100, Math.min(100, Math.round(t))), ti:Math.max(-100, Math.min(100, Math.round(ti)))};
+}
+function wbApply(c, w){
+  var G = wbGains(w), L = [new Uint8ClampedArray(256), new Uint8ClampedArray(256), new Uint8ClampedArray(256)];
+  for(var i = 0; i < 256; i++){ L[0][i] = i * G[0]; L[1][i] = i * G[1]; L[2][i] = i * G[2]; }
+  var x = c.getContext("2d"), W = c.width, H = c.height, step = Math.max(1, Math.floor(4e6 / W));
+  for(var y = 0; y < H; y += step){ var hh = Math.min(step, H - y), id = x.getImageData(0, y, W, hh), d = id.data;
+    for(var k = 0; k < d.length; k += 4){ d[k] = L[0][d[k]]; d[k+1] = L[1][d[k+1]]; d[k+2] = L[2][d[k+2]]; } x.putImageData(id, 0, y); }
+}
+/* ---------- contraste des tons : contraste local par zone de luminosite ---------- */
+function sstep(a, b, v){ var t = Math.max(0, Math.min(1, (v - a) / (b - a))); return t * t * (3 - 2 * t); }
+function toneApply(c, t){
+  var W = c.width, H = c.height, mn = Math.min(W, H), bl = filtered(c, "blur(" + (mn / 70).toFixed(1) + "px)");
+  var x = c.getContext("2d"), bx = bl.getContext("2d"), step = Math.max(1, Math.floor(3e6 / W));
+  var hi = t.hi / 100 * 1.8, mi = t.mid / 100 * 1.8, lo = t.lo / 100 * 1.8, ps = (t.ps || 0) / 100, ph = (t.ph || 0) / 100;
+  /* poids par niveau de luminosite (table de 256 valeurs) */
+  var WT = new Float32Array(256);
+  for(var i = 0; i < 256; i++){ var l = i / 255, wl = 1 - sstep(0.12, 0.5, l), wh = sstep(0.5, 0.88, l), wm = Math.max(0, 1 - Math.abs(l - 0.5) * 2.2); WT[i] = lo * wl + mi * wm + hi * wh; }
+  for(var y = 0; y < H; y += step){
+    var hh = Math.min(step, H - y), id = x.getImageData(0, y, W, hh), d = id.data, b = bx.getImageData(0, y, W, hh).data;
+    for(var k = 0; k < d.length; k += 4){
+      var L = (54 * d[k] + 183 * d[k+1] + 19 * d[k+2]) >> 8, Lb = (54 * b[k] + 183 * b[k+1] + 19 * b[k+2]) >> 8, dl = (L - Lb) * WT[L];
+      if(dl < 0 && ps && L < 64) dl *= 1 - ps * (1 - L / 64);
+      if(dl > 0 && ph && L > 192) dl *= 1 - ph * ((L - 192) / 63);
+      d[k] += dl; d[k+1] += dl; d[k+2] += dl;
+    }
+    x.putImageData(id, 0, y);
+  }
+}
+/* ---------- HDR : compression locale des tons + details ---------- */
+var HDRS = [[1.0, 0.9, 60, 0.15], [0.8, 0.45, 40, 0.0], [0.7, 1.2, 200, 0.05], [1.4, 1.6, 45, 0.25]];   /* nature, personnes, fin, fort */
+function hdrApply(c, h){
+  var k = h.f / 100, S = HDRS[h.st | 0] || HDRS[0], mn = Math.min(c.width, c.height);
+  var inv = filtered(c, "grayscale(1) blur(" + (mn / 25).toFixed(1) + "px) invert(1)");
+  blend(c, inv, "soft-light", k * S[0]);
+  blend(c, highpass(c, Math.max(0.8, mn / S[2])), "overlay", k * S[1]);
+  var br = 1 + (h.b || 0) / 250, sa = Math.max(0, 1 + S[3] * k + (h.sat || 0) / 100);
+  if(br !== 1 || sa !== 1) c.getContext("2d").drawImage(filtered(c, "brightness(" + br.toFixed(3) + ") saturate(" + sa.toFixed(3) + ")"), 0, 0);
+}
+
 /* ---------- ecran de reglage commun (gestes facon Snapseed) ---------- */
 var TOOLS = {
   details:{title:T("DÉTAILS", "DETAILS"), icon:"🔎", params:[["s", T("Structure", "Structure"), -100, 100], ["n", T("Netteté", "Sharpening"), 0, 100]], start:{s:25}},
   drama:{title:T("THÉÂTRAL", "DRAMA"), icon:"🎭", params:[["f", T("Force", "Strength"), 0, 100], ["sat", T("Saturation", "Saturation"), -100, 100]], start:{f:50},
     styles:[T("Lumineux 1", "Bright 1"), T("Lumineux 2", "Bright 2"), T("Sombre 1", "Dark 1"), T("Sombre 2", "Dark 2")]},
+  wb:{title:T("BALANCE DES BLANCS", "WHITE BALANCE"), icon:"💧", params:[["t", T("Température", "Temperature"), -100, 100], ["ti", T("Teinte", "Tint"), -100, 100]], start:{}, pipette:true},
+  tone:{title:T("CONTRASTE DES TONS", "TONAL CONTRAST"), icon:"🌗", params:[["hi", T("Tons clairs", "High tones"), -100, 100], ["mid", T("Tons moyens", "Mid tones"), -100, 100], ["lo", T("Tons foncés", "Low tones"), -100, 100], ["ps", T("Protéger les ombres", "Protect shadows"), 0, 100], ["ph", T("Protéger les hautes lumières", "Protect highlights"), 0, 100]], start:{mid:30}},
+  hdr:{title:"HDR", icon:"🌄", params:[["f", T("Force", "Strength"), 0, 100], ["b", T("Luminosité", "Brightness"), -100, 100], ["sat", T("Saturation", "Saturation"), -100, 100]], start:{f:50},
+    styles:[T("Nature", "Nature"), T("Personnes", "People"), T("Fin", "Fine"), T("Fort", "Strong")]},
   glow:{title:T("ÉCLAT GLAMOUR", "GLAMOUR GLOW"), icon:"✨", params:[["g", T("Éclat", "Glow"), 0, 100], ["sat", T("Saturation", "Saturation"), -100, 100], ["w", T("Chaleur", "Warmth"), -100, 100]], start:{g:40}}
 };
 function paramTool(key){
@@ -408,6 +472,7 @@ function paramTool(key){
    '<canvas id="x2KR" style="display:block;flex:none;width:100%;height:46px;touch-action:none"></canvas>' +
    '<div style="display:flex;align-items:center;justify-content:space-between;flex:none;padding:6px 0">' +
      '<button data-a="cancel" style="border:0;background:none;color:#fff;font-size:30px;width:52px">✕</button>' +
+     (def.pipette ? '<button data-a="pip" id="x2Pip" style="border:0;background:#1E88E5;color:#fff;border-radius:22px;padding:10px 16px;font-weight:900">💧 ' + T("Pipette", "Picker") + '</button>' : '') +
      '<button data-a="zero" style="border:0;background:#3a3a3a;color:#fff;border-radius:22px;padding:10px 18px;font-weight:900">' + T("Désactiver", "Turn off") + '</button>' +
      '<button data-a="ok" style="border:0;background:none;color:#4CAF50;font-size:34px;width:52px">✓</button></div>', true);
   var wrap = $("x2KW"), cv = $("x2KC"), ctx = cv.getContext("2d"), rul = $("x2KR"), rx = rul.getContext("2d"), dpr = window.devicePixelRatio || 1, menu = $("x2KM");
@@ -438,7 +503,19 @@ function paramTool(key){
   function setV(v){ var p = P[idx]; st[p[0]] = Math.max(p[2], Math.min(p[3], Math.round(v))); labels(); later(); }
   function drawMenu(sel){ menu.innerHTML = P.map(function(p, i){ return '<div style="padding:9px 18px;font-weight:900;font-size:15px;' + (i === sel ? 'background:#1E88E5;color:#fff' : 'color:#ccc') + '">' + p[1] + '<span style="float:right;margin-left:14px;color:' + (i === sel ? '#fff' : '#FFD600') + '">' + fmt(st[p[0]] || 0) + '</span></div>'; }).join(""); menu.style.display = "block"; }
   var g = null;
-  cv.onpointerdown = function(e){ cv.setPointerCapture(e.pointerId); g = {x:e.clientX, y:e.clientY, mode:null, v0:st[P[idx][0]] || 0, i0:idx}; };
+  var pip = false;
+  function pipPick(e){
+    var r = cv.getBoundingClientRect(), k = Math.min(cv.width / base.width, cv.height / base.height), ox = (cv.width - base.width * k) / 2, oy = (cv.height - base.height * k) / 2;
+    var bx = Math.round(((e.clientX - r.left) * dpr - ox) / k), by = Math.round(((e.clientY - r.top) * dpr - oy) / k);
+    if(bx < 2 || by < 2 || bx >= base.width - 2 || by >= base.height - 2) return false;
+    var d = base.getContext("2d").getImageData(bx - 2, by - 2, 5, 5).data, R = 0, G2 = 0, B = 0;
+    for(var i = 0; i < d.length; i += 4){ R += d[i]; G2 += d[i+1]; B += d[i+2]; }
+    var w = wbFromColor(R / 25, G2 / 25, B / 25); st.t = w.t; st.ti = w.ti; return true;
+  }
+  function pipMode(on){ pip = on; var b = $("x2Pip"); if(b){ b.style.outline = on ? "3px solid #FFD600" : ""; } $("x2KH").style.color = on ? "#FFD600" : ""; $("x2KH").textContent = on ? T("Touchez un endroit qui devrait être gris ou blanc.", "Tap a spot that should be grey or white.") : T("Glisse ↕ sur la photo pour choisir le réglage, ↔ pour le modifier.", "Swipe ↕ on the photo to pick a setting, ↔ to change it."); }
+  cv.onpointerdown = function(e){
+    if(pip){ if(pipPick(e)){ pipMode(false); labels(); later(); } return; }
+    cv.setPointerCapture(e.pointerId); g = {x:e.clientX, y:e.clientY, mode:null, v0:st[P[idx][0]] || 0, i0:idx}; };
   cv.onpointermove = function(e){
     if(!g) return; var dx = e.clientX - g.x, dy = e.clientY - g.y;
     if(!g.mode && Math.hypot(dx, dy) > 10) g.mode = Math.abs(dy) > Math.abs(dx) ? "menu" : "value";
@@ -453,21 +530,23 @@ function paramTool(key){
   var eye = $("x2KEye"); eye.onpointerdown = function(){ showOrig = true; draw(); }; eye.onpointerup = eye.onpointerleave = eye.onpointercancel = function(){ showOrig = false; draw(); };
   HH.pick = function(){ idx = (idx + 1) % P.length; labels(); };
   HH.sty = function(b){ st.st = +b.dataset.i; labels(); later(); };
+  HH.pip = function(){ pipMode(!pip); };
   HH.zero = function(){ P.forEach(function(p){ st[p[0]] = 0; }); labels(); later(); };
   HH.help = function(){ var h = $("x2KH"); h.style.color = "#FFD600"; h.textContent = T("↕ glisser : choisir le réglage • ↔ glisser : moins / plus • 👁 maintenu : sans l'outil • ✓ garder, ✕ annuler.", "↕ swipe: pick a setting • ↔ swipe: less / more • hold 👁: without the tool • ✓ keep, ✕ cancel."); };
   HH.cancel = hide;
   HH.ok = function(){ var s2 = get(); s2[key] = st; put(s2); hide(); };
   function layout(){ if(!document.body.contains(cv)){ window.removeEventListener("resize", layout); return; } labels(); draw(); }
+  if(def.pipette && !st.t && !st.ti) setTimeout(function(){ pipMode(true); }, 50);
   window.addEventListener("resize", layout); requestAnimationFrame(layout);
 }
 
 /* ================= GRILLE OUTILS ================= */
 function tuneOn(){ var sl = tuneSliders(); return sl.slice(1).some(function(r){ return +r.value !== 0; }); }
 var GRID = [
-  [T("Réglages", "Adjust"), [["tune", "🎛️", T("Retouches", "Tune"), function(){ return tuneOn(); }], ["details", "🔎", T("Détails", "Details"), function(s){ return detailsOn(s); }], ["curves", "📈", T("Courbes", "Curves"), function(s){ return curveOn(s); }]]],
+  [T("Réglages", "Adjust"), [["tune", "🎛️", T("Retouches", "Tune"), function(){ return tuneOn(); }], ["details", "🔎", T("Détails", "Details"), function(s){ return detailsOn(s); }], ["curves", "📈", T("Courbes", "Curves"), function(s){ return curveOn(s); }], ["wb", "💧", T("Balance des blancs", "White balance"), function(s){ return wbOn(s); }], ["tone", "🌗", T("Contraste des tons", "Tonal contrast"), function(s){ return toneOn(s); }]]],
   [T("Retouche locale", "Local"), [["heal", "🩹", T("Correcteur", "Healing"), function(){ return heals.length > 0; }]]],
   [T("Cadrage", "Framing"), [["crop", "✂️", T("Recadrer", "Crop"), function(){ return geoOn(); }]]],
-  [T("Créatif", "Creative"), [["drama", "🎭", T("Théâtral", "Drama"), function(s){ return dramaOn(s); }], ["glow", "✨", T("Éclat glamour", "Glamour glow"), function(s){ return glowOn(s); }], ["fx", "🌤️", T("Effets (ciel, visage, grain, N&B)", "Effects (sky, face, grain, B&W)"), function(){ return !!(window.__jmsFX && window.__jmsFX.get && (function(f){ return f.sky || f.face || f.grad || f.grain || f.bw || f.sharp || f.smooth || f.denoise; })(window.__jmsFX.get())); }]]]
+  [T("Créatif", "Creative"), [["drama", "🎭", T("Théâtral", "Drama"), function(s){ return dramaOn(s); }], ["hdr", "🌄", "HDR", function(s){ return hdrOn(s); }], ["glow", "✨", T("Éclat glamour", "Glamour glow"), function(s){ return glowOn(s); }], ["fx", "🌤️", T("Effets (ciel, visage, grain, N&B)", "Effects (sky, face, grain, B&W)"), function(){ return !!(window.__jmsFX && window.__jmsFX.get && (function(f){ return f.sky || f.face || f.grad || f.grain || f.bw || f.sharp || f.smooth || f.denoise; })(window.__jmsFX.get())); }]]]
 ];
 function openTool(k){
   if(k === "tune") return tune(); if(k === "crop") return crop(); if(k === "curves") return curves(); if(k === "heal") return healer();
