@@ -1,6 +1,6 @@
 # Regard Pur — tri de photos (PC Windows, puis Android)
 
-Version 3.4 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
+Version 3.5 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
@@ -54,6 +54,9 @@ Version 3.4 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 ## Outils de JM LAB PRO + glisser (3.4)
 - Balance des blancs (pipette), Détails, Contraste des tons, HDR, Théâtral, Éclat glamour : extraits de `jmfx2.js` (`JMLOOKS` dans `jmlab_core.js`), mêmes résultats que l'appli.
 - Régler en glissant sur la photo (comme Snapseed) : ↕ choisir le réglage, ↔ le doser, valeur affichée en grand.
+
+## 🩺 Corriger les problèmes (3.5)
+- Sur la sélection (ou la photo choisie) : chaque photo reçoit les outils dont elle a besoin selon les défauts trouvés (exposition vers un sujet à ~120, hautes lumières, ombres, léger flou → netteté / structure, bruit → lissage, dominante orangée / bleutée → balance des blancs, horizon → redressé), affichés dans le panneau, puis ouverture de Retoucher pour la finition (`fixPhoto`).
 
 ## Fabrication
 - Code : `app/` (Electron). La fenêtre est dans `app/renderer/` (HTML / JavaScript), la même base servira pour Android.

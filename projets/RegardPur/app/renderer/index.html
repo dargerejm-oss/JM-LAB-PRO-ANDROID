@@ -54,6 +54,7 @@
     <label class="sel expert">Exigence <i class="tip" data-tip="Souple : rejette seulement les photos vraiment ratées. Stricte : ne garde que les très bonnes.">?</i>
       <select id="sStrict"><option value="0">Souple</option><option value="1" selected>Normale</option><option value="2">Stricte</option></select>
     </label>
+    <button id="bFix" disabled data-tip="Corrige automatiquement les problèmes trouvés (exposition, léger flou, horizon, bruit, couleur) sur la sélection ou la photo choisie, puis ouvre Retoucher pour la finition"><svg class="ic"><use href="#i-magic"/></svg>Corriger les problèmes</button>
     <button id="bCompare" disabled data-tip="Comparer côte à côte la sélection (Ctrl + clic) ou la série de la photo choisie"><svg class="ic"><use href="#i-compare"/></svg>Comparer</button>
     <div class="grow"></div>
     <label class="sel">Taille <input type="range" id="rSize" min="120" max="360" value="200"></label>
@@ -144,6 +145,8 @@
   <aside id="rpSide">
     <div id="rtTop">
       <h3><svg class="ic"><use href="#i-sliders"/></svg>Réglages <i class="tip" data-tip="Même moteur que JM LAB PRO. Regard Pur apprend vos corrections d'exposition et de chaleur par catégorie et par client.">?</i></h3>
+      <button id="dvFix" style="width:100%;margin-bottom:6px" data-tip="Corrige les problèmes trouvés sur cette photo (ou la sélection)"><svg class="ic"><use href="#i-magic"/></svg>Corriger les problèmes de cette photo</button>
+      <div id="dvFixed" class="small" style="color:var(--gold);margin-bottom:6px"></div>
       <div class="row3"><button id="dvAuto" class="pri" data-tip="Règle la photo tout seul : ProLab automatique, correction selon le type de photo, peau protégée et vos habitudes apprises"><svg class="ic"><use href="#i-magic"/></svg>Auto</button><button id="dvCopy" data-tip="Copier les réglages de cette photo"><svg class="ic"><use href="#i-grid"/></svg>Copier</button><button id="dvPaste" data-tip="Coller les réglages copiés sur cette photo"><svg class="ic"><use href="#i-check"/></svg>Coller</button></div>
       <label class="sel full">Profil <select id="dvProf"></select></label>
       <div class="rl"><span>Intensité</span><input type="range" id="dvDose" min="0" max="100" value="65"><b id="dvDoseV">65</b></div>

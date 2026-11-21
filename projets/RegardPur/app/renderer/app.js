@@ -288,7 +288,7 @@ async function load(dir, items, label) {
     } catch (e) {}
   }
   $("empty").style.display = "none"; $("grid").style.display = "grid";
-  ["bAuto", "bCompare", "bStats"].forEach(function (b) { $(b).disabled = false; });
+  ["bAuto", "bCompare", "bStats", "bFix"].forEach(function (b) { $(b).disabled = false; });
   rescore(); buildPersons(); buildCards(); refresh(); updLearn(); setTab("trier");
   var todo = S.photos.filter(function (p) { return !p.a; });
   // session reprise : note artistique des photos qui n'en ont pas encore (vignettes chargees petit a petit)
@@ -854,6 +854,7 @@ function devShow(p) {
   $("dvProf").value = d.profile || "cat"; $("dvDose").value = d.dose; $("dvDoseV").textContent = d.dose; $("dvPro").checked = d.pro !== false;
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-dv]"), function (r) { var v = +(d.v[r.dataset.dv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
   curveDraw(d.curve);
+  $("dvFixed").textContent = d.fix && d.fix.length ? "🩺 Corrigé : " + d.fix.join(", ") : "";
   var lk = d.looks || {};
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop [data-lk]"), function (r) { var k = r.dataset.lk.split("."), v = +((lk[k[0]] || {})[k[1]] || 0); r.value = v; if (r.tagName === "INPUT") r.nextElementSibling.textContent = v > 0 ? "+" + v : v; });
 }
@@ -864,6 +865,7 @@ function devStyle(p) {
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
+  if (d.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
   if (p.ret) o.ret = rpEff(p.ret); if (p.heals) o.heals = p.heals;
   return o;
 }
@@ -944,6 +946,46 @@ window.addEventListener("mousemove", function (e) {
 });
 window.addEventListener("mouseup", function () { if (!tune.st) return; tune.st = null; setTimeout(function () { tuneHud(""); }, 700); });
 
+/* ---------------- 🩺 CORRIGER LES PROBLEMES : chaque photo recoit les outils dont elle a besoin ---------------- */
+function fixPhoto(p) {
+  var a = p.a; if (!a || a.err) return null;
+  var d = p.dev ? JSON.parse(JSON.stringify(p.dev)) : DEV_DEF(), L = d.looks = d.looks || {}, done = [];
+  var e = a.expo || {}, f = bigFaces(a), fl = f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }), lum = fl.length ? avg(fl) : e.mean;
+  // exposition : on vise un sujet (visage, sinon l'image) autour de 120
+  if (lum != null && (lum < 85 || lum > 170 || e.hi > 6 || e.lo > 15)) {
+    var ev = Math.max(-1.5, Math.min(2, Math.log2(120 / Math.max(10, lum)) * 0.85)); ev = Math.round(ev * 10) / 10;
+    if (Math.abs(ev) >= 0.2) { d.v.Exposition = Math.round(ev / (d.dose / 100) * 10) / 10; done.push("exposition " + (ev > 0 ? "+" : "") + String(ev).replace(".", ",")); }
+    if (e.hi > 4) { d.v["Hautes SANS GRIS"] = -Math.min(100, Math.round(30 + e.hi * 3)); done.push("hautes lumières récupérées"); }
+    if (e.lo > 10 || lum < 85) { d.v.Ombres = Math.min(100, Math.round(25 + (e.lo || 0) * 1.5)); done.push("ombres débouchées"); }
+    d.pro = false; // l'exposition est reglee ici : pas de deuxieme correction automatique
+  }
+  // leger flou : nettete et structure (un flou fort ne se rattrape pas)
+  var er = eyeRaw(a), sh = er != null ? er : a.sharp;
+  if (sh < 55) { var k = sh < 15 ? 1 : (55 - sh) / 40; L.details = {s: Math.round(15 + 20 * k), n: Math.round(35 + 45 * k)}; done.push("netteté +" + L.details.n + (sh < 15 ? " (flou fort : amélioration limitée)" : "")); }
+  // bruit : lissage leger
+  if (a.noiseView != null && a.noiseView > 5) { L.details = L.details || {s: 0, n: 0}; L.details.s = Math.min(L.details.s, -Math.round(Math.min(60, (a.noiseView - 4) * 8))); done.push("grain lissé"); }
+  // dominante de couleur chaude ou froide (orange / bleu) seulement : une photo verte (vegetation) n'est pas une dominante
+  var col = a.col || [];
+  if (col.length) { var R = 0, B = 0; for (var i = 0; i < col.length; i += 3) { R += col[i]; B += col[i + 2]; }
+    var rb = Math.log2(Math.max(1, B) / Math.max(1, R));
+    if (Math.abs(rb) > 0.32 && Math.abs(rb) < 1.2) { var t = Math.max(-100, Math.min(100, Math.round(100 * rb * 0.7))); L.wb = {t: t, ti: 0}; done.push(rb < 0 ? "dominante orangée corrigée" : "dominante bleutée corrigée"); } }
+  // horizon
+  if (a.tilt) { d.tilt = true; done.push("horizon redressé (" + Math.abs(a.tilt).toFixed(1).replace(".", ",") + "°)"); }
+  d.fix = done;
+  return done.length ? d : null;
+}
+function fixRun(list) {
+  var n = 0, none = 0;
+  list.forEach(function (p) { var d = fixPhoto(p); if (d) { p.dev = d; n++; updCard(p); } else none++; });
+  saveSoon();
+  if (!n) { toast("Aucun problème corrigeable sur " + (list.length > 1 ? "ces photos" : "cette photo") + "."); return; }
+  toast(n + " photo" + (n > 1 ? "s corrigées" : " corrigée") + (none ? " (" + none + " sans problème à corriger)" : "") + ". Finition possible dans Retoucher.", 4000);
+  if (S.tab !== "retoucher") setTab("retoucher"); else { var p = S.byId[S.view[S.cur]]; devShow(p); rpPreview(); }
+}
+function fixTargets() { return S.sel.size ? Array.from(S.sel).map(function (id) { return S.byId[id]; }) : [S.byId[S.view[S.cur]]].filter(Boolean); }
+$("bFix").onclick = function () { fixRun(fixTargets()); };
+$("dvFix").onclick = function () { fixRun(fixTargets()); };
+
 /* courbe : points a tirer */
 var CRV = {pts: null, drag: -1};
 function crvLut(pts) { pts = pts.slice().sort(function (a, b) { return a[0] - b[0]; }); var L = []; for (var v = 0; v < 256; v++) { var k = 0; while (k < pts.length - 2 && v > pts[k + 1][0]) k++; var a = pts[k], b = pts[k + 1], t = Math.max(0, Math.min(1, (v - a[0]) / Math.max(1, b[0] - a[0]))), t2 = t * t * (3 - 2 * t); L.push(a[1] + (b[1] - a[1]) * (t * 0.5 + t2 * 0.5)); } return L; }
@@ -1008,7 +1050,7 @@ function rpDraw() {
 function rpPreview() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
   var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
-  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm) dst = null; }
+  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm && !dst.tilt) dst = null; }
   clearTimeout(rp.t);
   rp.t = setTimeout(function () {
     if (!eff && !heals.length && !dst) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }

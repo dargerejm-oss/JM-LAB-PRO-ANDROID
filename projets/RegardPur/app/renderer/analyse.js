@@ -531,6 +531,7 @@ self.onmessage = function (e) {
       if (m.heals && m.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(cv, m.heals); }
       if (m.style) renderStyle(cv, m.style);
       var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;
+      if (m.style && m.style.tilt) { var th = m.style.tilt * Math.PI / 180, W2 = cv.width, H2 = cv.height, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W2 * cs + H2 * sn) / W2, (W2 * sn + H2 * cs) / H2), c3 = canvas(W2, H2), x3 = c3.getContext("2d"); x3.imageSmoothingQuality = "high"; x3.translate(W2 / 2, H2 / 2); x3.rotate(-th); x3.scale(kz, kz); x3.drawImage(cv, -W2 / 2, -H2 / 2); cv = c3; }
       return {b: await cv.convertToBlob({type: "image/jpeg", quality: 0.9}), n: n};
     }).then(function (r) { self.postMessage({id: m.id, prev: r.b, faces: r.n}); }, function (err) { self.postMessage({id: m.id, prev: null, err: String(err && err.message || err)}); });
     return;
