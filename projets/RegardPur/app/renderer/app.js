@@ -1133,12 +1133,17 @@ async function fixRun(list) {
           if (k !== "face") {
             $("aiState").textContent = "⏳ Vérification du résultat…";
             var m = await measure(p), q1 = qualOf(m, k);
-            if (q0 && q1 && (q1.v <= q0.v || (k === "scu" && q1.sh < q0.sh * 0.7))) { p.ai = save; full.cache.delete(p.id); gains.push(p.name + " : " + AIW[k] + " annulée (pas d'amélioration)"); continue; }
+            window.__rpLastMeas = {k: k, q0: q0, q1: q1};
+            // debruitage : seul le bruit compte (le bruit gonfle la nettete mesuree) ; autres : la nettete doit monter
+            var worse = !q0 || !q1 ? false : k === "scu" ? -q1.v > -q0.v * 0.85 : q1.v <= q0.v + 2;
+            if (worse) { p.ai = save; full.cache.delete(p.id); gains.push(p.name + " : " + AIW[k] + " annulée (pas d'amélioration)"); continue; }
             if (q0 && q1) { var g = q0.txt + " → " + q1.txt.replace(/^\D+/, ""); p.ai.gain = (p.ai.gain ? p.ai.gain + ", " : "") + g; before = m; }
           }
           p.ai.auto = true; aiPrefAdd(k, "auto");
           if (p.dev) { p.dev.fix = (p.dev.fix || []).concat([AIW[k] + " par IA" + (k !== "face" && p.ai.gain ? "" : "")]);
-            if (k === "naf") { p.dev.deblur = null; var L2 = p.dev.looks || {}; if (L2.details) L2.details.n = Math.min(L2.details.n || 0, 15); } }
+            var L2 = p.dev.looks || {};
+            if (k === "naf") { p.dev.deblur = null; if (L2.details) L2.details.n = Math.min(L2.details.n || 0, 15); }
+            if (k === "scu" && L2.details && L2.details.s < 0) { L2.details.s = 0; p.dev.fix = p.dev.fix.filter(function (t) { return t !== "grain lissé"; }); } }
           else { p.dev = DEV_DEF(); p.dev.fix = [AIW[k] + " par IA"]; }
         } catch (e) { gains.push(p.name + " : " + (e.message || e)); }
       }
