@@ -839,6 +839,34 @@ function updLearn() {
 }
 
 /* ---------------- tri automatique ---------------- */
+/* « Garder les N meilleures » : classement par score, une seule photo par serie (plus de variete), jamais une photo rejetee
+   par vous ; dans la vue affichee ou dans chaque seance ; les autres peuvent etre mises de cote (« A voir ») ou rejetees */
+function bestN() {
+  rescore();
+  dialog("<h3>Garder les meilleures</h3><div style='display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:8px 0'>" +
+    "<span>Nombre</span><input type='number' id='bnN' min='1' max='5000' value='" + (+localStorage.getItem("rp_bestn") || 50) + "' style='width:90px'>" +
+    "<span>Parmi</span><select id='bnScope'><option value='view'>Les photos affichées (" + S.view.length + ")</option><option value='sess'>Chaque séance (N par séance)</option></select>" +
+    "<span>Les autres</span><select id='bnRest'><option value='keep'>Ne pas y toucher</option><option value='todo'>Mettre « À voir »</option><option value='rej'>Rejeter</option></select></div>" +
+    "<label class='ck'><input type='checkbox' id='bnDiv' checked> Une seule par série de photos semblables (plus de variété)</label>" +
+    "<p class='small'>Vos choix faits à la main (Garder / Rejeter) ne sont jamais changés. Ctrl+Z pour annuler.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='go2' class='pri'>Garder</button></div>", function (c) {
+    if (c !== "go2") return;
+    var N2 = Math.max(1, +$("bnN").value || 50), scope = $("bnScope").value, rest = $("bnRest").value, div = $("bnDiv").checked;
+    try { localStorage.setItem("rp_bestn", N2); } catch (e) {}
+    var pool = S.view.map(function (id) { return S.byId[id]; }).filter(function (p) { return p && p.a && !p.a.err; });
+    var groups = scope === "sess" ? SESS.map(function (o) { return pool.filter(function (p) { return o.ids.indexOf(p.id) >= 0; }); }) : [pool];
+    pushUndo(pool); var kept = 0;
+    groups.forEach(function (gp) {
+      var cand = gp.filter(function (p) { return !(p.status === "X" && !p.auto) && !(p.why && p.why.rej.length); }).sort(function (a, b) { return b.score - a.score; });
+      var seen = {}, pick = [];
+      cand.forEach(function (p) { if (pick.length >= N2) return; if (p.dup >= 0) { if (seen["d" + p.dup]) return; seen["d" + p.dup] = 1; } if (div && p.g >= 0) { if (seen[p.g]) return; seen[p.g] = 1; } pick.push(p); });
+      var ids = {}; pick.forEach(function (p) { ids[p.id] = 1; if (!(p.status && !p.auto)) { p.status = "P"; p.auto = true; } kept++; });
+      gp.forEach(function (p) { if (ids[p.id] || (p.status && !p.auto)) return; if (rest === "todo") { p.status = ""; p.auto = true; } else if (rest === "rej") { p.status = "X"; p.auto = true; } });
+    });
+    S.photos.forEach(updCard); drawFilters(); showPanel(); saveSoon();
+    toast(kept + " meilleure" + (kept > 1 ? "s gardées" : " gardée") + (scope === "sess" ? " (" + N2 + " par séance)" : "") + ". Ctrl+Z pour annuler.", 4000);
+  });
+}
+$("bBestN").onclick = bestN;
 function autoCull() {
   rescore();
   var k = strict(), nP = 0, nX = 0, nT = 0, manual = 0;
