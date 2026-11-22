@@ -128,3 +128,4 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
   défaut (seul le curseur touché agit, le bouton Auto garde le rendu complet) ; exposition de « Mon style » en vrais IL.
   Contrôlé : 21 outils écran = export, parcours complet analyse → tri → corriger (IA) → export, horizon, Avant / Après.
 - 3.9.5 : Avant / Après = appui long sur la photo (photo d'origine entière, on voit redressement et recadrage), bouton ou touche B ; « glisser sur la photo » désactivé par défaut ; plus de zoom après un glissé ; mode d'emploi FR/EN mis à jour.
+- 3.9.6 : profils choisis dans Retoucher en voyant le résultat (« Voir la photo dans chaque profil » : vignettes de la photo dans les 13 profils, un clic applique) ; case ProLab visible en mode Simple ; export : option « Seulement les photos corrigées ou retouchées », plus de choix de profil à l'export (on exporte ce qu'on voit dans Retoucher).

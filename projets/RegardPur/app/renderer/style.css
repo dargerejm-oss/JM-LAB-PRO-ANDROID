@@ -317,4 +317,4 @@ body:not(.tab-retoucher) .rtOnly{display:none}
 #profGrid button{padding:2px;display:flex;flex-direction:column;gap:2px;border:2px solid transparent;background:none;min-width:0}
 #profGrid button.on{border-color:var(--gold)}
 #profGrid .pfi{display:block;width:100%;aspect-ratio:1;background:#222 center/cover no-repeat;border-radius:3px}
-#profGrid i{font-style:normal;font-size:10px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#profGrid i{display:block;width:100%;text-align:center;font-style:normal;font-size:10px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
