@@ -117,3 +117,4 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
   récupérées) dans Retoucher et à l'export, gardé dans .regardpur/raw ; RAW sans aperçu intégré analysés quand même.
   Les pages sont « isolées » (en-têtes COOP/COEP) pour que LibRaw puisse utiliser plusieurs cœurs.
 - DxO : lecture des vrais fichiers .dop (réglages de base + modifiés, courbe des tons, Smart Lighting, contrôle sélectif des tons…).
+- 3.9.1 : correction d'exposition plus douce (lunettes de soleil ignorées, limites +1 / −0,8 IL), bouton « Remettre à zéro ».
