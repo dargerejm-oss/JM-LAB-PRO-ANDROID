@@ -1046,7 +1046,14 @@ function adjSet() {
   rpPreview();
 }
 $("lpEv").addEventListener("input", adjSet); $("lpWb").addEventListener("input", adjSet);
-$("lpAdj0").onclick = function () { var p = S.byId[S.view[S.cur]]; if (!p) return; p.dev = null; $("lpEv").value = 0; $("lpWb").value = 0; adjSet(); devShow(p); saveSoon(); };
+function resetAll() {
+  var L = fixTargets(); if (!L.length) return;
+  L.forEach(function (p) { p.dev = null; p.adj = null; p.ret = null; if (p.ai) { p.ai = null; } full.cache.delete(p.id); updCard(p); });
+  var p = S.byId[S.view[S.cur]]; $("lpEv").value = 0; $("lpWb").value = 0; rp.cur = null; if (rp.open) rpDraw(); if (p) { devShow(p); aiShow(p); rpPreview(); }
+  saveSoon(); toast("↺ " + (L.length > 1 ? L.length + " photos remises" : "Photo remise") + " à l'origine : réglages, portrait et IA enlevés (le correcteur au pinceau est gardé).", 4000);
+}
+$("lpAdj0").onclick = resetAll;
+$("dvZero").onclick = resetAll;
 
 /* ---------------- REGLAGES COMPLETS (meme moteur que JM LAB PRO) ---------------- */
 var DEV_DEF = function () { return {profile: "cat", pro: true, dose: 65, v: {}, curve: null}; };
@@ -1216,13 +1223,15 @@ window.addEventListener("mouseup", function () { if (!tune.st) return; tune.st =
 function fixPhoto(p) {
   var a = p.a; if (!a || a.err) return null;
   var d = p.dev ? JSON.parse(JSON.stringify(p.dev)) : DEV_DEF(), L = d.looks = d.looks || {}, done = [];
-  var e = a.expo || {}, f = bigFaces(a), fl = f.filter(function (x) { return x.lum != null; }).map(function (x) { return x.lum; }), lum = fl.length ? avg(fl) : e.mean;
-  // exposition : on vise un sujet (visage, sinon l'image) autour de 120
-  if (lum != null && (lum < 85 || lum > 170 || e.hi > 6 || e.lo > 15)) {
-    var ev = Math.max(-1.5, Math.min(2, Math.log2(120 / Math.max(10, lum)) * 0.85)); ev = Math.round(ev * 10) / 10;
+  // exposition (douce) : surtout l'image entiere ; les visages comptent un peu, sauf avec lunettes / verres teintes (trop sombres)
+  var e = a.expo || {}, f = bigFaces(a).filter(function (x) { return x.lum != null && !x.tinted && !(x.glasses != null && x.glasses >= 0.25); });
+  var fl = f.length ? avg(f.map(function (x) { return x.lum; })) : null, lum = e.mean == null ? fl : fl == null ? e.mean : e.mean * 0.65 + fl * 0.35;
+  if (lum != null && (lum < 75 || lum > 180 || e.hi > 8 || e.lo > 25)) {
+    var ev = Math.max(-0.8, Math.min(1, Math.log2(115 / Math.max(10, lum)) * 0.5)); ev = Math.round(ev * 10) / 10;
+    if (e.hi > 8 && ev > 0) ev = Math.min(ev, 0.3); // deja des blancs brules : on n'eclaircit presque pas
     if (Math.abs(ev) >= 0.2) { d.v.Exposition = Math.round(ev / (d.dose / 100) * 10) / 10; done.push("exposition " + (ev > 0 ? "+" : "") + String(ev).replace(".", ",")); }
-    if (e.hi > 4) { d.v["Hautes SANS GRIS"] = -Math.min(100, Math.round(30 + e.hi * 3)); done.push("hautes lumières récupérées"); }
-    if (e.lo > 10 || lum < 85) { d.v.Ombres = Math.min(100, Math.round(25 + (e.lo || 0) * 1.5)); done.push("ombres débouchées"); }
+    if (e.hi > 8) { d.v["Hautes SANS GRIS"] = -Math.min(60, Math.round(15 + e.hi * 2)); done.push("hautes lumières récupérées"); }
+    if (e.lo > 25 || lum < 75) { d.v.Ombres = Math.min(40, Math.round(10 + (e.lo || 0) * 0.8)); done.push("ombres débouchées"); }
     d.pro = false; // l'exposition est reglee ici : pas de deuxieme correction automatique
   }
   // leger flou : nettete et structure (un flou fort ne se rattrape pas)
