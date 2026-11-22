@@ -119,3 +119,7 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
 - DxO : lecture des vrais fichiers .dop (réglages de base + modifiés, courbe des tons, Smart Lighting, contrôle sélectif des tons…).
 - 3.9.1 : correction d'exposition plus douce (lunettes de soleil ignorées, limites +1 / −0,8 IL), bouton « Remettre à zéro ».
 - 3.9.2 : « Corriger les problèmes » s'affiche vraiment sur l'image (conversion de l'exposition corrigée : +1 IL = vraiment +1 IL).
+- 3.9.3 : « Corriger les problèmes » et la retouche rapide partent d'un rendu NEUTRE (plus de profil ni ProLab ajoutés :
+  seules les corrections utiles changent l'image, visibles dans les curseurs) ; la vue en grand affiche toujours la version
+  corrigée (donc Avant / Après marche sans zoom) ; le bleu du ciel ou de la mer n'est plus pris pour une dominante ;
+  dominante corrigée plus doucement ; défloutage classique renforcé. Vérifié : écran = export pour 21 outils.

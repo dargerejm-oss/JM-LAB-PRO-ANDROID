@@ -1076,7 +1076,8 @@ function devShow(p) {
 /* reglages d'une photo pour le moteur : profil, ProLab, curseurs, courbe, correction du type de photo, retouche rapide */
 function devStyle(p) {
   if (!p.dev && !p.adj && !p.ret && !p.heals) return p.rot ? {rotOnly: true, rot: p.rot, q: 95} : null;
-  var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, sky: d.sky || null, crop: d.crop || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
+  // sans reglage enregistre (retouche rapide seule) : rendu neutre, pas de profil ni ProLab
+  var d = p.dev || {profile: "LABO PRO EV5", pro: false, dose: 100, v: {}, curve: null, neutral: true}, cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: d.neutral ? 0 : REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, sky: d.sky || null, crop: d.crop || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
   if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / (0.5 * 0.85 * (o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
@@ -1152,7 +1153,7 @@ $("rtTop").addEventListener("input", function (e) {
 $("rtTop").addEventListener("change", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
   if (t.dataset.lk && t.tagName === "SELECT") { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; devChanged(p); return; }
-  if (t.id === "dvProf") { devGet(p).profile = t.value; devChanged(p); }
+  if (t.id === "dvProf") { var dp = devGet(p); dp.profile = t.value; delete dp.neutral; devChanged(p); }
   else if (t.id === "dvPro") { devGet(p).pro = t.checked; devChanged(p); }
 });
 /* ✨ Auto : ProLab automatique + correction selon le type de photo + peau protegee + vos habitudes apprises */
@@ -1222,7 +1223,8 @@ window.addEventListener("mouseup", function () { if (!tune.st) return; tune.st =
 /* ---------------- 🩺 CORRIGER LES PROBLEMES : chaque photo recoit les outils dont elle a besoin ---------------- */
 function fixPhoto(p) {
   var a = p.a; if (!a || a.err) return null;
-  var d = p.dev ? JSON.parse(JSON.stringify(p.dev)) : DEV_DEF(), L = d.looks = d.looks || {}, done = [];
+  // sans reglage existant : rendu NEUTRE (aucun profil, pas de ProLab) ; seules les corrections utiles changent l'image
+  var d = p.dev ? JSON.parse(JSON.stringify(p.dev)) : {profile: "LABO PRO EV5", pro: false, dose: 100, v: {}, curve: null, neutral: true}, L = d.looks = d.looks || {}, done = [];
   // exposition (douce) : surtout l'image entiere ; les visages comptent un peu, sauf avec lunettes / verres teintes (trop sombres)
   var e = a.expo || {}, f = bigFaces(a).filter(function (x) { return x.lum != null && !x.tinted && !(x.glasses != null && x.glasses >= 0.25); });
   var fl = f.length ? avg(f.map(function (x) { return x.lum; })) : null, lum = e.mean == null ? fl : fl == null ? e.mean : e.mean * 0.65 + fl * 0.35;
@@ -1236,15 +1238,20 @@ function fixPhoto(p) {
   }
   // leger flou : nettete et structure (un flou fort ne se rattrape pas)
   var er = eyeRaw(a), sh = er != null ? er : a.sharp;
-  if (sh < 55) { var k = sh < 15 ? 1 : (55 - sh) / 40; d.deblur = {amt: Math.round(50 + 30 * k), kind: a.motion > 50 ? "bouge" : "auto"};
-    L.details = {s: Math.round(8 + 10 * k), n: Math.round(10 + 15 * k)}; done.push((a.motion > 50 ? "bougé" : "flou") + " corrigé" + (sh < 15 ? " (flou fort : amélioration limitée)" : "")); }
+  if (sh < 55) { var k = sh < 15 ? 1 : (55 - sh) / 40; d.deblur = {amt: Math.round(60 + 30 * k), kind: a.motion > 50 ? "bouge" : "auto"};
+    L.details = {s: Math.round(20 + 15 * k), n: Math.round(45 + 35 * k)}; done.push((a.motion > 50 ? "bougé" : "flou") + " corrigé" + (sh < 15 ? " (flou fort : amélioration limitée)" : "")); }
   // bruit : lissage leger
   if (a.noiseView != null && a.noiseView > 5) { L.details = L.details || {s: 0, n: 0}; L.details.s = Math.min(L.details.s, -Math.round(Math.min(60, (a.noiseView - 4) * 8))); done.push("grain lissé"); }
   // dominante de couleur chaude ou froide (orange / bleu) seulement : une photo verte (vegetation) n'est pas une dominante
   var col = a.col || [];
   if (col.length) { var R = 0, B = 0; for (var i = 0; i < col.length; i += 3) { R += col[i]; B += col[i + 2]; }
     var rb = Math.log2(Math.max(1, B) / Math.max(1, R));
-    if (Math.abs(rb) > 0.32 && Math.abs(rb) < 1.2) { var t = Math.max(-100, Math.min(100, Math.round(100 * rb * 0.7))); L.wb = {t: t, ti: 0}; done.push(rb < 0 ? "dominante orangée corrigée" : "dominante bleutée corrigée"); } }
+    // le bleu d'un ciel ou de la mer n'est pas une dominante : pas de compensation sur paysage / plage / nuit, ni si le haut (ciel) est le plus bleu
+    var cg = catOf(p), topB = 0, topR = 0, botB = 0, botR = 0;
+    for (i = 0; i < col.length; i += 3) { if (i < 12) { topR += col[i]; topB += col[i + 2]; } else { botR += col[i]; botB += col[i + 2]; } }
+    var skyBlue = Math.log2(Math.max(1, topB) / Math.max(1, topR)) > Math.log2(Math.max(1, botB) / Math.max(1, botR)) + 0.15;
+    var blueOk = rb > 0 && (cg === "paysage" || cg === "plage" || cg === "nuit" || skyBlue);
+    if (Math.abs(rb) > 0.32 && Math.abs(rb) < 1.2 && !blueOk) { var t = Math.max(-45, Math.min(45, Math.round(100 * rb * 0.45))); L.wb = {t: t, ti: 0}; done.push(rb < 0 ? "dominante orangée corrigée" : "dominante bleutée corrigée"); } }
   // horizon
   if (a.tilt) { d.tilt = true; done.push("horizon redressé (" + Math.abs(a.tilt).toFixed(1).replace(".", ",") + "°)"); }
   d.fix = done;
@@ -1300,7 +1307,7 @@ async function fixRun(list) {
             var L2 = p.dev.looks || {};
             if (k === "naf") { p.dev.deblur = null; if (L2.details) L2.details.n = Math.min(L2.details.n || 0, 15); }
             if (k === "scu" && L2.details && L2.details.s < 0) { L2.details.s = 0; p.dev.fix = p.dev.fix.filter(function (t) { return t !== "grain lissé"; }); } }
-          else { p.dev = DEV_DEF(); p.dev.fix = [AIW[k] + " par IA"]; }
+          else { p.dev = {profile: "LABO PRO EV5", pro: false, dose: 100, v: {}, curve: null, neutral: true, fix: [AIW[k] + " par IA"]}; }
         } catch (e) { gains.push(p.name + " : " + (e.message || e)); }
       }
       if (p.ai && p.ai.gain) gains.push(p.name + " : " + p.ai.gain);
@@ -1682,7 +1689,7 @@ function showLoupe() {
     full.zoom = false; img.dataset.id = id;
     if (p.thumbUrl) { img.src = p.thumbUrl; img.onload = function () { if (img.dataset.id === id) { fit(); drawLoupeMarks(p); } }; }
     img.dataset.full = "";
-    fullUrl(p).then(function (u) { if (img.dataset.id !== id || !u) return; img.onload = function () { img.dataset.full = id; if (!full.zoom) fit(); drawLoupeMarks(p); healDrawAll(); }; img.src = u; if (p.heals || p.ret) rpPreview(); });
+    fullUrl(p).then(function (u) { if (img.dataset.id !== id || !u) return; img.onload = function () { img.dataset.full = id; if (!full.zoom) fit(); drawLoupeMarks(p); healDrawAll(); }; img.src = u; if (p.heals || p.ret || devStyle(p)) rpPreview(); });
     var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
   } else drawLoupeMarks(p);
   drawFaces($("lpFaces"), p); adjShow(p); healDrawAll();
@@ -2279,5 +2286,5 @@ $("bImport").onclick = openImport; $("bCompare").onclick = openCompare; $("bHelp
 try { if (!localStorage.getItem("rp_intro")) setTimeout(function () { guide(0); }, 400); } catch (e) {}
 setTab("trier");
 updLearn();
-window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load}; window.__rp_full = function () { return full; };
+window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load, devStyle: devStyle, pool: function () { return pool; }, rpPreview: rpPreview, developOne: developOne, fixPhoto: fixPhoto, devShow: devShow}; window.__rp_full = function () { return full; };
 })();
