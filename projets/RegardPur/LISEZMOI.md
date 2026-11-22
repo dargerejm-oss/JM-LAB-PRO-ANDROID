@@ -123,3 +123,7 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
   seules les corrections utiles changent l'image, visibles dans les curseurs) ; la vue en grand affiche toujours la version
   corrigée (donc Avant / Après marche sans zoom) ; le bleu du ciel ou de la mer n'est plus pris pour une dominante ;
   dominante corrigée plus doucement ; défloutage classique renforcé. Vérifié : écran = export pour 21 outils.
+- 3.9.4 (version finale) : aperçu 2× plus rapide (assistant réservé, photo gardée décodée, taille de l'écran, pleine
+  résolution au zoom), export de 3 photos à la fois, jusqu'à 6 assistants d'analyse, IA préchargée ; curseurs neutres par
+  défaut (seul le curseur touché agit, le bouton Auto garde le rendu complet) ; exposition de « Mon style » en vrais IL.
+  Contrôlé : 21 outils écran = export, parcours complet analyse → tri → corriger (IA) → export, horizon, Avant / Après.

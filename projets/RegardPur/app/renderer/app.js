@@ -1057,7 +1057,8 @@ $("lpAdj0").onclick = resetAll;
 $("dvZero").onclick = resetAll;
 
 /* ---------------- REGLAGES COMPLETS (meme moteur que JM LAB PRO) ---------------- */
-var DEV_DEF = function () { return {profile: "cat", pro: true, dose: 65, v: {}, curve: null}; };
+// par defaut : rendu neutre (seuls les curseurs que vous touchez changent l'image) ; le bouton Auto, lui, applique le rendu complet
+var DEV_DEF = function () { return {profile: "LABO PRO EV5", pro: false, dose: 100, v: {}, curve: null, neutral: true}; };
 function devGet(p) { if (!p.dev) p.dev = DEV_DEF(); return p.dev; }
 function devShow(p) {
   var sel = $("dvProf"); if (!sel.options.length) sel.innerHTML = "<option value='cat'>Selon le type de photo (conseillé)</option>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'>" + o[1] + "</option>"; }).join("");
@@ -1100,7 +1101,7 @@ var TYPE_TOOLS = {
 };
 function typeShow(p) {
   if (!p || !p.a) { $("typeBox").style.display = "none"; return; }
-  var c = catOf(p), T = (MYSTYLE ? [["Mon style", {v: MYSTYLE.v, curve: MYSTYLE.curve, my: 1}]] : []).concat(TYPE_TOOLS[c] || []); TYPE_CUR = T; $("typeBox").style.display = T.length ? "" : "none";
+  var c = catOf(p), T = (MYSTYLE ? [["Mon style", {v: MYSTYLE.v, curve: MYSTYLE.curve, my: 1, evIL: !!MYSTYLE.evIL}]] : []).concat(TYPE_TOOLS[c] || []); TYPE_CUR = T; $("typeBox").style.display = T.length ? "" : "none";
   $("typeTitle").textContent = "Pour ce type de photo : " + (CATS[c] ? CATS[c].nom : c);
   var used = (p.dev && p.dev.tt) || [];
   $("typeTools").innerHTML = T.filter(function (t) { return !/^ai:/.test(t[1]) || AI.has[t[1] === "ai:face" ? "gfp" : t[1].slice(3)]; }).map(function (t) { return "<button data-tt='" + T.indexOf(t) + "'" + (used.indexOf(t[0]) >= 0 ? " class='done'" : "") + ">" + t[0] + "</button>"; }).join("");
@@ -1112,7 +1113,7 @@ $("typeTools").addEventListener("click", function (e) {
   if (typeof a === "string" && a.indexOf("rp:") === 0) { var k = a.slice(3); p.ret = {preset: k, str: 100, v: JSON.parse(JSON.stringify(RP_PRESETS[k].v))}; rp.cur = p.ret; }
   else if (a === "crop") { var cc = autoCrop(p, "orig"); if (!cc) { toast("Le cadrage est déjà bon."); return; } devGet(p).crop = cc; }
   else if (a === "tilt") { if (!p.a.tilt) { toast("L'horizon de cette photo est déjà droit."); return; } devGet(p).tilt = true; }
-  else { var d = devGet(p); if (a.sky) d.sky = JSON.parse(JSON.stringify(a.sky)); if (a.curve) d.curve = JSON.parse(JSON.stringify(a.curve)); if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
+  else { var d = devGet(p); if (a.sky) d.sky = JSON.parse(JSON.stringify(a.sky)); if (a.curve) d.curve = JSON.parse(JSON.stringify(a.curve)); if (a.my && a.evIL && a.v && a.v.Exposition != null) { a = JSON.parse(JSON.stringify(a)); a.v.Exposition = Math.round(a.v.Exposition / (0.5 * 0.85 * (d.dose || 65) / 100) * 10) / 10; } if (a.v) Object.keys(a.v).forEach(function (k) { d.v[k] = a.v[k]; }); if (a.lk) { d.looks = d.looks || {}; Object.keys(a.lk).forEach(function (k) { d.looks[k] = JSON.parse(JSON.stringify(a.lk[k])); }); } }
   var d2 = devGet(p); d2.tt = (d2.tt || []).filter(function (x) { return x !== t[0]; }).concat([t[0]]);
   devShow(p); devChanged(p); toast("« " + t[0] + " » appliqué — affinez avec les curseurs si besoin.");
 });
@@ -2209,11 +2210,11 @@ async function learnStyle() {
   }
   if (nf < 3) { $("styleInfo").textContent = "Pas assez de photos retouchées trouvées (" + nf + ")."; return; }
   var med = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }, v = {};
-  LRMAP.forEach(function (m) { var a = vals[m[0]]; if (!a || a.length < nf * 0.3) return; var x = med(a); if (m[0] === "Exposure2012") x = x / 0.65; else x = x * m[2]; x = Math.round(x * 10) / 10; if (Math.abs(x) >= (m[0] === "Exposure2012" ? 0.1 : 2)) v[m[1]] = Math.max(-100, Math.min(100, x)); });
+  LRMAP.forEach(function (m) { var a = vals[m[0]]; if (!a || a.length < nf * 0.3) return; var x = med(a); if (m[0] !== "Exposure2012") x = x * m[2]; x = Math.round(x * 10) / 10; if (Math.abs(x) >= (m[0] === "Exposure2012" ? 0.1 : 2)) v[m[1]] = Math.max(-100, Math.min(100, x)); });
   // courbe des tons : mediane des courbes (lues a 5 hauteurs), si au moins un tiers des photos en a une
   var curve = null; if (curves.length >= Math.max(1, nf * 0.3)) { curve = [[0, 0]]; [64, 128, 192].forEach(function (x) { curve.push([x, Math.round(med(curves.map(function (c) { return crvLut(c)[x]; })))]); }); curve.push([255, 255]); }
   if (Object.keys(v).length === 0 && !curve) { $("styleInfo").textContent = "Vos photos n'ont pas de réglage commun à reprendre."; return; }
-  MYSTYLE = {v: v, curve: curve, n: nf, lr: src.lr, dxo: src.dxo, date: Date.now()}; try { localStorage.setItem("rp_mystyle", JSON.stringify(MYSTYLE)); } catch (e) {}
+  MYSTYLE = {v: v, curve: curve, evIL: true, n: nf, lr: src.lr, dxo: src.dxo, date: Date.now()}; try { localStorage.setItem("rp_mystyle", JSON.stringify(MYSTYLE)); } catch (e) {}
   $("styleInfo").textContent = "Style appris sur " + nf + " photo(s) (" + (src.lr ? "Lightroom " + src.lr : "") + (src.lr && src.dxo ? ", " : "") + (src.dxo ? "DxO " + src.dxo : "") + ")";
   var p = S.byId[S.view[S.cur]]; if (p) typeShow(p);
 }
