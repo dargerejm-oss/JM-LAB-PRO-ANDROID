@@ -12,7 +12,7 @@ protocol.registerSchemesAsPrivileged([{scheme: 'app', privileges: {standard: tru
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1500, height: 950, minWidth: 1000, minHeight: 640, backgroundColor: '#0d0f12', title: 'Regard Pur',
+    width: 1500, height: 950, minWidth: 700, minHeight: 460, backgroundColor: '#0d0f12', title: 'Regard Pur',
     icon: path.join(__dirname, 'renderer', 'icon.png'),
     webPreferences: {preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: false}
   });

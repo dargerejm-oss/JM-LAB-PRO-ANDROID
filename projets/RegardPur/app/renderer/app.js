@@ -1197,13 +1197,15 @@ $("rtTop").addEventListener("change", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
   if (t.dataset.lk && t.tagName === "SELECT") { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; devChanged(p); return; }
   if (t.id === "dvProf") { profSet(p, t.value); }
-  else if (t.id === "dvPro") { var dq = devGet(p); dq.pro = t.checked; if (t.checked) delete dq.neutral; else if (dq.profile === "LABO PRO EV5") dq.neutral = true; devChanged(p); profThumbs(p); }
+  else if (t.id === "dvPro") { var LP = S.sel.size > 1 && S.sel.has(p.id) ? fixTargets() : [p]; LP.forEach(function (q) { var dq = devGet(q); dq.pro = t.checked; if (t.checked) delete dq.neutral; else if (dq.profile === "LABO PRO EV5") dq.neutral = true; if (q !== p) updCard(q); }); devChanged(p); profThumbs(p); if (LP.length > 1) toast("ProLab " + (t.checked ? "activé" : "désactivé") + " sur les " + LP.length + " photos sélectionnées."); }
 });
 /* profils : chaque profil est montre sur la photo elle-meme (vignettes) ; un clic l'applique et l'image change aussitot */
 function profSet(p, v) {
-  var dp = devGet(p); dp.profile = v;
-  if (v === "LABO PRO EV5" && dp.pro === false) dp.neutral = true; else delete dp.neutral;
+  // plusieurs photos selectionnees : le profil s'applique a toute la selection
+  var L = S.sel.size > 1 && S.sel.has(p.id) ? fixTargets() : [p];
+  L.forEach(function (q) { var dp = devGet(q); dp.profile = v; if (v === "LABO PRO EV5" && dp.pro === false) dp.neutral = true; else delete dp.neutral; if (q !== p) updCard(q); });
   $("dvProf").value = v; profMark(p); devChanged(p);
+  if (L.length > 1) toast("Profil appliqué aux " + L.length + " photos sélectionnées.");
 }
 function profMark(p) { var d = p.dev || DEV_DEF(); Array.prototype.forEach.call(document.querySelectorAll("#profGrid [data-pf]"), function (b) { b.classList.toggle("on", b.dataset.pf === (d.profile || "cat")); }); }
 var PFV = {id: null, n: 0, urls: []};
@@ -1360,6 +1362,8 @@ function qualOf(a, k) { // ce qu'on attend de chaque correction
 async function fixRun(list) {
   var n = 0, none = 0, ai = AI.ok && N && $("fixAi").checked, gains = [], skipped = {};
   list.forEach(function (p) { var d = fixPhoto(p); if (d) { p.dev = d; n++; updCard(p); } else none++; });
+  // on passe tout de suite dans Retoucher (profils, reglages) : l'IA continue en arriere-plan, avec la barre en bas
+  if (ai && n) { if (S.tab !== "retoucher") setTab("retoucher"); else { var pc0 = S.byId[S.view[S.cur]]; devShow(pc0); rpPreview(); } }
   if (ai) {
     var todo = list.map(function (p) { return [p, aiNeeds(p).filter(function (k) { if (aiRefused(k)) { skipped[k] = 1; return false; } return true; })]; }).filter(function (x) { return x[1].length; });
     // beaucoup de photos a reparer par l'IA : on previent du temps avant de lancer (environ 8 s par reparation)
@@ -1367,6 +1371,7 @@ async function fixRun(list) {
     if (todo.length > 15 && mn >= 3 && !confirm("L'IA doit réparer " + todo.length + " photos : environ " + (mn >= 120 ? Math.round(mn / 60) + " heures" : mn + " minutes") + ".\n\nOK = lancer l'IA maintenant\nAnnuler = garder seulement les corrections rapides (déjà faites)")) todo = [];
     AI.busy = true; aiShow(); AIJ = {t0: Date.now(), i: 1, n: todo.length, f: 0, op: "Corriger les problèmes (IA)", op0: "Corriger les problèmes (IA)", det: ""}; jobRender();
     for (var i = 0; i < todo.length; i++) {
+      if (i > 0 && S.byId[S.view[S.cur]] === todo[i - 1][0]) { devShow(todo[i - 1][0]); aiShow(todo[i - 1][0]); rpPreview(); }
       var p = todo[i][0], ks = todo[i][1], before = p.a;
       if (p.ai) { p.ai = null; full.cache.delete(p.id); } // on repart de l'original
       for (var j = 0; j < ks.length; j++) {
@@ -2037,6 +2042,7 @@ function openExport() {
   renderWire();
 }
 async function doExport() {
+  if (AI.busy && !confirm("L'IA est encore en train de corriger des photos.\nLes photos qu'elle n'a pas encore traitées seront exportées sans la correction IA.\n\nOK = exporter quand même · Annuler = attendre la fin (barre en bas)")) return;
   var w = document.querySelector("input[name=eW]:checked").value, minS = +$("eS").value, move = $("eA").value === "move", eDv = ($("eD").value || "Retenues").trim(), absD = isAbs(eDv), sub = absD ? eDv : eDv.replace(/[\\\/:*?"<>|]/g, "_"), rej = $("eRej").checked, xmp = $("eX").checked;
   var pick = S.photos.filter(function (p) { return w === "P" ? p.status === "P" : w === "PT" ? p.status !== "X" : w === "R" ? edited(p) : p.stars >= minS; });
   var rejs = rej ? S.photos.filter(function (p) { return p.status === "X"; }) : [];
@@ -2253,6 +2259,23 @@ function rotate(delta) {
   toast("↻ Rotation " + (delta === 180 ? "180° (photo retournée)" : delta < 0 ? "à gauche" : "à droite") + (L.some(function (p) { return p.raw; }) ? " (RAW : appliquée à l'export JPEG seulement)" : " — appliquée à l'export, l'original n'est pas modifié"));
 }
 Array.prototype.forEach.call(document.querySelectorAll(".rotL,.rotR,.rot180"), function (b) { b.onclick = function () { rotate(b.classList.contains("rotL") ? -90 : b.classList.contains("rot180") ? 180 : 90); }; });
+/* taille d'affichage : petit ecran (13 pouces, zoom Windows 150 %) -> reduction automatique pour que tout tienne ;
+   Ctrl + / Ctrl - / Ctrl 0 pour choisir (memorise) */
+function zoomUi(f, user) {
+  if (!N || !N.setZoom) return; f = Math.max(0.6, Math.min(1.5, Math.round(f * 100) / 100)); N.setZoom(f);
+  if (user) { try { localStorage.setItem("rp_zoom", String(f)); } catch (e) {} toast("Taille d'affichage : " + Math.round(f * 100) + " % (Ctrl + / Ctrl − / Ctrl 0)"); }
+}
+(function () {
+  if (!N || !N.setZoom) return; var z = null; try { z = +localStorage.getItem("rp_zoom") || null; } catch (e) {}
+  if (z) zoomUi(z); else { var h = window.innerHeight * (N.getZoom ? N.getZoom() : 1), w = window.innerWidth * (N.getZoom ? N.getZoom() : 1); var k = Math.min(1, h / 760, w / 1200); if (k < 0.97) zoomUi(Math.max(0.7, k)); }
+  document.addEventListener("keydown", function (e) {
+    if (!e.ctrlKey || e.altKey) return; var cur = N.getZoom ? N.getZoom() : 1;
+    if (e.key === "-" || e.key === "_" || e.code === "NumpadSubtract") zoomUi(cur - 0.1, true);
+    else if (e.key === "+" || e.key === "=" || e.code === "NumpadAdd") zoomUi(cur + 0.1, true);
+    else if (e.key === "0" || e.code === "Numpad0") { try { localStorage.removeItem("rp_zoom"); } catch (x) {} zoomUi(1, true); }
+    else return; e.preventDefault(); e.stopPropagation();
+  }, true);
+})();
 function trashSel() {
   if (!N) return; var L = fixTargets(); if (!L.length) return;
   dialog("<h3>Mettre à la corbeille ?</h3><p>" + (L.length > 1 ? L.length + " photos" : L[0].name) + " iront dans la Corbeille de Windows : vous pourrez les récupérer.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='yes' class='pri'>Corbeille</button></div>", async function (c) {
