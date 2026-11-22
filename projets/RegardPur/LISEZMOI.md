@@ -127,3 +127,4 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
   résolution au zoom), export de 3 photos à la fois, jusqu'à 6 assistants d'analyse, IA préchargée ; curseurs neutres par
   défaut (seul le curseur touché agit, le bouton Auto garde le rendu complet) ; exposition de « Mon style » en vrais IL.
   Contrôlé : 21 outils écran = export, parcours complet analyse → tri → corriger (IA) → export, horizon, Avant / Après.
+- 3.9.5 : Avant / Après = appui long sur la photo (photo d'origine entière, on voit redressement et recadrage), bouton ou touche B ; « glisser sur la photo » désactivé par défaut ; plus de zoom après un glissé ; mode d'emploi FR/EN mis à jour.
