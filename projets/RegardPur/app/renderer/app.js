@@ -519,6 +519,7 @@ function onResult(w, e) {
   if (r.meas !== undefined) { var cbm = prevWait[r.id]; delete prevWait[r.id]; if (cbm) cbm(r); return; }
   if (r.faces5 !== undefined) { var cbf = prevWait[r.id]; delete prevWait[r.id]; if (cbf) cbf(r); return; }
   if (r.joined !== undefined) { var cbj = prevWait[r.id]; delete prevWait[r.id]; if (cbj) cbj(r); return; }
+  if (r.warm !== undefined) { var cbw = prevWait[r.id]; delete prevWait[r.id]; if (cbw) cbw(r); else if (r.warm) r.warm.close(); return; }
   if (r.profs !== undefined) { var cbq = prevWait[r.id]; delete prevWait[r.id]; if (cbq) cbq(r); return; }
   if (r.prev !== undefined) { var cbp = prevWait[r.id]; delete prevWait[r.id]; if (cbp) cbp(r); return; }
   if (r.dev !== undefined) { var cbd = devWait[r.id]; delete devWait[r.id]; if (cbd) cbd(r); return; }
@@ -1469,7 +1470,27 @@ function prevSend(job) {
   };
   var sk = job.src + "|" + job.max;
   if (PV.src === sk) go(null);
+  else if (WARM.has(sk)) { var wb = WARM.get(sk); WARM.delete(sk); PV.src = sk; var w0 = prevWorker(), msg0 = {id: job.key, src: job.src, heic: job.heic, preview: true, max: job.max, ret: job.eff, heals: job.heals, style: job.dst, fast: job.fast || 0, bmp: wb};
+    prevWait[job.key] = function (r) { PV.busy = false; if (!r.prev && /source/.test(r.err || "")) PV.src = null; job.done(r); if (PV.next) { var n = PV.next; PV.next = null; prevSend(n); } }; w0.postMessage(msg0, [wb]); }
   else readBytes(job.p).then(function (b) { if (!b) { PV.busy = false; return; } PV.src = sk; go(b); });
+}
+/* la photo suivante (et la precedente) est decodee a l'avance par un assistant a part : elle s'affiche corrigee tout de suite */
+var WARM = new Map(), WARMW = null, WARMING = {};
+function warmNear() {
+  if (S.tab !== "retoucher") return;
+  [S.cur + 1, S.cur - 1].forEach(function (i) {
+    var q = S.byId[S.view[i]]; if (!q) return;
+    var st = devStyle(q); if (!st || (!st.jm && !st.tilt && !st.rot && !st.crop) && !q.ret && !q.heals) return;
+    var max = prevSize(), sk = q.id + "|" + (q.ai ? q.ai.file : "") + "|" + (q.rawDev || "") + "|" + max;
+    if (PV.src === sk || WARM.has(sk) || WARMING[sk]) return; WARMING[sk] = 1;
+    readBytes(q).then(function (b) {
+      if (!b) { delete WARMING[sk]; return; }
+      if (!WARMW) { WARMW = new Worker("analyse.js"); WARMW.inflight = 0; WARMW.jobs = {}; WARMW.onmessage = onResult.bind(null, WARMW); }
+      var id = "warm:" + sk, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
+      prevWait[id] = function (r) { delete WARMING[sk]; if (!r.warm) return; WARM.set(sk, r.warm); while (WARM.size > 3) { var k0 = WARM.keys().next().value; WARM.get(k0).close(); WARM.delete(k0); } };
+      WARMW.postMessage({id: id, warm: true, buf: c, heic: heicOf(q), max: max}, [c.buffer]);
+    });
+  });
 }
 function rpPreview(fast) {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
@@ -1483,7 +1504,7 @@ function rpPreview(fast) {
     var my = ++rp.busy;
     prevSend({p: p, key: "prev:" + id + ":" + my, src: id + "|" + (p.ai ? p.ai.file : "") + "|" + (p.rawDev || ""), heic: heicOf(p), max: prevSize(), eff: eff, heals: heals, dst: dst, fast: fs, done: function (r) {
       // on affiche tout resultat plus recent que celui a l'ecran (l'apercu rapide n'est plus jete quand l'image nette est demandee)
-      if (my <= (rp.shown || 0) || $("lpImg").dataset.id !== id) return; if (r.prev) rp.shown = my;
+      if (my <= (rp.shown || 0) || $("lpImg").dataset.id !== id) return; if (r.prev) rp.shown = my; if (!fs) setTimeout(warmNear, 300);
       if (busy) busy.textContent = r.prev ? (r.faces || !eff || !rp.open ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
       var hb = $("healMsg"); if (hb) hb.textContent = "";
       var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";

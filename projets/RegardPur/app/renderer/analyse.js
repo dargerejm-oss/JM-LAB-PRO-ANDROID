@@ -664,6 +664,14 @@ self.onmessage = function (e) {
     queue = queue.then(function () { return develop(m); }).then(function (b) { self.postMessage({id: m.id, dev: b}, [b.buffer]); }, function (err) { self.postMessage({id: m.id, dev: null, err: String(err && err.message || err)}); });
     return;
   }
+  if (m.warm) { // photo suivante preparee a l'avance (decodee a la taille de l'apercu)
+    queue = queue.then(async function () {
+      var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+      var k = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)), c = canvas(Math.round(bm.width * k), Math.round(bm.height * k)), x = c.getContext("2d"); x.imageSmoothingQuality = "high"; x.drawImage(bm, 0, 0, c.width, c.height); bm.close();
+      return c.transferToImageBitmap();
+    }).then(function (b) { self.postMessage({id: m.id, warm: b}, [b]); }, function () { self.postMessage({id: m.id, warm: null}); });
+    return;
+  }
   if (m.profs) { // vignettes : la photo dans chaque profil (pour choisir en voyant le resultat)
     queue = queue.then(async function () {
       var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
@@ -686,8 +694,8 @@ self.onmessage = function (e) {
       var ck = (m.src || "") + "|" + (m.max || 2400), cv;
       if (m.src && PCACHE && PCACHE.key === ck) { cv = canvas(PCACHE.c.width, PCACHE.c.height); cv.getContext("2d").drawImage(PCACHE.c, 0, 0); }
       else {
-        if (!m.buf) throw new Error("source");
-        var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+        if (!m.buf && !m.bmp) throw new Error("source");
+        var bm = m.bmp ? m.bmp : m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
         var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)); cv = canvas(bm.width * k2, bm.height * k2); var cx2 = cv.getContext("2d"); cx2.imageSmoothingQuality = "high"; cx2.drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
         if (m.src) { var keep = canvas(cv.width, cv.height); keep.getContext("2d").drawImage(cv, 0, 0); PCACHE = {key: ck, c: keep}; }
       }
