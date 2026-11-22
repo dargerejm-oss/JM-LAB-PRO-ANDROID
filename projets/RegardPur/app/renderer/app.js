@@ -1209,6 +1209,8 @@ function tuneHud(mode) {
   if (mode === "list") $("tuneList").innerHTML = TUNE.map(function (t, i) { return "<div" + (i === tune.i ? " class='on'" : "") + "><span>" + t[0] + "</span><span>" + tuneTxt(i) + "</span></div>"; }).join("");
   if (mode === "adj") $("tuneVal").textContent = TUNE[tune.i][0] + "  " + tuneTxt(tune.i);
 }
+try { $("tuneOn").checked = localStorage.getItem("rp_tune") === "1"; } catch (e) { $("tuneOn").checked = false; }
+$("tuneOn").addEventListener("change", function () { try { localStorage.setItem("rp_tune", this.checked ? "1" : "0"); } catch (e) {} });
 $("lpView").addEventListener("mousedown", function (e) {
   if (!$("loupe").classList.contains("rmode") || !$("tuneOn").checked || heal.on || $("lkPip").classList.contains("on") || e.button !== 0 || full.zoom) return;
   e.stopImmediatePropagation(); e.preventDefault();
@@ -1663,12 +1665,13 @@ function fullUrl(p) {
 }
 function openLoupe() { if (S.cur < 0) return; $("loupe").classList.add("show"); showLoupe(); }
 function closeLoupe() { if ($("loupe").classList.contains("rmode")) { setTab("trier"); return; } if (rp.open) rpToggle(); if (heal.on) healToggle(); $("loupe").classList.remove("show"); full.zoom = false; scrollToCur(); }
-/* avant / apres : l'original (sans IA ni reglages) a gauche de la ligne, la photo corrigee a droite */
-var AB = {on: false, x: 0.5, id: null, url: null};
+/* avant / apres : la photo d'ORIGINE en entier (sans redressement, recadrage ni reglages) a la place de la version corrigee ;
+   appui long sur la photo = avant tant qu'on appuie ; bouton « Avant / Apres » ou touche B = bascule */
+var AB = {on: false, id: null, url: null, hold: false};
 function abPlace() {
-  var img = $("lpImg"), b = $("abImg"), v = $("lpView");
-  b.style.width = img.naturalWidth + "px"; b.style.height = img.naturalHeight + "px"; b.style.transform = img.style.transform;
-  var x = Math.round(v.clientWidth * AB.x); $("abWrap").style.width = x + "px"; $("abLine").style.left = x + "px";
+  var b = $("abImg"), v = $("lpView"); if (!b.naturalWidth) return;
+  var s = Math.min(v.clientWidth / b.naturalWidth, v.clientHeight / b.naturalHeight, 1), w = b.naturalWidth * s, h = b.naturalHeight * s;
+  b.style.width = w + "px"; b.style.height = h + "px"; b.style.left = (v.clientWidth - w) / 2 + "px"; b.style.top = (v.clientHeight - h) / 2 + "px"; b.style.transform = "none";
 }
 function abLoad() {
   var p = S.byId[S.view[S.cur]]; if (!p || AB.id === p.id) { abPlace(); return; }
@@ -1682,12 +1685,6 @@ function abLoad() {
 }
 function abToggle(on) { AB.on = on == null ? !AB.on : on; $("lpView").classList.toggle("ab", AB.on); $("lpAB").classList.toggle("on", AB.on); if (AB.on) abLoad(); }
 $("lpAB").onclick = function () { abToggle(); };
-$("abLine").addEventListener("mousedown", function (e) {
-  e.preventDefault(); e.stopPropagation(); var v = $("lpView"), r = v.getBoundingClientRect();
-  var mv = function (ev) { AB.x = Math.max(0.02, Math.min(0.98, (ev.clientX - r.left) / r.width)); abPlace(); };
-  var up = function () { window.removeEventListener("mousemove", mv); window.removeEventListener("mouseup", up); };
-  window.addEventListener("mousemove", mv); window.addEventListener("mouseup", up);
-});
 function fit() {
   var v = $("lpView"), img = $("lpImg"); if (!img.naturalWidth) return;
   var s = Math.min(v.clientWidth / img.naturalWidth, v.clientHeight / img.naturalHeight, 1);
@@ -1753,9 +1750,12 @@ $("lpZoom").onclick = function () {
 };
 (function () {
   var v = $("lpView"), drag = null, moved = false;
-  v.addEventListener("mousedown", function (e) { drag = {x: e.clientX, y: e.clientY, tx: full.tx, ty: full.ty}; moved = false; });
-  window.addEventListener("mousemove", function (e) { if (!drag || !full.zoom) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true; full.tx = drag.tx + dx; full.ty = drag.ty + dy; apply(); });
-  window.addEventListener("mouseup", function (e) { if (drag && !moved && e.target.closest && e.target.closest("#lpView")) { var r = v.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top); } drag = null; });
+  v.addEventListener("mousedown", function (e) {
+    drag = {x: e.clientX, y: e.clientY, tx: full.tx, ty: full.ty}; moved = false;
+    if (e.button === 0 && !heal.on && !$("lkPip").classList.contains("on") && !AB.on) { clearTimeout(AB.t); AB.t = setTimeout(function () { if (drag && !moved) { AB.hold = true; abToggle(true); } }, 250); }
+  });
+  window.addEventListener("mousemove", function (e) { if (!drag) return; var dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 4) moved = true; if (!full.zoom) return; full.tx = drag.tx + dx; full.ty = drag.ty + dy; apply(); });
+  window.addEventListener("mouseup", function (e) { clearTimeout(AB.t); if (AB.hold) { AB.hold = false; abToggle(false); drag = null; return; } if (drag && !moved && e.target.closest && e.target.closest("#lpView")) { var r = v.getBoundingClientRect(); zoomAt(e.clientX - r.left, e.clientY - r.top); } drag = null; });
   v.addEventListener("wheel", function (e) { e.preventDefault(); setCur(S.cur + (e.deltaY > 0 ? 1 : -1)); }, {passive: false});
   window.addEventListener("resize", function () { if ($("loupe").classList.contains("show") && !full.zoom) { fit(); drawLoupeMarks(S.byId[S.view[S.cur]]); } });
 })();

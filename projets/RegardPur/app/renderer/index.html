@@ -143,9 +143,9 @@
     <label class="ck expert" data-tip="Montrer les cadres des visages et la zone la plus nette (F)"><input type="checkbox" id="lpMarks" checked> Repères <kbd>F</kbd></label>
     <button id="lpZoom" data-tip="Zoom 100 % sur les yeux ou la zone nette (Z)"><svg class="ic"><use href="#i-zoom"/></svg>100 % <kbd>Z</kbd></button>
     <button id="lpRet" style="display:none"></button>
-    <button id="lpAB" class="rtOnly" data-tip="Comparer avant / après : glissez la ligne sur la photo (touche B)"><svg class="ic"><use href="#i-compare"/></svg>Avant / Après <kbd>B</kbd></button>
+    <button id="lpAB" class="rtOnly" data-tip="Voir la photo d'origine en entier (touche B) — ou restez appuyé sur la photo"><svg class="ic"><use href="#i-compare"/></svg>Avant / Après <kbd>B</kbd></button>
   </div>
-  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="abWrap"><img id="abImg" alt="" draggable="false"></div><div id="abLine"><span>Avant</span><i></i><span>Après</span></div><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas><div id="tuneHud"><div id="tuneList"></div><div id="tuneVal"></div></div>
+  <div id="lpView"><img id="lpImg" alt="" draggable="false"><div id="abWrap"><img id="abImg" alt="" draggable="false"><b class="abTag">AVANT (photo d'origine)</b></div><div id="lpWarm"></div><div id="lpOver"></div><canvas id="lpPaint"></canvas><div id="tuneHud"><div id="tuneList"></div><div id="tuneVal"></div></div>
     <div id="healBar"><b>🩹 Correcteur</b><span>Peignez sur ce qu'il faut enlever (tache, fil, panneau…). Z : zoom, clic droit glissé : se déplacer.</span>
       <label>Taille <input type="range" id="healSize" min="4" max="80" value="18"></label><button id="healUndo">↶ Annuler</button><button id="healClear">Tout effacer</button><i id="healMsg"></i></div></div>
   <div id="lpInfo"></div>
@@ -162,7 +162,7 @@
       <label class="sel full">Profil <select id="dvProf"></select></label>
       <div class="rl"><span>Intensité</span><input type="range" id="dvDose" min="0" max="100" value="65"><b id="dvDoseV">65</b></div>
       <label class="ck expert"><input type="checkbox" id="dvPro" checked> ProLab automatique (exposition corrigée)</label>
-      <label class="ck"><input type="checkbox" id="tuneOn" checked> Glisser sur la photo : ↕ choisir le réglage, ↔ le doser</label>
+      <label class="ck"><input type="checkbox" id="tuneOn"> Glisser sur la photo : ↕ choisir le réglage, ↔ le doser</label>
       <h5>Lumière</h5>
       <div class="rl"><span><svg class="ic"><use href="#i-sun"/></svg>Exposition</span><input type="range" id="lpEv" min="-20" max="20" value="0"><b id="lpEvV">0</b></div>
       <div class="rl"><span>Contraste</span><input type="range" data-dv="Contraste" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Hautes lumières</span><input type="range" data-dv="Hautes SANS GRIS" min="-100" max="0" value="0"><b>0</b></div><div class="rl"><span>Ombres</span><input type="range" data-dv="Ombres" min="0" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Blancs</span><input type="range" data-dv="Blanc" min="-100" max="100" value="0"><b>0</b></div><div class="rl expert"><span>Noirs</span><input type="range" data-dv="Noir" min="-100" max="100" value="0"><b>0</b></div>

@@ -309,3 +309,6 @@ body:not(.tab-retoucher) .rtOnly{display:none}
 #typeBox h5{margin:0 0 4px}
 .chips{display:flex;flex-wrap:wrap;gap:4px}.chips button{font-size:11px;padding:4px 7px;border-radius:12px}
 .chips button.done{border-color:#5fd068;color:#5fd068}
+#abWrap{right:0;width:auto!important;background:#0b0c0e}
+#abWrap img{transform:none!important}
+#abWrap .abTag{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#000c;color:#d4af37;font-size:12px;padding:3px 10px;border-radius:12px;letter-spacing:.05em}
