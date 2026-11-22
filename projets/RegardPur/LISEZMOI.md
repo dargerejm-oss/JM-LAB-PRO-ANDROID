@@ -118,3 +118,4 @@ Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoi
   Les pages sont « isolées » (en-têtes COOP/COEP) pour que LibRaw puisse utiliser plusieurs cœurs.
 - DxO : lecture des vrais fichiers .dop (réglages de base + modifiés, courbe des tons, Smart Lighting, contrôle sélectif des tons…).
 - 3.9.1 : correction d'exposition plus douce (lunettes de soleil ignorées, limites +1 / −0,8 IL), bouton « Remettre à zéro ».
+- 3.9.2 : « Corriger les problèmes » s'affiche vraiment sur l'image (conversion de l'exposition corrigée : +1 IL = vraiment +1 IL).

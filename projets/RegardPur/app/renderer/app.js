@@ -1079,7 +1079,7 @@ function devStyle(p) {
   var d = p.dev || DEV_DEF(), cat = CATS[catOf(p)], o = {profile: d.profile === "cat" ? cat.prof : d.profile, off: d.pro === false, dose: d.dose, hp: REND.hp == null ? 30 : REND.hp, v: JSON.parse(JSON.stringify(d.v)), curve: d.curve, curves: d.curves || null, levels: d.levels || null, sky: d.sky || null, crop: d.crop || null, deblur: d.deblur && d.deblur.amt > 0 ? Object.assign({mo: p.a && p.a.motion != null ? p.a.motion : null}, d.deblur) : null, looks: d.looks || null, q: 92, jm: !!(p.dev || p.adj)};
   if (d.ia) { o.auto = {cibles: cat.cibles, ev: cat.ev, wb: cat.wb, tint: cat.tint}; o.skin = cat.peau; }
   var ad = p.adj || (d.ia ? adjBias(p) : null);
-  if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
+  if (ad) { o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / (0.5 * 0.85 * (o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   if (d.tilt && p.a && p.a.tilt) o.tilt = p.a.tilt;
   if (p.ret) o.ret = rpEff(p.ret); if (p.heals) o.heals = p.heals;
   if (p.rot) o.rot = p.rot;
@@ -1229,7 +1229,7 @@ function fixPhoto(p) {
   if (lum != null && (lum < 75 || lum > 180 || e.hi > 8 || e.lo > 25)) {
     var ev = Math.max(-0.8, Math.min(1, Math.log2(115 / Math.max(10, lum)) * 0.5)); ev = Math.round(ev * 10) / 10;
     if (e.hi > 8 && ev > 0) ev = Math.min(ev, 0.3); // deja des blancs brules : on n'eclaircit presque pas
-    if (Math.abs(ev) >= 0.2) { d.v.Exposition = Math.round(ev / (d.dose / 100) * 10) / 10; done.push("exposition " + (ev > 0 ? "+" : "") + String(ev).replace(".", ",")); }
+    if (Math.abs(ev) >= 0.2) { d.v.Exposition = Math.round(ev / (0.5 * 0.85 * d.dose / 100) * 10) / 10; /* 1 cran = 0,5 IL x intensite x 0,85 dans le moteur */ done.push("exposition " + (ev > 0 ? "+" : "") + String(ev).replace(".", ",")); }
     if (e.hi > 8) { d.v["Hautes SANS GRIS"] = -Math.min(60, Math.round(15 + e.hi * 2)); done.push("hautes lumières récupérées"); }
     if (e.lo > 25 || lum < 75) { d.v.Ombres = Math.min(40, Math.round(10 + (e.lo || 0) * 0.8)); done.push("ombres débouchées"); }
     d.pro = false; // l'exposition est reglee ici : pas de deuxieme correction automatique
@@ -1400,7 +1400,7 @@ function rpPreview() {
       if (!b) return; ensurePool(); var w = pool[0], key = "prev:" + id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
       prevWait[key] = function (r) {
         if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
-        if (busy) busy.textContent = r.prev ? (r.faces || !eff ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
+        if (busy) busy.textContent = r.prev ? (r.faces || !eff || !rp.open ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
         var hb = $("healMsg"); if (hb) hb.textContent = "";
         var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
         if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
@@ -1872,7 +1872,7 @@ function styleFor(p, base) {
   if (p.heals) o.heals = p.heals;
   if (p.rot) o.rot = p.rot;
   var ad = p.adj || adjBias(p);
-  if (ad) { o.v = o.v || {}; o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / ((o.dose || 65) / 100) / 0.85 * 0.85; o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
+  if (ad) { o.v = o.v || {}; o.v.Exposition = (+o.v.Exposition || 0) + ad.ev / (0.5 * 0.85 * (o.dose || 65) / 100); o.v.Temperature = Math.max(-100, Math.min(100, (+o.v.Temperature || 0) + ad.wb)); }
   return o;
 }
 var devWait = {};
