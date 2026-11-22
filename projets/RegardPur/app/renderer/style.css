@@ -333,7 +333,7 @@ body:not(.tab-retoucher) .rtOnly{display:none}
 /* barre de travail (bas de l'ecran) et sablier 3D dont le sable va du rouge (debut) au vert fonce (fin) */
 #jobBar{position:fixed;left:0;right:0;bottom:0;height:58px;z-index:45;display:none;align-items:center;gap:14px;padding:0 16px;background:linear-gradient(180deg,#1b1f26,#101318);border-top:1px solid var(--line);box-shadow:0 -6px 18px #0008;--sand:hsl(0,85%,50%)}
 #jobBar.show{display:flex}
-body.jobOn #main{height:calc(100% - 58px - 58px)}
+body.jobOn #main{height:calc(100% - 104px - 58px)}
 body.jobOn .ovl{bottom:58px}
 body.jobOn #toast{bottom:74px}
 #jobBar .jbMain{flex:1;min-width:0}
@@ -362,3 +362,7 @@ body.jobOn #toast{bottom:74px}
 #jbFill{border-radius:10px}
 #jbPh{position:absolute;inset:0;font-size:11.5px;line-height:20px;padding:0 10px;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #jbStop{flex:none;padding:6px 12px;border-color:#a33;color:#f88}
+/* barre d'outils trop longue (petit ecran) : elle defile au lieu d'etre coupee */
+.subT{overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.subT > *{flex-shrink:0}
+.subT .grow{flex-shrink:1;min-width:0}
