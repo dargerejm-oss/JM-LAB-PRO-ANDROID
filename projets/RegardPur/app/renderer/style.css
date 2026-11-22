@@ -318,3 +318,15 @@ body:not(.tab-retoucher) .rtOnly{display:none}
 #profGrid button.on{border-color:var(--gold)}
 #profGrid .pfi{display:block;width:100%;aspect-ratio:1;background:#222 center/cover no-repeat;border-radius:3px}
 #profGrid i{display:block;width:100%;text-align:center;font-style:normal;font-size:10px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#coView{display:none;position:fixed;inset:0;z-index:60;background:var(--bg,#111);flex-direction:column}
+#coView.show{display:flex}
+#coView .coBar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line,#333)}
+#coView .coBar .grow{flex:1}
+#coView .coImgs{flex:1;display:flex;gap:8px;padding:8px;min-height:0}
+#coView figure{flex:1;margin:0;display:flex;flex-direction:column;min-width:0;min-height:0}
+#coView figcaption{font-size:12px;color:var(--gold,#d4a72c);padding:2px 0 6px;text-align:center}
+#coView img{flex:1;min-height:0;width:100%;object-fit:contain;background:#000}
+#coView.one figure:first-child{display:none}
+#coView.one.showA figure:first-child{display:flex}
+#coView.one.showA figure:last-child{display:none}
+.rotRow{display:flex;align-items:center;gap:5px;margin:0 0 6px}.rotRow span{flex:1;font-size:12px;color:var(--mut)}.rotRow button{padding:4px 8px}

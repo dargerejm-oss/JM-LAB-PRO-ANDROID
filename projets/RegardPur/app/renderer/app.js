@@ -2008,7 +2008,8 @@ function openExport() {
     "<div class='card2'><h3><i>3</i>Retouche</h3>" + renderUI() +
       (nR ? "<p class='small' style='color:var(--gold)'>" + nR + " photo(s) corrigée(s) ou retouchée(s).</p>" : "") +
     "</div>" +
-    "<div class='go'><button class='pri big' data-c='go'><svg class='ic'><use href='#i-export'/></svg>Exporter</button></div></div>";
+    "<div class='go'><button class='pri big' data-c='go'><svg class='ic'><use href='#i-export'/></svg>Exporter</button></div>" +
+    "<div class='go'><button data-c='cmpo' data-tip='Pour chaque photo corrigée du dossier d’export, retrouve la photo originale dans le dossier source et les montre côte à côte'><svg class='ic'><use href='#i-compare'/></svg>Comparer les corrigées avec leurs originaux</button></div></div>";
   renderWire();
 }
 async function doExport() {
@@ -2025,7 +2026,7 @@ async function doExport() {
     try { var old = await N.readText(xp); await N.writeText(xp, old && /<rdf:Description/.test(old) ? xmpMerge(old, p) : xmpPacket(p)); } catch (e) { err++; }
     step();
   }
-  var dest = join(S.dir, sub);
+  var dest = join(S.dir, sub), MAP = {}, nDev = 0;
   // plusieurs photos developpees en meme temps (une par assistant de calcul, 3 au plus)
   ensurePool(); var nextI = 0, K = Math.max(1, Math.min(3, pool.length));
   async function one(i) {
@@ -2035,21 +2036,78 @@ async function doExport() {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
       $("progTxt").textContent = "Retouche " + (k + 1) + " / " + pick.length;
       var nm = st2.rotOnly ? pick[i].name.replace(/\.[^.]+$/, "") : REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
-      try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
+      try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); MAP[nm + ".jpg"] = pick[i].path; nDev++; } catch (e) { err++; }
     } else if (pick[i].ai) { // seulement l'amelioration IA : on livre la version amelioree a cote de l'original
-      try { await N.copyAs(pick[i].ai.file, join(dest, pick[i].name.replace(/\.[^.]+$/, "") + "_IA.jpg")); } catch (e) { err++; }
+      try { var nIA = pick[i].name.replace(/\.[^.]+$/, "") + "_IA.jpg"; await N.copyAs(pick[i].ai.file, join(dest, nIA)); MAP[nIA] = pick[i].path; nDev++; } catch (e) { err++; }
     }
-    if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
+    if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { try { var op = pick[i].path, np = await N.copy(op, dest, move); if (move) { pick[i].path = np; Object.keys(MAP).forEach(function (k) { if (MAP[k] === op) MAP[k] = np; }); } } catch (e) { err++; } }
     step();
   }
   await Promise.all(Array.from({length: K}, async function () { while (nextI < pick.length) await one(nextI++); }));
+  // le dossier d'export est marque (il n'est pas relu comme des photos a trier) et garde le lien photo corrigee -> original
+  try { if (!(await N.exists(join(dest, ".regardpur-export")))) await N.writeText(join(dest, ".regardpur-export"), "Dossier cree par Regard Pur");
+    var old = {}; try { old = JSON.parse(await N.readText(join(dest, ".regardpur-originaux.json")) || "{}"); } catch (e) {}
+    if (Object.keys(MAP).length) await N.writeText(join(dest, ".regardpur-originaux.json"), JSON.stringify(Object.assign(old, MAP))); } catch (e) {}
   for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }
   S.analysing = false; prog(); saveSoon();
-  dialog("<h3>✔ Export terminé</h3><p>" + pick.length + " photo(s) " + (style ? "retouchée(s) avec le rendu JM LAB PRO" + (withOrig ? (move ? " (originaux déplacés)" : " (originaux copiés)") : "") : (move ? "déplacée(s)" : "copiée(s)")) + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +
+  dialog("<h3>✔ Export terminé</h3><p>" + (nDev ? nDev + " photo(s) retouchée(s)" + (withOrig ? (move ? " (originaux déplacés)" : " (originaux joints)") : "") + (pick.length > nDev ? " et " + (pick.length - nDev) + " " + (move ? "déplacée(s)" : "copiée(s)") + " telles quelles" : "") : pick.length + " photo(s) " + (move ? "déplacée(s)" : "copiée(s)")) + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +
     (xmp ? "<p class='small'>Dans Lightroom : sélectionnez les photos puis « Métadonnées › Lire les métadonnées à partir des fichiers ». Les JPEG gardent leurs notes dans Lightroom uniquement s'ils sont importés après l'export.</p>" : "") +
-    "<div class='row'><button data-c='open'>📂 Ouvrir le dossier</button><button class='pri' data-c='ok'>OK</button></div>",
-    function (c) { if (c === "open") N.openPath(dest); });
+    "<div class='row'><button data-c='open'>📂 Ouvrir le dossier</button>" + (nDev ? "<button data-c='cmpo'>Comparer avec les originaux</button>" : "") + "<button class='pri' data-c='ok'>OK</button></div>",
+    function (c) { if (c === "open") N.openPath(dest); if (c === "cmpo") cmpOrig(dest); });
 }
+
+/* ---------------- comparer les photos corrigees (dossier d'export) avec leurs originaux (dossier source) ---------------- */
+var CO = {pairs: [], i: 0, urls: []};
+async function cmpOrig(dir) {
+  if (!N) return;
+  if (!dir) { var sub = (($("eD") && $("eD").value) || "Retenues").replace(/[\\\/:*?"<>|]/g, "_"); dir = S.dir ? join(S.dir, sub) : null; if (!dir || !(await N.exists(dir))) dir = await N.pickDir(); }
+  if (!dir) return;
+  toast("Recherche des originaux…");
+  var files = (await N.list(dir)).filter(function (f) { return /\.jpe?g$/i.test(f.name) && f.path.indexOf(dir) === 0 && !/[\\\/]/.test(f.rel); });
+  var map = {}; try { map = JSON.parse(await N.readText(join(dir, ".regardpur-originaux.json")) || "{}"); } catch (e) {}
+  // originaux connus : photos du dossier ouvert, sinon fichiers du dossier parent
+  var byBase = {}, add = function (path, name, p) { var b = name.replace(/\.[^.]+$/, "").toLowerCase(); if (!byBase[b] || /\.(jpe?g)$/i.test(name)) byBase[b] = {path: path, p: p || null}; };
+  S.photos.forEach(function (p) { add(p.path, p.name, p); });
+  if (!S.photos.length) { var parent = dir.replace(/[\\\/][^\\\/]+[\\\/]?$/, ""); (await N.list(parent)).forEach(function (f) { if (f.path.indexOf(dir) !== 0) add(f.path, f.name); }); }
+  var byPath = {}; S.photos.forEach(function (p) { byPath[p.path] = p; });
+  var pairs = [];
+  files.forEach(function (f) {
+    var o = null;
+    if (map[f.name]) o = {path: map[f.name], p: byPath[map[f.name]] || null};
+    else { var b = f.name.replace(/\.[^.]+$/, "").replace(/_(JMD_LAB_PRO|IA)$/i, "").toLowerCase(); if (b !== f.name.replace(/\.[^.]+$/, "").toLowerCase()) o = byBase[b] || null; }
+    if (o) pairs.push({fix: f.path, name: f.name, orig: o.path, p: o.p});
+  });
+  if (!pairs.length) { dialog("<h3>Comparer avec les originaux</h3><p>Aucune photo corrigée avec son original n'a été trouvée dans <b>" + esc(dir) + "</b>.</p><p class='small'>Les photos corrigées s'appellent « nom_JMD_LAB_PRO.jpg » ou ont été exportées par Regard Pur.</p><div class='row'><button class='pri' data-c='ok'>OK</button></div>"); return; }
+  pairs.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  CO.pairs = pairs; CO.i = 0; $("coView").classList.add("show"); coShow();
+}
+async function coUrl(path, p) {
+  if (p) return fullUrl(p);
+  var raw = /\.(cr2|cr3|nef|nrw|arw|srf|sr2|raf|orf|rw2|pef|dng|srw|x3f|3fr|iiq|rwl|mrw|kdc|erf)$/i.test(path);
+  if (/\.(heic|heif|hif)$/i.test(path)) return null;
+  var b = await N.read(path, raw); if (!b) return null; var u = URL.createObjectURL(new Blob([b], {type: "image/jpeg"})); CO.urls.push(u); return u;
+}
+async function coShow() {
+  var c = CO.pairs[CO.i]; if (!c) return;
+  CO.urls.forEach(function (u) { URL.revokeObjectURL(u); }); CO.urls = [];
+  $("coName").textContent = c.name + "  —  " + (CO.i + 1) + " / " + CO.pairs.length;
+  $("coOrigName").textContent = "Original : " + c.orig.split(/[\\\/]/).pop();
+  $("coA").removeAttribute("src"); $("coB").removeAttribute("src");
+  var my = c, u1 = await coUrl(c.orig, c.p), u2 = await coUrl(c.fix, null);
+  if (CO.pairs[CO.i] !== my) return;
+  if (u1) $("coA").src = u1; else $("coOrigName").textContent += " (aperçu impossible)";
+  if (u2) $("coB").src = u2;
+}
+function coMove(d) { if (!CO.pairs.length) return; CO.i = (CO.i + d + CO.pairs.length) % CO.pairs.length; coShow(); }
+function coClose() { $("coView").classList.remove("show"); CO.urls.forEach(function (u) { URL.revokeObjectURL(u); }); CO.urls = []; }
+$("coPrev").onclick = function () { coMove(-1); }; $("coNext").onclick = function () { coMove(1); }; $("coClose").onclick = coClose;
+$("coSwap").onclick = function () { $("coView").classList.toggle("one"); $("coView").classList.remove("showA"); };
+$("coView").addEventListener("click", function (e) { if (e.target.tagName === "IMG" && $("coView").classList.contains("one")) $("coView").classList.toggle("showA"); });
+document.addEventListener("keydown", function (e) {
+  if (!$("coView").classList.contains("show")) return;
+  if (e.key === "ArrowRight") coMove(1); else if (e.key === "ArrowLeft") coMove(-1); else if (e.key === "Escape") coClose(); else if (e.key === " ") { if ($("coView").classList.contains("one")) $("coView").classList.toggle("showA"); else $("coView").classList.add("one"); } else return;
+  e.preventDefault(); e.stopPropagation();
+}, true);
 
 /* ---------------- importer depuis une carte SD (copie + renommage + copie de securite) ---------------- */
 var IMP = (function () { try { return JSON.parse(localStorage.getItem("rp_import")) || {}; } catch (e) { return {}; } })();
@@ -2164,9 +2222,9 @@ function rotate(delta) {
   var L = fixTargets(); if (!L.length) return;
   L.forEach(function (p) { p.rot = (((p.rot || 0) + delta) % 360 + 360) % 360; updCard(p); full.cache.delete(p.id); });
   saveSoon(); if ($("loupe").classList.contains("show")) rpPreview();
-  toast("↻ Rotation " + (delta < 0 ? "à gauche" : "à droite") + (L.some(function (p) { return p.raw; }) ? " (RAW : appliquée à l'export JPEG seulement)" : " — appliquée à l'export, l'original n'est pas modifié"));
+  toast("↻ Rotation " + (delta === 180 ? "180° (photo retournée)" : delta < 0 ? "à gauche" : "à droite") + (L.some(function (p) { return p.raw; }) ? " (RAW : appliquée à l'export JPEG seulement)" : " — appliquée à l'export, l'original n'est pas modifié"));
 }
-Array.prototype.forEach.call(document.querySelectorAll(".rotL,.rotR"), function (b) { b.onclick = function () { rotate(b.classList.contains("rotL") ? -90 : 90); }; });
+Array.prototype.forEach.call(document.querySelectorAll(".rotL,.rotR,.rot180"), function (b) { b.onclick = function () { rotate(b.classList.contains("rotL") ? -90 : b.classList.contains("rot180") ? 180 : 90); }; });
 function trashSel() {
   if (!N) return; var L = fixTargets(); if (!L.length) return;
   dialog("<h3>Mettre à la corbeille ?</h3><p>" + (L.length > 1 ? L.length + " photos" : L[0].name) + " iront dans la Corbeille de Windows : vous pourrez les récupérer.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='yes' class='pri'>Corbeille</button></div>", async function (c) {
@@ -2371,7 +2429,7 @@ function setTab(t) {
   }
 }
 $("tabs").addEventListener("click", function (e) { var b = e.target.closest("button[data-t]"); if (b) setTab(b.dataset.t); });
-$("exportPage").addEventListener("click", function (e) { var b = e.target.closest("[data-c=go]"); if (b) doExport(); });
+$("exportPage").addEventListener("click", function (e) { var b = e.target.closest("[data-c=go]"); if (b) doExport(); if (e.target.closest("[data-c=cmpo]")) cmpOrig(); });
 /* mode Simple / Expert */
 function setMode(expert) { document.body.classList.toggle("simple", !expert); $("cExpert").checked = expert; try { localStorage.setItem("rp_expert", expert ? "1" : "0"); } catch (e) {} }
 $("cExpert").addEventListener("change", function () { setMode(this.checked); if (rp.open) rpDraw(); });
