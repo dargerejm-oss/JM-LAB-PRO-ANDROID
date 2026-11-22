@@ -559,14 +559,19 @@ function jobRender() {
   else if (S.analysing && totalN) J = {op: S.jobOp || "Analyse des photos", det: S.jobOp === "Export" ? $("progTxt").textContent : doneN + " / " + totalN, ph: S.jobPh || $("progTxt").textContent, done: doneN / totalN, t0: S.t0};
   var b = $("jobBar"); if (!J) { b.classList.remove("show"); document.body.classList.remove("jobOn"); return; }
   b.classList.add("show"); document.body.classList.add("jobOn");
+  $("jbStop").style.display = AIJ || S.exporting ? "" : "none"; $("jbStop").disabled = !!(AI.stop || S.stopExp);
   var f = Math.max(0, Math.min(1, J.done)), el = (Date.now() - (J.t0 || Date.now())) / 1000;
   // couleur du sable : rouge au debut, orange, jaune, puis vert fonce quand c'est termine
   var hue = Math.round(f * 130), lig = Math.round(52 - Math.max(0, f - 0.6) * 40); b.style.setProperty("--sand", "hsl(" + hue + ",85%," + lig + "%)");
   $("jbPh").textContent = J.ph ? "Phase : " + J.ph : "";
   $("jbOp").textContent = J.op; $("jbDet").textContent = J.det; $("jbFill").style.width = (f * 100).toFixed(1) + "%"; $("jbPct").textContent = Math.floor(f * 100) + " %";
-  $("jbTime").textContent = "écoulé " + dureeTxt(el) + (f > 0.01 && f < 1 && el > 3 ? " · reste ≈ " + dureeTxt(el / f - el) : "");
+  $("jbTime").textContent = "écoulé " + dureeTxt(el) + (f > 0 && f < 1 && el > 20 ? " · reste ≈ " + dureeTxt(el / f - el) : "");
 }
 setInterval(function () { if (AIJ || OJ || S.analysing) jobRender(); }, 1000);
+$("jbStop").onclick = function () {
+  if (AIJ && confirm("Arrêter l'IA ?\nLes photos déjà traitées gardent leur correction ; les autres gardent seulement les corrections rapides.")) { AI.stop = true; $("jbPh").textContent = "Arrêt après la photo en cours…"; jobRender(); }
+  else if (!AIJ && S.exporting && confirm("Arrêter l'export ?\nLes photos déjà exportées restent dans le dossier.")) { S.stopExp = true; jobRender(); }
+};
 function prog() {
   var e = $("prog"); if (!S.analysing) { e.style.display = "none"; S.jobOp = null; S.jobPh = null; jobRender(); return; }
   e.style.display = "block"; $("progBar").style.width = (doneN / Math.max(1, totalN) * 100) + "%"; jobRender();
@@ -1370,7 +1375,9 @@ async function fixRun(list) {
     var nk = todo.reduce(function (t, x) { return t + x[1].length; }, 0), mn = Math.round(nk * 8 / 60);
     if (todo.length > 15 && mn >= 3 && !confirm("L'IA doit réparer " + todo.length + " photos : environ " + (mn >= 120 ? Math.round(mn / 60) + " heures" : mn + " minutes") + ".\n\nOK = lancer l'IA maintenant\nAnnuler = garder seulement les corrections rapides (déjà faites)")) todo = [];
     AI.busy = true; aiShow(); AIJ = {t0: Date.now(), i: 1, n: todo.length, f: 0, op: "Corriger les problèmes (IA)", op0: "Corriger les problèmes (IA)", det: ""}; jobRender();
+    AI.stop = false;
     for (var i = 0; i < todo.length; i++) {
+      if (AI.stop) { gains.unshift("IA arrêtée après " + i + " photo(s) sur " + todo.length); break; }
       if (i > 0 && S.byId[S.view[S.cur]] === todo[i - 1][0]) { devShow(todo[i - 1][0]); aiShow(todo[i - 1][0]); rpPreview(); }
       var p = todo[i][0], ks = todo[i][1], before = p.a;
       if (p.ai) { p.ai = null; full.cache.delete(p.id); } // on repart de l'original
@@ -1582,7 +1589,7 @@ async function aiOne(p, kind, nb, of, chain) {
   var bm = await createImageBitmap(blob, {imageOrientation: "from-image"}), W = bm.width, H = bm.height, MP = W * H;
   var same = kind === "naf" || kind === "scu", model = same ? kind : $("aiSoft").value, d, tw, th;
   if (same) { d = Math.min(1, Math.sqrt((kind === "scu" ? 6e6 : 8e6) / MP)); }
-  else if (kind === "esr") { d = Math.max(0.25, Math.min(1, Math.sqrt(3e6 / MP))); }
+  else if (kind === "esr") { d = Math.max(0.2, Math.min(1, Math.sqrt(1.5e6 / MP))); } // x4 : 1,5 Mpx d'entree donnent deja ~24 Mpx
   else { var t = Math.min(2, Math.sqrt(60e6 / MP)); d = Math.max(t / 4, Math.min(1, Math.sqrt(3e6 / MP))); }
   var iw = Math.max(16, Math.round(W * d)), ih = Math.max(16, Math.round(H * d));
   if (same) { tw = iw; th = ih; } else if (kind === "esr") { tw = W; th = H; } else { tw = Math.round(W * Math.min(2, Math.sqrt(60e6 / MP))); th = Math.round(H * tw / W); }
@@ -1665,7 +1672,8 @@ async function aiFace(p, nb, of, chain) {
 async function aiRun(kind) {
   if (AI.busy || !N) return; var list = fixTargets(); if (!list.length) return;
   AI.busy = true; aiShow(); var ok = 0, t0 = Date.now(), errs = []; AIJ = {t0: t0, i: 1, n: list.length, f: 0, op: "Amélioration IA", op0: "Amélioration IA", det: ""}; jobRender();
-  for (var i = 0; i < list.length; i++) { try { await aiOne(list[i], kind, i + 1, list.length); ok++; updCard(list[i]); } catch (e) { errs.push(e.message || String(e)); } }
+  AI.stop = false;
+  for (var i = 0; i < list.length; i++) { if (AI.stop) break; try { await aiOne(list[i], kind, i + 1, list.length); ok++; updCard(list[i]); } catch (e) { errs.push(e.message || String(e)); } }
   AI.busy = false; AIJ = null; jobRender(); saveSoon();
   var p = S.byId[S.view[S.cur]]; aiShow(p); if (p) rpPreview();
   var VB = {naf: ["défloutée", "défloutées"], esr: ["restaurée", "restaurées"], x2: ["agrandie ×2", "agrandies ×2"], scu: ["débruitée", "débruitées"], face: ["aux visages réparés", "aux visages réparés"]}[kind];
@@ -2076,7 +2084,9 @@ async function doExport() {
     if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { if (!st2) S.jobPh = (move ? "déplacement" : "copie") + " des photos · " + pick[i].name; try { var op = pick[i].path, np = await N.copy(op, dest, move); if (move) { pick[i].path = np; Object.keys(MAP).forEach(function (k) { if (MAP[k] === op) MAP[k] = np; }); } } catch (e) { err++; } }
     step();
   }
-  await Promise.all(Array.from({length: K}, async function () { while (nextI < pick.length) await one(nextI++); }));
+  S.exporting = true; S.stopExp = false;
+  await Promise.all(Array.from({length: K}, async function () { while (nextI < pick.length && !S.stopExp) await one(nextI++); }));
+  S.exporting = false;
   // le dossier d'export est marque (il n'est pas relu comme des photos a trier) et garde le lien photo corrigee -> original
   try { if (!(await N.exists(join(dest, ".regardpur-export")))) await N.writeText(join(dest, ".regardpur-export"), "Dossier cree par Regard Pur");
     var old = {}; try { old = JSON.parse(await N.readText(join(dest, ".regardpur-originaux.json")) || "{}"); } catch (e) {}
