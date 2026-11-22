@@ -55,6 +55,7 @@ async function run(m, rgba, w, h, tw, th, prog) {
   for (let i = 0; i < tw * th; i++) { const c = cnt[i] || 1; res[i * 4] = Math.max(0, Math.min(255, Math.round(acc[i * 3] / c * 255))); res[i * 4 + 1] = Math.max(0, Math.min(255, Math.round(acc[i * 3 + 1] / c * 255))); res[i * 4 + 2] = Math.max(0, Math.min(255, Math.round(acc[i * 3 + 2] / c * 255))); res[i * 4 + 3] = 255; }
   return res;
 }
+async function warm(list) { for (const m of list || []) { if (FILES[m] && fs.existsSync(path.join(DIR, FILES[m]))) { try { await session(m); } catch (e) {} } } }
 function setDir(d) { DIR = d; }
 function dir() { return DIR; }
-module.exports = {init, available, run, setDir, dir};
+module.exports = {init, available, run, setDir, dir, warm};

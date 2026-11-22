@@ -170,6 +170,7 @@ function aiChild() {
   aiProc.on('exit', (c) => { aiProc = null; Object.keys(aiWait).forEach(k => { aiWait[k].rej(new Error("le calcul IA s'est arrêté (mémoire insuffisante ?)")); delete aiWait[k]; }); });
   return aiProc;
 }
+ipcMain.handle('aiWarm', (e, list) => { try { aiChild().send({warm: list}); } catch (x) {} return true; });
 ipcMain.handle('aiRun', (e, m, rgba, w, h, tw, th) => new Promise((res, rej) => {
   let last = 0; const id = ++aiSeq;
   aiWait[id] = {res, rej, prog: (f, ep) => { const t = Date.now(); if (t - last > 300 || f >= 1) { last = t; e.sender.send('aiProg', f, ep); } }};

@@ -627,7 +627,7 @@ async function develop(m) {
   return out;
 }
 
-var queue = Promise.resolve();
+var queue = Promise.resolve(), PCACHE = null;
 self.onmessage = function (e) {
   var m = e.data;
   if (m.develop) {
@@ -637,8 +637,15 @@ self.onmessage = function (e) {
   if (m.preview) { // apercu de la retouche portrait
     queue = queue.then(async function () {
       needPortrait();
-      var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
-      var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)), cv = canvas(bm.width * k2, bm.height * k2); cv.getContext("2d").drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
+      // la photo decodee (a la taille de l'apercu) est gardee : bouger un curseur ne relit plus le fichier
+      var ck = (m.src || "") + "|" + (m.max || 2400), cv;
+      if (m.src && PCACHE && PCACHE.key === ck) { cv = canvas(PCACHE.c.width, PCACHE.c.height); cv.getContext("2d").drawImage(PCACHE.c, 0, 0); }
+      else {
+        if (!m.buf) throw new Error("source");
+        var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+        var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)); cv = canvas(bm.width * k2, bm.height * k2); var cx2 = cv.getContext("2d"); cx2.imageSmoothingQuality = "high"; cx2.drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
+        if (m.src) { var keep = canvas(cv.width, cv.height); keep.getContext("2d").drawImage(cv, 0, 0); PCACHE = {key: ck, c: keep}; }
+      }
       if (m.heals && m.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(cv, m.heals); }
       DBI = null; if (m.style) renderStyle(cv, m.style);
       var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;

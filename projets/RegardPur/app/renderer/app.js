@@ -463,7 +463,8 @@ var pool = [], queue = [], runId = 0, doneN = 0, totalN = 0;
 function stopAnalysis() { runId++; queue = []; pool.forEach(function (w) { w.inflight = 0; }); }
 function ensurePool() {
   if (pool.length) return;
-  var n = clamp((navigator.hardwareConcurrency || 4) - 1, 1, 4);
+  // un assistant par coeur (moins un), jusqu'a 6 si le PC a assez de memoire (chaque assistant garde ses modeles)
+  var n = clamp((navigator.hardwareConcurrency || 4) - 1, 1, (navigator.deviceMemory || 8) >= 8 ? 6 : 3);
   for (var i = 0; i < n; i++) {
     var w = new Worker("analyse.js"); w.inflight = 0; w.jobs = {};
     w.onmessage = onResult.bind(null, w); pool.push(w);
@@ -1394,33 +1395,61 @@ function rpDraw() {
     "<div class='apply'><button data-a='none'>Retirer la retouche</button><button data-a='hold' title='Maintenez pour voir l avant'>👁 Avant (maintenir)</button></div>" +
     "<div class='note'>" + (p.ret ? "✔ Cette photo est retouchée (appliqué à l'export)." : "Aperçu seulement : touchez « Appliquer à » pour garder la retouche.") + "</div>";
 }
+/* apercu rapide : un assistant de calcul reserve (n'attend jamais l'analyse), la photo decodee gardee en memoire,
+   calcul a la taille de l'ecran (pleine resolution seulement au zoom), et seule la derniere position d'un curseur est calculee */
+var PV = {w: null, src: null, busy: false, next: null};
+function prevWorker() { if (!PV.w) { PV.w = new Worker("analyse.js"); PV.w.inflight = 0; PV.w.jobs = {}; PV.w.onmessage = onResult.bind(null, PV.w); } return PV.w; }
+function prevSize() { var v = $("lpView"), r = window.devicePixelRatio || 1; return full.zoom ? 4000 : Math.min(2400, Math.max(1000, Math.round(Math.max(v.clientWidth, v.clientHeight) * r))); }
+function prevSend(job) {
+  if (PV.busy) { PV.next = job; return; }
+  PV.busy = true;
+  var go = function (b) {
+    var w = prevWorker(), msg = {id: job.key, src: job.src, heic: job.heic, preview: true, max: job.max, ret: job.eff, heals: job.heals, style: job.dst};
+    prevWait[job.key] = function (r) { PV.busy = false; if (!r.prev && /source/.test(r.err || "")) PV.src = null; job.done(r); if (PV.next) { var n = PV.next; PV.next = null; prevSend(n); } };
+    if (b) { var c = b.buffer.byteLength === b.byteLength ? b : b.slice(); msg.buf = c; w.postMessage(msg, [c.buffer]); } else w.postMessage(msg);
+  };
+  var sk = job.src + "|" + job.max;
+  if (PV.src === sk) go(null);
+  else readBytes(job.p).then(function (b) { if (!b) { PV.busy = false; return; } PV.src = sk; go(b); });
+}
 function rpPreview() {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
   var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
-  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm && !dst.tilt && !dst.rot) dst = null; }
+  if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm && !dst.tilt && !dst.rot && !dst.crop) dst = null; }
   clearTimeout(rp.t);
   rp.t = setTimeout(function () {
     if (!eff && !heals.length && !dst) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
     var busy = $("rpBusy"); if (busy) busy.textContent = "⏳ Calcul de l'aperçu…";
     var my = ++rp.busy;
-    readBytes(p).then(function (b) {
-      if (!b) return; ensurePool(); var w = pool[0], key = "prev:" + id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
-      prevWait[key] = function (r) {
-        if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
-        if (busy) busy.textContent = r.prev ? (r.faces || !eff || !rp.open ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
-        var hb = $("healMsg"); if (hb) hb.textContent = "";
-        var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
-        if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"); img.onload = function () { if (!full.zoom) fit(); drawLoupeMarks(p); adjShow(p); }; img.src = rp.url; }
-      };
-      w.postMessage({id: key, buf: c, heic: heicOf(p), preview: true, max: 2400, ret: eff, heals: heals, style: dst}, [c.buffer]);
-    });
-  }, 300);
+    prevSend({p: p, key: "prev:" + id + ":" + my, src: id + "|" + (p.ai ? p.ai.file : "") + "|" + (p.rawDev || ""), heic: heicOf(p), max: prevSize(), eff: eff, heals: heals, dst: dst, done: function (r) {
+      if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
+      if (busy) busy.textContent = r.prev ? (r.faces || !eff || !rp.open ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
+      var hb = $("healMsg"); if (hb) hb.textContent = "";
+      var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
+      if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"), oldW = img.naturalWidth;
+        img.onload = function () {
+          if (!full.zoom) fit();
+          else if (oldW && img.naturalWidth !== oldW) { var k = img.naturalWidth / oldW, v = $("lpView"), cx = v.clientWidth / 2, cy = v.clientHeight / 2; full.tx = cx - (cx - full.tx) * k; full.ty = cy - (cy - full.ty) * k; apply(); }
+          drawLoupeMarks(p); adjShow(p); };
+        img.src = rp.url; }
+    }});
+  }, 120);
 }
 var prevWait = {};
 /* ---------------- AMELIORATION IA (NAFNet, Real-ESRGAN) : calcul sur le PC, resultat enregistre a part ---------------- */
 var AI = {ok: false, busy: false, has: {}};
 var AIK = {naf: "Déflouée par IA", esr: "Restaurée par IA", x2: "Agrandie ×2 par IA", scu: "Débruitée par IA", face: "Visages réparés par IA"};
+/* prechargement : en Retoucher, le modele d'IA dont la photo aura sans doute besoin est charge a l'avance (rien n'est calcule) */
+var AIWARM = {};
+function aiWarm(p) {
+  if (!AI.ok || !N || !N.aiWarm || !p || !p.a || S.tab !== "retoucher") return;
+  clearTimeout(aiWarm.t); aiWarm.t = setTimeout(function () {
+    var m = aiNeeds(p).map(function (k) { return k === "face" ? "gfp" : k; }).filter(function (k) { return !AIWARM[k]; });
+    if (!m.length) return; m.forEach(function (k) { AIWARM[k] = 1; }); N.aiWarm(m);
+  }, 1500);
+}
 function aiShow(p) {
+  aiWarm(p);
   if (!AI.ok) return; $("aiBox").style.display = ""; $("fixOpts").style.display = "";
   [["aiNaf", "naf"], ["aiEsr", "esr"], ["aiX2", "esr"], ["aiScu", "scu"], ["aiGfp", "gfp"]].forEach(function (k) { $(k[0]).disabled = AI.busy; $(k[0]).style.display = AI.has[k[1]] ? "" : "none"; });
   if (!AI.busy) $("aiState").textContent = p && p.ai ? "✓ " + aiLabel(p.ai) + (p.ai.gain ? " — " + p.ai.gain : "") + " (vos réglages s'appliquent par-dessus)." : "";
@@ -1711,6 +1740,8 @@ function zoomAt(cx, cy) {
   if (full.zoom) { full.zoom = false; fit(); drawLoupeMarks(S.byId[S.view[S.cur]]); return; }
   var px = (cx - full.tx) / full.sc, py = (cy - full.ty) / full.sc, v = $("lpView");
   full.zoom = true; full.sc = 1 / (window.devicePixelRatio || 1); full.tx = v.clientWidth / 2 - px * full.sc; full.ty = v.clientHeight / 2 - py * full.sc; apply(); drawLoupeMarks(S.byId[S.view[S.cur]]);
+  // version corrigee affichee : on la recalcule en pleine resolution pour un vrai 100 %
+  var q = S.byId[S.view[S.cur]]; if (q && (devStyle(q) || q.ret || q.heals) && S.tab === "retoucher") rpPreview();
 }
 $("lpZoom").onclick = function () {
   var p = S.byId[S.view[S.cur]], img = $("lpImg"), v = $("lpView");
@@ -1886,7 +1917,7 @@ var devWait = {};
 function developOne(p, style) {
   return readBytes(p).then(function (b) {
     if (!b) throw new Error("aperçu introuvable");
-    ensurePool(); var w = pool[0], key = "dev:" + p.id + ":" + Date.now(), c = b.buffer.byteLength === b.byteLength ? b : b.slice();
+    ensurePool(); var w = pool[(developOne.rr = ((developOne.rr || 0) + 1)) % pool.length], key = "dev:" + p.id + ":" + Date.now() + Math.random(), c = b.buffer.byteLength === b.byteLength ? b : b.slice();
     return new Promise(function (res, rej) { devWait[key] = function (r) { if (r.dev) res(r.dev); else rej(new Error(r.err || "échec")); }; w.postMessage({id: key, buf: c, heic: heicOf(p), develop: true, style: style}, [c.buffer]); });
   });
 }
@@ -1932,12 +1963,14 @@ async function doExport() {
     step();
   }
   var dest = join(S.dir, sub);
-  for (i = 0; i < pick.length; i++) {
+  // plusieurs photos developpees en meme temps (une par assistant de calcul, 3 au plus)
+  ensurePool(); var nextI = 0, K = Math.max(1, Math.min(3, pool.length));
+  async function one(i) {
     var st2 = style ? styleFor(pick[i], style) : devStyle(pick[i]);
     if (st2 && pick[i].raw && !pick[i].rawDev) { $("progTxt").textContent = "Développement RAW " + (i + 1) + " / " + pick.length; await rawEnsure(pick[i]); }
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
-      $("progTxt").textContent = "Retouche " + (i + 1) + " / " + pick.length;
+      $("progTxt").textContent = "Retouche " + (k + 1) + " / " + pick.length;
       var nm = st2.rotOnly ? pick[i].name.replace(/\.[^.]+$/, "") : REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
       try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); } catch (e) { err++; }
     } else if (pick[i].ai) { // seulement l'amelioration IA : on livre la version amelioree a cote de l'original
@@ -1946,6 +1979,7 @@ async function doExport() {
     if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { try { var np = await N.copy(pick[i].path, dest, move); if (move) pick[i].path = np; } catch (e) { err++; } }
     step();
   }
+  await Promise.all(Array.from({length: K}, async function () { while (nextI < pick.length) await one(nextI++); }));
   for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }
   S.analysing = false; prog(); saveSoon();
   dialog("<h3>✔ Export terminé</h3><p>" + pick.length + " photo(s) " + (style ? "retouchée(s) avec le rendu JM LAB PRO" + (withOrig ? (move ? " (originaux déplacés)" : " (originaux copiés)") : "") : (move ? "déplacée(s)" : "copiée(s)")) + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +

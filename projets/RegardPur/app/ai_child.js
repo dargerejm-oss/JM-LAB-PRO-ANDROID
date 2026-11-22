@@ -3,6 +3,7 @@
 const AI = require('./ai');
 process.on('message', async (q) => {
   if (q.init) { AI.setDir(q.dir); return; }
+  if (q.warm) { AI.warm(q.warm); return; } // prechargement du modele (aucun calcul)
   try {
     const r = await AI.run(q.m, q.rgba, q.w, q.h, q.tw, q.th, (f, ep) => process.send({id: q.id, prog: f, ep}));
     process.send({id: q.id, res: r});
