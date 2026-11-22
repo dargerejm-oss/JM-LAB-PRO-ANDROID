@@ -330,3 +330,34 @@ body:not(.tab-retoucher) .rtOnly{display:none}
 #coView.one.showA figure:first-child{display:flex}
 #coView.one.showA figure:last-child{display:none}
 .rotRow{display:flex;align-items:center;gap:5px;margin:0 0 6px}.rotRow span{flex:1;font-size:12px;color:var(--mut)}.rotRow button{padding:4px 8px}
+/* barre de travail (bas de l'ecran) et sablier 3D dont le sable va du rouge (debut) au vert fonce (fin) */
+#jobBar{position:fixed;left:0;right:0;bottom:0;height:58px;z-index:45;display:none;align-items:center;gap:14px;padding:0 16px;background:linear-gradient(180deg,#1b1f26,#101318);border-top:1px solid var(--line);box-shadow:0 -6px 18px #0008;--sand:hsl(0,85%,50%)}
+#jobBar.show{display:flex}
+body.jobOn #main{height:calc(100% - 58px - 58px)}
+body.jobOn .ovl{bottom:58px}
+body.jobOn #toast{bottom:74px}
+#jobBar .jbMain{flex:1;min-width:0}
+#jobBar .jbTxt{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:6px}
+#jobBar .jbTxt span{color:var(--mut)}
+#jobBar .jbTrack{height:10px;border-radius:5px;background:#0006;box-shadow:inset 0 1px 3px #000;overflow:hidden}
+#jbFill{height:100%;width:0;border-radius:5px;background:linear-gradient(180deg,color-mix(in srgb,var(--sand) 70%,#fff),var(--sand));transition:width .4s,background .6s}
+#jobBar .jbNums{display:flex;flex-direction:column;align-items:flex-end;font-size:12px;color:var(--mut);min-width:170px}
+#jobBar .jbNums b{font-size:18px;color:var(--sand);transition:color .6s}
+.hg3{width:34px;height:46px;perspective:160px;flex:none}
+.hgIn{position:relative;width:100%;height:100%;transform-style:preserve-3d;animation:hgSpin 3.2s ease-in-out infinite}
+@keyframes hgSpin{0%{transform:rotateY(-25deg) rotateZ(0)}40%{transform:rotateY(25deg) rotateZ(0)}50%{transform:rotateY(0) rotateZ(180deg)}90%{transform:rotateY(-25deg) rotateZ(180deg)}100%{transform:rotateY(-25deg) rotateZ(360deg)}}
+.hgIn::before,.hgIn::after{content:"";position:absolute;left:0;right:0;height:5px;border-radius:2px;background:linear-gradient(180deg,#c9a46a,#7a5626);box-shadow:0 1px 2px #000}
+.hgIn::before{top:0}.hgIn::after{bottom:0}
+.hgTop,.hgBot{position:absolute;left:4px;right:4px;height:18px;overflow:hidden;background:linear-gradient(90deg,#ffffff22,#ffffff08 40%,#ffffff30 70%,#ffffff10)}
+.hgTop{top:5px;clip-path:polygon(0 0,100% 0,56% 100%,44% 100%)}
+.hgBot{bottom:5px;clip-path:polygon(44% 0,56% 0,100% 100%,0 100%)}
+.hgTop i,.hgBot i{position:absolute;left:0;right:0;background:var(--sand);transition:background .6s;box-shadow:inset 0 0 4px #0006}
+.hgTop i{bottom:0;height:100%;animation:hgDown 1.6s linear infinite}
+.hgBot i{bottom:0;height:0;animation:hgUp 1.6s linear infinite}
+@keyframes hgDown{0%{height:85%}100%{height:5%}}
+@keyframes hgUp{0%{height:5%}100%{height:80%}}
+.hgFlow{position:absolute;left:50%;top:22px;width:2px;height:16px;margin-left:-1px;background:var(--sand);opacity:.9;animation:hgFlow .4s linear infinite}
+@keyframes hgFlow{0%{opacity:.5}50%{opacity:1}100%{opacity:.5}}
+#jobBar .jbTrack{position:relative;height:20px;border-radius:10px}
+#jbFill{border-radius:10px}
+#jbPh{position:absolute;inset:0;font-size:11.5px;line-height:20px;padding:0 10px;color:#fff;text-shadow:0 1px 2px #000,0 0 4px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

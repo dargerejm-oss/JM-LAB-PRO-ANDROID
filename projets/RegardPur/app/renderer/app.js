@@ -374,8 +374,9 @@ async function sigScan() {
   var tmpl = {img: im, w: im.naturalWidth, h: im.naturalHeight}, L = S.photos.filter(function (p) { return p.thumbUrl; }), t0 = Date.now();
   for (var i = 0; i < L.length; i++) {
     try { L[i].sig = await sigScore(L[i], tmpl); } catch (e) {}
-    if (i % 10 === 0) { $("sigInfo").textContent = "⏳ " + (i + 1) + " / " + L.length; await new Promise(function (r) { setTimeout(r, 0); }); }
+    if (i % 10 === 0) { $("sigInfo").textContent = "⏳ " + (i + 1) + " / " + L.length; ojStep("Recherche de votre signature", "comparaison avec le modèle de signature", i + 1, L.length, (i + 1) + " / " + L.length + " · " + L[i].name); await new Promise(function (r) { setTimeout(r, 0); }); }
   }
+  ojEnd();
   var n = L.filter(function (p) { return p.sig >= 0.6; }).length;
   $("sigInfo").textContent = "Signature trouvée sur " + n + " / " + L.length + " (" + Math.round((Date.now() - t0) / 1000) + " s)";
   rescore(); refresh(false); drawFilters(); saveSoon();
@@ -492,7 +493,7 @@ function analyse(list) {
   // d'abord les photos visibles, dans l'ordre de la grille
   var order = {}; S.view.forEach(function (id, i) { order[id] = i; });
   queue = list.slice().sort(function (a, b) { return (order[a.id] == null ? 1e9 : order[a.id]) - (order[b.id] == null ? 1e9 : order[b.id]); });
-  doneN = 0; totalN = queue.length; S.analysing = true; S.t0 = Date.now(); prog(); pump();
+  doneN = 0; totalN = queue.length; S.analysing = true; S.t0 = Date.now(); S.jobOp = "Analyse des photos (tri, netteté, visages)"; S.jobPh = "lecture, netteté, exposition, visages et yeux, note artistique"; prog(); pump();
 }
 /* pendant qu'on retouche, l'analyse en arriere-plan laisse la place a l'apercu (moitie des assistants, un travail chacun) */
 function retouching() { S.busyUntil = Date.now() + 3000; clearTimeout(S.busyT); if (S.analysing) S.busyT = setTimeout(pump, 3100); }
@@ -545,9 +546,30 @@ function done(p, r) {
   if (doneN >= totalN) { S.analysing = false; prog(); rescore(); refresh(); saveSoon(); toast("Analyse terminée : " + totalN + " photos. Touchez <b>✨ Tri automatique</b> ou triez vous-même (P / X)."); }
   else if (doneN % 25 === 0) { rescore(); refresh(); saveSoon(); }
 }
+/* barre de travail en bas de l'ecran : operation en cours, sablier, progression, pourcentage, temps passe et temps restant */
+var AIJ = null, OJ = null;
+/* autres operations longues : meme barre (sablier, phase, %, temps) */
+function ojStep(op, ph, i, n, det) { if (!OJ || OJ.op !== op) OJ = {op: op, t0: Date.now()}; OJ.ph = ph; OJ.i = i; OJ.n = n; OJ.det = det || ""; jobRender(); }
+function ojEnd() { OJ = null; jobRender(); }
+function dureeTxt(sec) { sec = Math.max(0, Math.round(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s2 = sec % 60; return h ? h + " h " + (m < 10 ? "0" : "") + m : m ? m + " min " + (s2 < 10 ? "0" : "") + s2 : s2 + " s"; }
+function jobRender() {
+  var J = null;
+  var X = AIJ || OJ;
+  if (X) J = {op: X.op || "IA", det: X.det || "", ph: X.ph || "", done: (X.i - 1 + (X.f || 0)) / Math.max(1, X.n), t0: X.t0};
+  else if (S.analysing && totalN) J = {op: S.jobOp || "Analyse des photos", det: S.jobOp === "Export" ? $("progTxt").textContent : doneN + " / " + totalN, ph: S.jobPh || $("progTxt").textContent, done: doneN / totalN, t0: S.t0};
+  var b = $("jobBar"); if (!J) { b.classList.remove("show"); document.body.classList.remove("jobOn"); return; }
+  b.classList.add("show"); document.body.classList.add("jobOn");
+  var f = Math.max(0, Math.min(1, J.done)), el = (Date.now() - (J.t0 || Date.now())) / 1000;
+  // couleur du sable : rouge au debut, orange, jaune, puis vert fonce quand c'est termine
+  var hue = Math.round(f * 130), lig = Math.round(52 - Math.max(0, f - 0.6) * 40); b.style.setProperty("--sand", "hsl(" + hue + ",85%," + lig + "%)");
+  $("jbPh").textContent = J.ph ? "Phase : " + J.ph : "";
+  $("jbOp").textContent = J.op; $("jbDet").textContent = J.det; $("jbFill").style.width = (f * 100).toFixed(1) + "%"; $("jbPct").textContent = Math.floor(f * 100) + " %";
+  $("jbTime").textContent = "écoulé " + dureeTxt(el) + (f > 0.01 && f < 1 && el > 3 ? " · reste ≈ " + dureeTxt(el / f - el) : "");
+}
+setInterval(function () { if (AIJ || OJ || S.analysing) jobRender(); }, 1000);
 function prog() {
-  var e = $("prog"); if (!S.analysing) { e.style.display = "none"; return; }
-  e.style.display = "block"; $("progBar").style.width = (doneN / Math.max(1, totalN) * 100) + "%";
+  var e = $("prog"); if (!S.analysing) { e.style.display = "none"; S.jobOp = null; S.jobPh = null; jobRender(); return; }
+  e.style.display = "block"; $("progBar").style.width = (doneN / Math.max(1, totalN) * 100) + "%"; jobRender();
   var eta = "";
   if (S.t0 && doneN >= 3 && doneN < totalN) { var sec = Math.round((Date.now() - S.t0) / doneN * (totalN - doneN) / 1000); eta = " · reste " + (sec >= 60 ? Math.round(sec / 60) + " min" : sec + " s"); }
   $("progTxt").textContent = "Analyse " + doneN + " / " + totalN + eta;
@@ -1343,16 +1365,17 @@ async function fixRun(list) {
     // beaucoup de photos a reparer par l'IA : on previent du temps avant de lancer (environ 8 s par reparation)
     var nk = todo.reduce(function (t, x) { return t + x[1].length; }, 0), mn = Math.round(nk * 8 / 60);
     if (todo.length > 15 && mn >= 3 && !confirm("L'IA doit réparer " + todo.length + " photos : environ " + (mn >= 120 ? Math.round(mn / 60) + " heures" : mn + " minutes") + ".\n\nOK = lancer l'IA maintenant\nAnnuler = garder seulement les corrections rapides (déjà faites)")) todo = [];
-    AI.busy = true; aiShow();
+    AI.busy = true; aiShow(); AIJ = {t0: Date.now(), i: 1, n: todo.length, f: 0, op: "Corriger les problèmes (IA)", op0: "Corriger les problèmes (IA)", det: ""}; jobRender();
     for (var i = 0; i < todo.length; i++) {
       var p = todo[i][0], ks = todo[i][1], before = p.a;
       if (p.ai) { p.ai = null; full.cache.delete(p.id); } // on repart de l'original
       for (var j = 0; j < ks.length; j++) {
         var k = ks[j], q0 = qualOf(before, k), save = p.ai;
         try {
+          if (AIJ) { AIJ.j = j; AIJ.m = ks.length; }
           await aiOne(p, k, i + 1, todo.length, true);
           if (k !== "face") {
-            $("aiState").textContent = "⏳ Vérification du résultat…";
+            $("aiState").textContent = "⏳ Vérification du résultat…"; if (AIJ) { AIJ.ph = "vérification du résultat (l'IA est annulée si la photo n'est pas meilleure)"; AIJ.det = "photo " + (i + 1) + " / " + todo.length + " · " + p.name; jobRender(); }
             var m = await measure(p), q1 = qualOf(m, k);
             window.__rpLastMeas = {k: k, q0: q0, q1: q1};
             // debruitage : seul le bruit compte (le bruit gonfle la nettete mesuree) ; autres : la nettete doit monter
@@ -1371,7 +1394,7 @@ async function fixRun(list) {
       if (p.ai && p.ai.gain) gains.push(p.name + " : " + p.ai.gain);
       updCard(p); n += p.dev && !list.indexOf ? 0 : 0;
     }
-    AI.busy = false;
+    AI.busy = false; AIJ = null; jobRender();
   }
   saveSoon();
   var nn = list.filter(function (p) { return p.dev && p.dev.fix && p.dev.fix.length; }).length;
@@ -1562,6 +1585,7 @@ async function aiOne(p, kind, nb, of, chain) {
   var src = xi.getImageData(0, 0, iw, ih), t0 = Date.now();
   N.onAiProg(function (f, ep) {
     var el = (Date.now() - t0) / 1000, rest = f > 0.02 ? Math.round(el / f - el) : null;
+    if (AIJ) { AIJ.ph = AIK[kind].replace(" par IA", "").toLowerCase() + " par IA (" + ep + ")"; AIJ.op = AIJ.op0 || "IA"; AIJ.det = "photo " + nb + " / " + of + " · " + p.name + " · " + Math.round(f * 100) + " % de cette photo"; AIJ.i = nb; AIJ.n = of; AIJ.f = ((AIJ.j || 0) + f) / (AIJ.m || 1); jobRender(); }
     $("aiState").textContent = "⏳ " + AIK[kind].replace(" par IA", "") + " " + (of > 1 ? "(photo " + nb + " / " + of + ") " : "") + Math.round(f * 100) + " %" + (rest != null ? " — encore ~" + (rest > 90 ? Math.round(rest / 60) + " min" : rest + " s") : "") + " · " + ep;
   });
   var out = await N.aiRun(model, new Uint8Array(src.data.buffer), iw, ih, tw, th);
@@ -1621,7 +1645,7 @@ async function aiFace(p, nb, of, chain) {
   var mk = new OffscreenCanvas(512, 512), xm = mk.getContext("2d"); xm.filter = "blur(26px)"; xm.fillStyle = "#fff"; xm.beginPath(); xm.ellipse(256, 280, 190, 215, 0, 0, Math.PI * 2); xm.fill();
   var al = +$("aiFace").value || 0.6;
   for (var i = 0; i < f5.length; i++) {
-    $("aiState").textContent = "⏳ Visage " + (i + 1) + " / " + f5.length + (of > 1 ? " (photo " + nb + " / " + of + ")" : "") + "…";
+    $("aiState").textContent = "⏳ Visage " + (i + 1) + " / " + f5.length + (of > 1 ? " (photo " + nb + " / " + of + ")" : "") + "…"; if (AIJ) { AIJ.ph = "réparation des visages par IA"; AIJ.op = AIJ.op0 || "IA"; AIJ.det = "photo " + nb + " / " + of + " · " + p.name + " · visage " + (i + 1) + " / " + f5.length; AIJ.i = nb; AIJ.n = of; AIJ.f = ((AIJ.j || 0) + i / f5.length) / (AIJ.m || 1); jobRender(); }
     var T = simil(f5[i], FFHQ), ci = new OffscreenCanvas(512, 512), xi = ci.getContext("2d"); xi.imageSmoothingQuality = "high";
     xi.setTransform(T.a, T.b, -T.b, T.a, T.tx, T.ty); xi.drawImage(co, 0, 0); xi.setTransform(1, 0, 0, 1, 0, 0);
     var src = xi.getImageData(0, 0, 512, 512), out = await N.aiRun("gfp", new Uint8Array(src.data.buffer), 512, 512, 512, 512);
@@ -1635,9 +1659,9 @@ async function aiFace(p, nb, of, chain) {
 }
 async function aiRun(kind) {
   if (AI.busy || !N) return; var list = fixTargets(); if (!list.length) return;
-  AI.busy = true; aiShow(); var ok = 0, t0 = Date.now(), errs = [];
+  AI.busy = true; aiShow(); var ok = 0, t0 = Date.now(), errs = []; AIJ = {t0: t0, i: 1, n: list.length, f: 0, op: "Amélioration IA", op0: "Amélioration IA", det: ""}; jobRender();
   for (var i = 0; i < list.length; i++) { try { await aiOne(list[i], kind, i + 1, list.length); ok++; updCard(list[i]); } catch (e) { errs.push(e.message || String(e)); } }
-  AI.busy = false; saveSoon();
+  AI.busy = false; AIJ = null; jobRender(); saveSoon();
   var p = S.byId[S.view[S.cur]]; aiShow(p); if (p) rpPreview();
   var VB = {naf: ["défloutée", "défloutées"], esr: ["restaurée", "restaurées"], x2: ["agrandie ×2", "agrandies ×2"], scu: ["débruitée", "débruitées"], face: ["aux visages réparés", "aux visages réparés"]}[kind];
   toast(ok ? ok + " photo" + (ok > 1 ? "s " + VB[1] : " " + VB[0]) + " par IA en " + Math.round((Date.now() - t0) / 1000) + " s." + (errs.length ? " Échec : " + errs[0] : "") : "Échec de l'IA : " + (errs[0] || ""), 5000);
@@ -2019,28 +2043,31 @@ async function doExport() {
   var style = renderRead(), withOrig = !!REND.orig;
   closeDialog();
   var tot = (xmp ? S.photos.length : 0) + pick.length + rejs.length, k = 0, err = 0;
-  S.analysing = true; totalN = tot; doneN = 0; prog(); $("progTxt").textContent = "Export…";
-  function step() { doneN = ++k; prog(); $("progTxt").textContent = "Export " + k + " / " + tot; }
+  S.analysing = true; totalN = tot; doneN = 0; S.t0 = Date.now(); S.jobOp = "Export"; S.jobPh = "préparation"; prog(); $("progTxt").textContent = "Export…";
+  // les fichiers XMP (tres rapides) comptent peu dans le pourcentage et le temps restant
+  var wTot = (xmp ? S.photos.length * 0.02 : 0) + pick.length + rejs.length, wDone = 0;
+  function step(w) { k++; wDone += w == null ? 1 : w; doneN = wDone; totalN = wTot; prog(); $("progTxt").textContent = "Export " + k + " / " + tot; }
+  if (xmp) S.jobPh = "fichiers XMP pour DxO / Lightroom (étoiles, gardées, rejetées)";
   if (xmp) for (var i = 0; i < S.photos.length; i++) {
     var p = S.photos[i], xp = p.path.replace(/\.[^.\\\/]+$/, ".xmp");
     try { var old = await N.readText(xp); await N.writeText(xp, old && /<rdf:Description/.test(old) ? xmpMerge(old, p) : xmpPacket(p)); } catch (e) { err++; }
-    step();
+    step(0.02);
   }
   var dest = absD ? sub : join(S.dir, sub), MAP = {}, nDev = 0;
   // plusieurs photos developpees en meme temps (une par assistant de calcul, 3 au plus)
   ensurePool(); var nextI = 0, K = Math.max(1, Math.min(3, pool.length));
   async function one(i) {
     var st2 = edited(pick[i]) ? devStyle(pick[i]) : null;
-    if (st2 && pick[i].raw && !pick[i].rawDev) { $("progTxt").textContent = "Développement RAW " + (i + 1) + " / " + pick.length; await rawEnsure(pick[i]); }
+    if (st2 && pick[i].raw && !pick[i].rawDev) { S.jobPh = "développement du RAW (" + pick[i].name + ")"; $("progTxt").textContent = "Développement RAW " + (i + 1) + " / " + pick.length; await rawEnsure(pick[i]); }
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
-      $("progTxt").textContent = "Retouche " + (k + 1) + " / " + pick.length;
+      $("progTxt").textContent = "Retouche " + (k + 1) + " / " + pick.length; S.jobPh = "retouche des photos (rendu vu dans Retoucher) · " + pick[i].name;
       var nm = st2.rotOnly ? pick[i].name.replace(/\.[^.]+$/, "") : REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
       try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); MAP[nm + ".jpg"] = pick[i].path; nDev++; } catch (e) { err++; }
     } else if (pick[i].ai) { // seulement l'amelioration IA : on livre la version amelioree a cote de l'original
       try { var nIA = pick[i].name.replace(/\.[^.]+$/, "") + "_IA.jpg"; await N.copyAs(pick[i].ai.file, join(dest, nIA)); MAP[nIA] = pick[i].path; nDev++; } catch (e) { err++; }
     }
-    if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { try { var op = pick[i].path, np = await N.copy(op, dest, move); if (move) { pick[i].path = np; Object.keys(MAP).forEach(function (k) { if (MAP[k] === op) MAP[k] = np; }); } } catch (e) { err++; } }
+    if ((withOrig && !(st2 && st2.rotOnly)) || !st2) { if (!st2) S.jobPh = (move ? "déplacement" : "copie") + " des photos · " + pick[i].name; try { var op = pick[i].path, np = await N.copy(op, dest, move); if (move) { pick[i].path = np; Object.keys(MAP).forEach(function (k) { if (MAP[k] === op) MAP[k] = np; }); } } catch (e) { err++; } }
     step();
   }
   await Promise.all(Array.from({length: K}, async function () { while (nextI < pick.length) await one(nextI++); }));
@@ -2048,6 +2075,7 @@ async function doExport() {
   try { if (!(await N.exists(join(dest, ".regardpur-export")))) await N.writeText(join(dest, ".regardpur-export"), "Dossier cree par Regard Pur");
     var old = {}; try { old = JSON.parse(await N.readText(join(dest, ".regardpur-originaux.json")) || "{}"); } catch (e) {}
     if (Object.keys(MAP).length) await N.writeText(join(dest, ".regardpur-originaux.json"), JSON.stringify(Object.assign(old, MAP))); } catch (e) {}
+  if (rejs.length) S.jobPh = "rangement des rejetées dans « Rejetées »";
   for (i = 0; i < rejs.length; i++) { try { rejs[i].path = await N.copy(rejs[i].path, join(S.dir, "Rejetées"), true); } catch (e) { err++; } step(); }
   S.analysing = false; prog(); saveSoon();
   dialog("<h3>✔ Export terminé</h3><p>" + (nDev ? nDev + " photo(s) retouchée(s)" + (withOrig ? (move ? " (originaux déplacés)" : " (originaux joints)") : "") + (pick.length > nDev ? " et " + (pick.length - nDev) + " " + (move ? "déplacée(s)" : "copiée(s)") + " telles quelles" : "") : pick.length + " photo(s) " + (move ? "déplacée(s)" : "copiée(s)")) + " dans <b>" + esc(sub) + "</b>" + (rejs.length ? ", " + rejs.length + " rejetée(s) rangée(s) dans <b>Rejetées</b>" : "") + (xmp ? ", fichiers XMP écrits" : "") + "." + (err ? "<br><span style='color:var(--rej)'>" + err + " erreur(s).</span>" : "") + "</p>" +
@@ -2151,7 +2179,7 @@ async function doImport(src, list) {
   var todo = list.filter(function (o) { return !skip || !IMP.seen[o.name + "|" + o.size]; });
   if (!todo.length) { toast("Toutes ces photos ont déjà été importées."); return; }
   // date de prise de vue de chaque photo (pour les dossiers et les noms)
-  S.analysing = true; totalN = todo.length * 2; doneN = 0; prog();
+  S.analysing = true; totalN = todo.length * 2; doneN = 0; S.t0 = Date.now(); S.jobOp = "Import depuis la carte"; S.jobPh = "copie et renommage des photos"; prog();
   for (var i = 0; i < todo.length; i++) {
     var o = todo[i];
     try { var h = await N.readHead(o.path, 262144), ex = await window.exifr.parse(h, {pick: ["DateTimeOriginal", "CreateDate"]}).catch(function () { return null; }); var dt = ex && (ex.DateTimeOriginal || ex.CreateDate); o.t = dt instanceof Date ? dt.getTime() : o.mtime; } catch (e) { o.t = o.mtime; }
@@ -2238,12 +2266,12 @@ async function quickCopy() {
   if (!N) return; var L = fixTargets(); if (!L.length) return;
   if (!QC) { QC = await N.pickDir("Dossier de copie rapide (choisi une seule fois)", S.dir); if (!QC) return; try { localStorage.setItem("rp_qc", QC); } catch (e) {} }
   var n = 0, dj = 0;
-  for (var i = 0; i < L.length; i++) { var p = L[i]; if (p.qc) { dj++; continue; }
+  for (var i = 0; i < L.length; i++) { var p = L[i]; if (p.qc) { dj++; continue; } if (L.length > 5) ojStep("Copie rapide", "copie vers « " + QC.split(/[\\/]/).pop() + " »", i + 1, L.length, (i + 1) + " / " + L.length + " · " + p.name);
     try { var st = p.rot && !p.raw ? devStyle(p) : null;
       if (st && st.rotOnly) { var jpg = await developOne(p, st); await N.writeBin(join(QC, p.name.replace(/\.[^.]+$/, "") + ".jpg"), jpg); }
       else await N.copyAs(p.path, join(QC, p.name));
       p.qc = true; n++; updCard(p); } catch (e) {} }
-  saveSoon(); toast((n ? n + " copiée" + (n > 1 ? "s" : "") + " vers « " + QC.split(/[\\/]/).pop() + " »" : "") + (dj ? (n ? " · " : "") + dj + " déjà copiée" + (dj > 1 ? "s" : "") : "") + " (touche S ; Maj+S pour changer de dossier)");
+  ojEnd(); saveSoon(); toast((n ? n + " copiée" + (n > 1 ? "s" : "") + " vers « " + QC.split(/[\\/]/).pop() + " »" : "") + (dj ? (n ? " · " : "") + dj + " déjà copiée" + (dj > 1 ? "s" : "") : "") + " (touche S ; Maj+S pour changer de dossier)");
 }
 /* lieux (repris d'ARCHIVAGE_TRI_PRO), seulement a la demande : GPS -> Ville-Pays */
 async function placesRun() {
@@ -2251,8 +2279,9 @@ async function placesRun() {
   if (!L.length) { $("placeInfo").textContent = "Aucune photo avec position GPS à nommer."; return; }
   dialog("<h3>Nommer les lieux ?</h3><p>" + L.length + " photo(s) ont une position GPS. Regard Pur va demander la ville et le pays à OpenStreetMap (gratuit). <b>Internet est utilisé</b> : seules les coordonnées arrondies à environ 1 km sont envoyées, une demande par seconde ; les réponses sont gardées sur votre PC.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='yes' class='pri'>Nommer les lieux</button></div>", async function (c) {
     if (c !== "yes") return; var n = 0;
-    for (var i = 0; i < L.length; i++) { var g = L[i].a.exif.gps; $("placeInfo").textContent = "⏳ " + (i + 1) + " / " + L.length;
+    for (var i = 0; i < L.length; i++) { var g = L[i].a.exif.gps; $("placeInfo").textContent = "⏳ " + (i + 1) + " / " + L.length; ojStep("Lieux des photos (GPS)", "ville et pays demandés à OpenStreetMap", i + 1, L.length, (i + 1) + " / " + L.length + " · " + L[i].name);
       var v = await N.placeName(g[0], g[1]); if (v) { L[i].place = v; n++; } else if (v === null && i > 2 && !n) break; }
+    ojEnd();
     $("placeInfo").textContent = n ? n + " lieu(x) trouvé(s)" : "Lieux indisponibles (pas d'internet ?)"; saveSoon(); drawFilters(); showPanel();
   });
 }
@@ -2327,8 +2356,9 @@ async function learnStyle() {
     try { if (f.kind === "dop") { o = dopParse(await N.readText(f.path)); if (o) src.dxo++; }
       else { var t = f.kind === "xmp" ? await N.readText(f.path) : new TextDecoder("latin1").decode(await N.readHead(f.path, 262144)); o = lrParse(t); if (o) src.lr++; } } catch (e) {}
     if (o) { nf++; if (o.__curve) { curves.push(o.__curve); delete o.__curve; } Object.keys(o).forEach(function (k) { (vals[k] = vals[k] || []).push(o[k]); }); }
-    if (i % 25 === 0) $("styleInfo").textContent = "⏳ " + (i + 1) + " / " + L.length;
+    if (i % 25 === 0) { $("styleInfo").textContent = "⏳ " + (i + 1) + " / " + L.length; ojStep("Apprentissage de votre style", "lecture des réglages Lightroom / DxO", i + 1, L.length, (i + 1) + " / " + L.length + " fichiers"); }
   }
+  ojEnd();
   if (nf < 3) { $("styleInfo").textContent = "Pas assez de photos retouchées trouvées (" + nf + ")."; return; }
   var med = function (a) { a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }, v = {};
   LRMAP.forEach(function (m) { var a = vals[m[0]]; if (!a || a.length < nf * 0.3) return; var x = med(a); if (m[0] !== "Exposure2012") x = x * m[2]; x = Math.round(x * 10) / 10; if (Math.abs(x) >= (m[0] === "Exposure2012" ? 0.1 : 2)) v[m[1]] = Math.max(-100, Math.min(100, x)); });
@@ -2444,5 +2474,5 @@ $("bImport").onclick = openImport; $("bCompare").onclick = openCompare; $("bHelp
 try { if (!localStorage.getItem("rp_intro")) setTimeout(function () { guide(0); }, 400); } catch (e) {}
 setTab("trier");
 updLearn();
-window.__rp = {S: S, score: score, reasons: reasons, autoCull: autoCull, load: load, devStyle: devStyle, pool: function () { return pool; }, rpPreview: rpPreview, developOne: developOne, fixPhoto: fixPhoto, devShow: devShow}; window.__rp_full = function () { return full; };
+window.__rp = {jobTest: function (o) { AIJ = o; jobRender(); }, S: S, score: score, reasons: reasons, autoCull: autoCull, load: load, devStyle: devStyle, pool: function () { return pool; }, rpPreview: rpPreview, developOne: developOne, fixPhoto: fixPhoto, devShow: devShow}; window.__rp_full = function () { return full; };
 })();
