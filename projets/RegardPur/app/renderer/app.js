@@ -2001,7 +2001,7 @@ function openExport() {
       "<label class='opt'><input type='radio' name='eW' value='S'><div><b>Avec au moins <select id='eS'><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> étoile(s)</b> (" + nS + " avec étoiles)</div></label>" +
     "</div>" +
     "<div class='card2'><h3><i>2</i>Où ?</h3>" +
-      "<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'><select id='eA'><option value='copy'>Copier</option><option value='move'>Déplacer</option></select> dans le sous-dossier <input type='text' id='eD' value='Retenues' style='flex:1;min-width:160px'> <span class='small'>du dossier des photos</span></div>" +
+      "<div style='display:flex;gap:8px;align-items:center;flex-wrap:wrap'><select id='eA'><option value='copy'>Copier</option><option value='move'>Déplacer</option></select> dans <input type='text' id='eD' value='Retenues' style='flex:1;min-width:160px' data-tip='Un nom (sous-dossier du dossier des photos) ou un dossier choisi avec « Parcourir… »'> <button data-c='pickD' data-tip='Choisir ou créer le dossier dans l’explorateur Windows'>📂 Parcourir…</button></div>" +
       "<label class='opt'><input type='checkbox' id='eX' checked><div><b>Fichiers pour DxO, Lightroom, Capture One</b> (XMP) à côté de toutes les photos : étoiles, vert = gardée, rouge = rejetée.</div></label>" +
       "<details class='adv'><summary>Plus d'options</summary><label class='opt'><input type='checkbox' id='eRej'><div>Ranger aussi les <b>rejetées</b> (" + nX + ") dans le sous-dossier « Rejetées » (rien n'est effacé)</div></label></details>" +
     "</div>" +
@@ -2013,7 +2013,7 @@ function openExport() {
   renderWire();
 }
 async function doExport() {
-  var w = document.querySelector("input[name=eW]:checked").value, minS = +$("eS").value, move = $("eA").value === "move", sub = ($("eD").value || "Retenues").replace(/[\\\/:*?"<>|]/g, "_"), rej = $("eRej").checked, xmp = $("eX").checked;
+  var w = document.querySelector("input[name=eW]:checked").value, minS = +$("eS").value, move = $("eA").value === "move", eDv = ($("eD").value || "Retenues").trim(), absD = isAbs(eDv), sub = absD ? eDv : eDv.replace(/[\\\/:*?"<>|]/g, "_"), rej = $("eRej").checked, xmp = $("eX").checked;
   var pick = S.photos.filter(function (p) { return w === "P" ? p.status === "P" : w === "PT" ? p.status !== "X" : w === "R" ? edited(p) : p.stars >= minS; });
   var rejs = rej ? S.photos.filter(function (p) { return p.status === "X"; }) : [];
   var style = renderRead(), withOrig = !!REND.orig;
@@ -2026,7 +2026,7 @@ async function doExport() {
     try { var old = await N.readText(xp); await N.writeText(xp, old && /<rdf:Description/.test(old) ? xmpMerge(old, p) : xmpPacket(p)); } catch (e) { err++; }
     step();
   }
-  var dest = join(S.dir, sub), MAP = {}, nDev = 0;
+  var dest = absD ? sub : join(S.dir, sub), MAP = {}, nDev = 0;
   // plusieurs photos developpees en meme temps (une par assistant de calcul, 3 au plus)
   ensurePool(); var nextI = 0, K = Math.max(1, Math.min(3, pool.length));
   async function one(i) {
@@ -2060,7 +2060,7 @@ async function doExport() {
 var CO = {pairs: [], i: 0, urls: []};
 async function cmpOrig(dir) {
   if (!N) return;
-  if (!dir) { var sub = (($("eD") && $("eD").value) || "Retenues").replace(/[\\\/:*?"<>|]/g, "_"); dir = S.dir ? join(S.dir, sub) : null; if (!dir || !(await N.exists(dir))) dir = await N.pickDir(); }
+  if (!dir) { var ev = (($("eD") && $("eD").value) || "Retenues").trim(), sub = isAbs(ev) ? ev : ev.replace(/[\\\/:*?"<>|]/g, "_"); dir = isAbs(sub) ? sub : S.dir ? join(S.dir, sub) : null; if (!dir || !(await N.exists(dir))) dir = await N.pickDir(); }
   if (!dir) return;
   toast("Recherche des originaux…");
   var files = (await N.list(dir)).filter(function (f) { return /\.jpe?g$/i.test(f.name) && f.path.indexOf(dir) === 0 && !/[\\\/]/.test(f.rel); });
@@ -2429,7 +2429,9 @@ function setTab(t) {
   }
 }
 $("tabs").addEventListener("click", function (e) { var b = e.target.closest("button[data-t]"); if (b) setTab(b.dataset.t); });
-$("exportPage").addEventListener("click", function (e) { var b = e.target.closest("[data-c=go]"); if (b) doExport(); if (e.target.closest("[data-c=cmpo]")) cmpOrig(); });
+$("exportPage").addEventListener("click", function (e) { var b = e.target.closest("[data-c=go]"); if (b) doExport(); if (e.target.closest("[data-c=cmpo]")) cmpOrig();
+  if (e.target.closest("[data-c=pickD]")) { var cur = ($("eD").value || "").trim(); N.pickDir("Dossier d'export", isAbs(cur) ? cur : S.dir).then(function (d) { if (d) $("eD").value = d; }); } });
+function isAbs(p) { return /^([a-zA-Z]:[\\\/]|[\\\/])/.test(p || ""); }
 /* mode Simple / Expert */
 function setMode(expert) { document.body.classList.toggle("simple", !expert); $("cExpert").checked = expert; try { localStorage.setItem("rp_expert", expert ? "1" : "0"); } catch (e) {} }
 $("cExpert").addEventListener("change", function () { setMode(this.checked); if (rp.open) rpDraw(); });
