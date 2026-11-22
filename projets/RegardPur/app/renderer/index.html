@@ -160,8 +160,9 @@
       <div class="row3"><button id="dvAuto" class="pri" data-tip="Règle la photo tout seul : ProLab automatique, correction selon le type de photo, peau protégée et vos habitudes apprises"><svg class="ic"><use href="#i-magic"/></svg>Auto</button><button id="dvCopy" data-tip="Copier les réglages de cette photo"><svg class="ic"><use href="#i-grid"/></svg>Copier</button><button id="dvPaste" data-tip="Coller les réglages copiés sur cette photo"><svg class="ic"><use href="#i-check"/></svg>Coller</button></div>
       <div id="typeBox"><h5 id="typeTitle">Pour ce type de photo</h5><div id="typeTools" class="chips"></div></div>
       <label class="sel full">Profil <select id="dvProf"></select></label>
+      <details id="profBox" class="profBox"><summary>Voir la photo dans chaque profil</summary><div id="profMsg" class="small"></div><div id="profGrid"></div></details>
       <div class="rl"><span>Intensité</span><input type="range" id="dvDose" min="0" max="100" value="65"><b id="dvDoseV">65</b></div>
-      <label class="ck expert"><input type="checkbox" id="dvPro" checked> ProLab automatique (exposition corrigée)</label>
+      <label class="ck"><input type="checkbox" id="dvPro" checked> ProLab automatique (exposition corrigée)</label>
       <label class="ck"><input type="checkbox" id="tuneOn"> Glisser sur la photo : ↕ choisir le réglage, ↔ le doser</label>
       <h5>Lumière</h5>
       <div class="rl"><span><svg class="ic"><use href="#i-sun"/></svg>Exposition</span><input type="range" id="lpEv" min="-20" max="20" value="0"><b id="lpEvV">0</b></div>

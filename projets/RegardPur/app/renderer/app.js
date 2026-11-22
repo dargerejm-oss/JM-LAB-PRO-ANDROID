@@ -502,6 +502,7 @@ function onResult(w, e) {
   if (r.meas !== undefined) { var cbm = prevWait[r.id]; delete prevWait[r.id]; if (cbm) cbm(r); return; }
   if (r.faces5 !== undefined) { var cbf = prevWait[r.id]; delete prevWait[r.id]; if (cbf) cbf(r); return; }
   if (r.joined !== undefined) { var cbj = prevWait[r.id]; delete prevWait[r.id]; if (cbj) cbj(r); return; }
+  if (r.profs !== undefined) { var cbq = prevWait[r.id]; delete prevWait[r.id]; if (cbq) cbq(r); return; }
   if (r.prev !== undefined) { var cbp = prevWait[r.id]; delete prevWait[r.id]; if (cbp) cbp(r); return; }
   if (r.dev !== undefined) { var cbd = devWait[r.id]; delete devWait[r.id]; if (cbd) cbd(r); return; }
   if (r.full !== undefined) { var cb = fullWait[r.id]; delete fullWait[r.id]; if (cb) cb(r.full); return; }
@@ -1068,7 +1069,7 @@ function devShow(p) {
   curveDraw(CRV.ch === "m" ? d.curve : (d.curves || {})[CRV.ch]);
   var db = d.deblur || {}; $("dbAmt").value = db.amt || 0; $("dbAmt").nextElementSibling.textContent = db.amt || 0; $("dbKind").value = db.kind || "auto"; if (!(db.amt > 0)) $("dbInfo").textContent = "";
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-lv]"), function (r) { var v = +((d.levels || {})[r.dataset.lv] || 0); r.value = v; r.nextElementSibling.textContent = v > 0 && r.dataset.lv === "g" ? "+" + v : v; });
-  aiShow(p); typeShow(p);
+  aiShow(p); typeShow(p); profThumbs(p);
   Array.prototype.forEach.call(document.querySelectorAll("#rtTop input[data-sky]"), function (rg) { var v = +((d.sky || {})[rg.dataset.sky] || 0); rg.value = v; rg.nextElementSibling.textContent = v; });
   $("crRatio").value = d.crop && d.crop.r ? d.crop.r : "orig"; $("crOff").disabled = !d.crop;
   $("dvFixed").textContent = d.fix && d.fix.length ? "🩺 Corrigé : " + d.fix.join(", ") : "";
@@ -1142,7 +1143,7 @@ function autoCrop(p, ratio) {
 $("crAuto").onclick = function () { fixTargets().forEach(function (p) { var c = autoCrop(p, $("crRatio").value); if (c) devGet(p).crop = c; }); var p = S.byId[S.view[S.cur]]; if (p) { devShow(p); devChanged(p); } toast("Recadrage auto appliqué (bouton « Sans » pour revenir)."); };
 $("crRatio").addEventListener("change", function () { $("crAuto").click(); });
 $("crOff").onclick = function () { fixTargets().forEach(function (p) { if (p.dev) delete p.dev.crop; }); var p = S.byId[S.view[S.cur]]; if (p) { devShow(p); devChanged(p); } };
-function devChanged(p) { saveSoon(); rpPreview(); updCard(p); }
+function devChanged(p) { saveSoon(); rpPreview(); updCard(p); clearTimeout(PFV.t); PFV.t = setTimeout(function () { if (S.byId[S.view[S.cur]] === p) profThumbs(p); }, 700); }
 $("rtTop").addEventListener("input", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
   if (t.id === "dbAmt" || t.id === "dbKind") { var dd = devGet(p); dd.deblur = dd.deblur || {}; if (t.id === "dbAmt") { dd.deblur.amt = +t.value; t.nextElementSibling.textContent = t.value; } else dd.deblur.kind = t.value; devChanged(p); return; }
@@ -1155,9 +1156,39 @@ $("rtTop").addEventListener("input", function (e) {
 $("rtTop").addEventListener("change", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
   if (t.dataset.lk && t.tagName === "SELECT") { var k = t.dataset.lk.split("."), d = devGet(p); d.looks = d.looks || {}; d.looks[k[0]] = d.looks[k[0]] || {}; d.looks[k[0]][k[1]] = +t.value; devChanged(p); return; }
-  if (t.id === "dvProf") { var dp = devGet(p); dp.profile = t.value; delete dp.neutral; devChanged(p); }
-  else if (t.id === "dvPro") { devGet(p).pro = t.checked; devChanged(p); }
+  if (t.id === "dvProf") { profSet(p, t.value); }
+  else if (t.id === "dvPro") { var dq = devGet(p); dq.pro = t.checked; if (t.checked) delete dq.neutral; else if (dq.profile === "LABO PRO EV5") dq.neutral = true; devChanged(p); profThumbs(p); }
 });
+/* profils : chaque profil est montre sur la photo elle-meme (vignettes) ; un clic l'applique et l'image change aussitot */
+function profSet(p, v) {
+  var dp = devGet(p); dp.profile = v;
+  if (v === "LABO PRO EV5" && dp.pro === false) dp.neutral = true; else delete dp.neutral;
+  $("dvProf").value = v; profMark(p); devChanged(p);
+}
+function profMark(p) { var d = p.dev || DEV_DEF(); Array.prototype.forEach.call(document.querySelectorAll("#profGrid [data-pf]"), function (b) { b.classList.toggle("on", b.dataset.pf === (d.profile || "cat")); }); }
+var PFV = {id: null, n: 0, urls: []};
+function profThumbs(p) {
+  var g = $("profGrid"); if (!g || !$("profBox").open || !p) return;
+  var cat = CATS[catOf(p)], list = [["cat", "Selon le type (" + (PROFS.filter(function (o) { return o[0] === cat.prof; })[0] || ["", cat.prof])[1] + ")"]].concat(PROFS);
+  var base = devStyle(p) || {}; base = JSON.parse(JSON.stringify(base)); ["ret", "heals", "tilt", "crop", "deblur", "rotOnly"].forEach(function (k) { delete base[k]; });
+  var styles = list.map(function (o) { var st = JSON.parse(JSON.stringify(base)); if (!st.v) { st.v = {}; st.dose = 100; st.off = true; st.q = 92; } st.profile = o[0] === "cat" ? cat.prof : o[0]; st.jm = true; st.hp = o[0] === "LABO PRO EV5" && st.off ? 0 : (REND.hp == null ? 30 : REND.hp); return st; });
+  var key = p.id + "|" + JSON.stringify(base); if (PFV.id === key) { profMark(p); return; }
+  PFV.id = key; var my = ++PFV.n;
+  g.innerHTML = list.map(function (o) { return "<button data-pf='" + o[0] + "' title='" + o[1].replace(/'/g, "&#39;") + "'><span class='pfi'></span><i>" + o[1] + "</i></button>"; }).join("");
+  profMark(p); $("profMsg").textContent = "⏳ Calcul des aperçus…";
+  readBytes(p).then(function (b) {
+    if (!b || my !== PFV.n) return;
+    var w = prevWorker(), id = "profs:" + p.id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
+    prevWait[id] = function (r) {
+      if (my !== PFV.n) return; $("profMsg").textContent = r.profs && r.profs.length ? "" : "Aperçus impossibles : " + (r.err || "");
+      PFV.urls.forEach(function (u) { URL.revokeObjectURL(u); }); PFV.urls = (r.profs || []).map(function (bl) { return URL.createObjectURL(bl); });
+      Array.prototype.forEach.call(g.querySelectorAll(".pfi"), function (sp, i) { if (PFV.urls[i]) sp.style.backgroundImage = "url(" + PFV.urls[i] + ")"; });
+    };
+    w.postMessage({id: id, profs: styles, buf: c, heic: heicOf(p), max: 240}, [c.buffer]);
+  });
+}
+$("profBox").addEventListener("toggle", function () { var p = S.byId[S.view[S.cur]]; if ($("profBox").open) { PFV.id = null; profThumbs(p); } });
+$("profGrid").addEventListener("click", function (e) { var b = e.target.closest("[data-pf]"), p = S.byId[S.view[S.cur]]; if (!b || !p) return; profSet(p, b.dataset.pf); });
 /* ✨ Auto : ProLab automatique + correction selon le type de photo + peau protegee + vos habitudes apprises */
 $("dvAuto").onclick = function () {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
@@ -1864,41 +1895,19 @@ function parseStyle(t) {
   while ((m = re.exec(t))) if (RKEY[m[1]]) v[RKEY[m[1]]] = +m[2];
   return Object.keys(v).length ? {name: name ? name.replace(/_/g, " ") : "style", v: v} : null;
 }
+/* export : les photos corrigees sont exportees TELLES QU'ON LES VOIT dans Retoucher (aucun profil choisi a l'aveugle ici) */
 function renderUI() {
-  var g = function (lbl, html, tip) { return "<span>" + lbl + (tip ? " <i class='tip' data-tip='" + tip + "'>?</i>" : "") + "</span>" + html; };
-  return "<label class='opt'><input type='checkbox' id='rOn'" + (REND.on ? " checked" : "") + "><div><b>Retoucher les photos exportées</b> avec le rendu JM LAB PRO (même moteur que l'appli). Elles sont développées en JPEG ; les originaux ne sont jamais modifiés.</div></label>" +
-    "<div id='rBox' style='display:" + (REND.on ? "block" : "none") + ";margin:4px 0 4px 26px'>" +
-    "<div style='display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center'>" +
-    g("Profil", "<select id='rProf'><option value='cat'" + ((REND.profile || "cat") === "cat" ? " selected" : "") + ">Selon la catégorie (conseillé)</option>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'" + (REND.profile === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>", "Le rendu des couleurs. « Selon la catégorie » choisit le bon profil pour chaque photo (portrait, paysage, nuit…).") +
-    g("Intensité", "<div style='display:flex;gap:8px;align-items:center'><input type='range' id='rDose' min='0' max='100' value='" + (REND.dose == null ? 65 : REND.dose) + "'><b id='rDoseV' style='width:42px'>" + (REND.dose == null ? 65 : REND.dose) + " %</b></div>", "Force du rendu JM LAB PRO.") +
-    "</div><details class='adv'><summary>Réglages avancés</summary><div style='display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin-top:8px'>" +
-    g("Correction auto", "<label class='ck' style='margin:0'><input type='checkbox' id='rCat'" + (REND.cat === false ? "" : " checked") + "> selon la catégorie de chaque photo (tons, peau protégée)</label>") +
-    g("ProLab automatique", "<label class='ck' style='margin:0'><input type='checkbox' id='rAuto'" + (REND.off ? "" : " checked") + "> exposition corrigée photo par photo</label>") +
-    g("Protection hautes lumières", "<div style='display:flex;gap:8px;align-items:center'><input type='range' id='rHp' min='0' max='100' value='" + (REND.hp == null ? 30 : REND.hp) + "'><b id='rHpV' style='width:42px'>" + (REND.hp == null ? 30 : REND.hp) + " %</b></div>", "Évite que les blancs deviennent tout blancs.") +
-    g("Code de style", "<div><input type='text' id='rCode' style='width:100%' placeholder='Collez un code JMLAB_PRESET:… de l&#39;appli (Styles › Partager)' value='" + esc(REND.code || "") + "'><div id='rCodeI' class='small'></div></div>", "Un style partagé depuis JM LAB PRO sur le téléphone.") +
-    g("Horizon", "<label class='ck' style='margin:0'><input type='checkbox' id='rTilt'" + (REND.tilt === false ? "" : " checked") + "> redresser l'horizon penché (recadrage automatique)</label>") +
-    g("Noms", "<label class='ck' style='margin:0'><input type='checkbox' id='rName'" + (REND.name ? " checked" : "") + "> catégorie_client_001.jpg</label>") +
-    g("Originaux", "<label class='ck' style='margin:0'><input type='checkbox' id='rOrig'" + (REND.orig ? " checked" : "") + "> joindre aussi l'original</label>") +
-    "</div></details></div>";
+  return "<p class='small'>Les photos <b>corrigées ou retouchées</b> dans ② Retoucher sont exportées <b>telles que vous les voyez</b> (JPEG). Les autres sont copiées telles quelles. Pour changer le rendu (profil, couleurs…), faites-le dans Retoucher, où vous voyez le résultat.</p>" +
+    "<label class='opt'><input type='checkbox' id='rOrig'" + (REND.orig ? " checked" : "") + "><div>Joindre aussi l'<b>original</b> des photos corrigées</div></label>" +
+    "<label class='opt'><input type='checkbox' id='rName'" + (REND.name ? " checked" : "") + "><div>Nommer les photos corrigées <b>catégorie_client_001.jpg</b> (sinon : nom d'origine + _JMD_LAB_PRO)</div></label>";
 }
-function renderWire() {
-  var upd = function () {
-    $("rBox").style.display = $("rOn").checked ? "block" : "none"; $("rDoseV").textContent = $("rDose").value + " %"; $("rHpV").textContent = $("rHp").value + " %";
-    var st = parseStyle($("rCode").value || ""); $("rCodeI").textContent = $("rCode").value ? (st ? "Style « " + st.name + " » : " + Object.keys(st.v).map(function (k) { return k.replace("Hautes SANS GRIS", "Hautes") + " " + st.v[k]; }).join(", ") : "Code non reconnu") : "Sans code : seuls le profil et ProLab s'appliquent.";
-  };
-  ["rOn", "rDose", "rHp", "rCode"].forEach(function (id) { $(id).addEventListener("input", upd); $(id).addEventListener("change", upd); }); upd();
-}
+function renderWire() {}
 function renderRead() {
-  REND = {on: $("rOn").checked, cat: $("rCat").checked, profile: $("rProf").value, off: !$("rAuto").checked, dose: +$("rDose").value, hp: +$("rHp").value, code: $("rCode").value.trim(), orig: $("rOrig").checked, tilt: $("rTilt").checked, name: $("rName").checked};
+  REND.orig = $("rOrig").checked; REND.name = $("rName").checked; REND.on = false;
   try { localStorage.setItem("rp_render", JSON.stringify(REND)); } catch (e) {}
-  // memoire par client : ses reglages sont retrouves la prochaine fois
   var cl = ($("tClient").value || "").trim(); if (cl) { CLI[cl] = REND; try { localStorage.setItem("rp_clients", JSON.stringify(CLI)); } catch (e) {} }
-  if (!REND.on) return null;
-  var st = parseStyle(REND.code) || {v: {}}, dose = st.v.Dosage != null ? st.v.Dosage : REND.dose;
-  return {profile: REND.profile, off: REND.off, dose: dose, hp: REND.hp, v: st.v, q: 92};
+  return null;
 }
-var CLI = (function () { try { return JSON.parse(localStorage.getItem("rp_clients")) || {}; } catch (e) { return {}; } })();
-/* reglages propres a une photo : categorie (cibles, profil conseille, peau) et horizon */
 function styleFor(p, base) {
   // la photo a ses propres reglages (etape Retoucher) : ils passent avant ceux de l'export
   if (p.dev) { var ds = devStyle(p); if (REND.tilt && p.a && p.a.tilt) ds.tilt = p.a.tilt; if (!ds.skin) ds.skin = 0.85; return ds; }
@@ -1923,11 +1932,13 @@ function developOne(p, style) {
   });
 }
 
+// photo corrigee ou retouchee (curseurs, corrections, IA, portrait, correcteur, rotation…)
+function edited(p) { var d = p.dev; return !!(p.adj || p.ret || p.heals || p.ai || p.rot || (d && (Object.keys(d.v || {}).some(function (k) { return +d.v[k]; }) || d.curve || d.curves || d.levels || d.sky || d.crop || d.deblur || d.tilt || !d.neutral || (d.looks && Object.keys(d.looks).length)))); }
 function openExport() {
   var cl = ($("tClient").value || "").trim(), mem = cl && CLI[cl];
   if (mem) REND = JSON.parse(JSON.stringify(mem));
   var c = function (f) { return S.photos.filter(f).length; }, nP = c(function (p) { return p.status === "P"; }), nX = c(function (p) { return p.status === "X"; }), nS = c(function (p) { return p.stars > 0; }), nT = c(function (p) { return p.status !== "X"; });
-  var nR = c(function (p) { return p.ret || p.heals || p.adj || p.dev; });
+  var nR = c(function (p) { return edited(p); });
   var pg = $("exportPage");
   if (!N) { pg.innerHTML = "<div class='exp'><h2>Exporter</h2><p>L'export (copie des photos, fichiers pour DxO et Lightroom, retouche) se fait dans la version PC de Regard Pur.</p></div>"; return; }
   if (!S.photos.length) { pg.innerHTML = "<div class='exp'><h2>Exporter</h2><p>Ouvrez d'abord un dossier de photos (étape 1 : Trier).</p></div>"; return; }
@@ -1936,6 +1947,7 @@ function openExport() {
     "<div class='card2'><h3><i>1</i>Quelles photos ?</h3>" +
       "<label class='opt'><input type='radio' name='eW' value='P' checked><div><b>Les gardées</b> (" + nP + ")</div></label>" +
       "<label class='opt'><input type='radio' name='eW' value='PT'><div><b>Tout sauf les rejetées</b> (" + nT + ")</div></label>" +
+      "<label class='opt'><input type='radio' name='eW' value='R'><div><b>Seulement les photos corrigées ou retouchées</b> (" + nR + ")</div></label>" +
       "<label class='opt'><input type='radio' name='eW' value='S'><div><b>Avec au moins <select id='eS'><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select> étoile(s)</b> (" + nS + " avec étoiles)</div></label>" +
     "</div>" +
     "<div class='card2'><h3><i>2</i>Où ?</h3>" +
@@ -1944,16 +1956,16 @@ function openExport() {
       "<details class='adv'><summary>Plus d'options</summary><label class='opt'><input type='checkbox' id='eRej'><div>Ranger aussi les <b>rejetées</b> (" + nX + ") dans le sous-dossier « Rejetées » (rien n'est effacé)</div></label></details>" +
     "</div>" +
     "<div class='card2'><h3><i>3</i>Retouche</h3>" + renderUI() +
-      (nR ? "<p class='small' style='color:var(--gold)'>" + nR + " photo(s) ont une retouche (portrait, correcteur ou rapide) : elle sera faite à l'export.</p>" : "") +
+      (nR ? "<p class='small' style='color:var(--gold)'>" + nR + " photo(s) corrigée(s) ou retouchée(s).</p>" : "") +
     "</div>" +
     "<div class='go'><button class='pri big' data-c='go'><svg class='ic'><use href='#i-export'/></svg>Exporter</button></div></div>";
   renderWire();
 }
 async function doExport() {
   var w = document.querySelector("input[name=eW]:checked").value, minS = +$("eS").value, move = $("eA").value === "move", sub = ($("eD").value || "Retenues").replace(/[\\\/:*?"<>|]/g, "_"), rej = $("eRej").checked, xmp = $("eX").checked;
-  var pick = S.photos.filter(function (p) { return w === "P" ? p.status === "P" : w === "PT" ? p.status !== "X" : p.stars >= minS; });
+  var pick = S.photos.filter(function (p) { return w === "P" ? p.status === "P" : w === "PT" ? p.status !== "X" : w === "R" ? edited(p) : p.stars >= minS; });
   var rejs = rej ? S.photos.filter(function (p) { return p.status === "X"; }) : [];
-  var style = renderRead(), withOrig = !style || REND.orig;
+  var style = renderRead(), withOrig = !!REND.orig;
   closeDialog();
   var tot = (xmp ? S.photos.length : 0) + pick.length + rejs.length, k = 0, err = 0;
   S.analysing = true; totalN = tot; doneN = 0; prog(); $("progTxt").textContent = "Export…";
@@ -1967,7 +1979,7 @@ async function doExport() {
   // plusieurs photos developpees en meme temps (une par assistant de calcul, 3 au plus)
   ensurePool(); var nextI = 0, K = Math.max(1, Math.min(3, pool.length));
   async function one(i) {
-    var st2 = style ? styleFor(pick[i], style) : devStyle(pick[i]);
+    var st2 = edited(pick[i]) ? devStyle(pick[i]) : null;
     if (st2 && pick[i].raw && !pick[i].rawDev) { $("progTxt").textContent = "Développement RAW " + (i + 1) + " / " + pick.length; await rawEnsure(pick[i]); }
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)

@@ -634,6 +634,21 @@ self.onmessage = function (e) {
     queue = queue.then(function () { return develop(m); }).then(function (b) { self.postMessage({id: m.id, dev: b}, [b.buffer]); }, function (err) { self.postMessage({id: m.id, dev: null, err: String(err && err.message || err)}); });
     return;
   }
+  if (m.profs) { // vignettes : la photo dans chaque profil (pour choisir en voyant le resultat)
+    queue = queue.then(async function () {
+      var bm = m.heic ? await createImageBitmap(await heicCanvas(m.buf)) : await createImageBitmap(new Blob([m.buf]), {imageOrientation: "from-image"});
+      var k = Math.min(1, (m.max || 260) / Math.max(bm.width, bm.height)), base = canvas(Math.round(bm.width * k), Math.round(bm.height * k)), bx = base.getContext("2d"); bx.imageSmoothingQuality = "high"; bx.drawImage(bm, 0, 0, base.width, base.height); bm.close();
+      var out = [];
+      for (var i = 0; i < m.profs.length; i++) {
+        var c = canvas(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0);
+        try { renderStyle(c, m.profs[i]); } catch (e) {}
+        if (m.profs[i].rot) c = rotQ(c, m.profs[i].rot);
+        out.push(await c.convertToBlob({type: "image/jpeg", quality: 0.85}));
+      }
+      return out;
+    }).then(function (r) { self.postMessage({id: m.id, profs: r}); }, function (err) { self.postMessage({id: m.id, profs: [], err: String(err && err.message || err)}); });
+    return;
+  }
   if (m.preview) { // apercu de la retouche portrait
     queue = queue.then(async function () {
       needPortrait();

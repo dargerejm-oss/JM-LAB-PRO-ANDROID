@@ -312,3 +312,9 @@ body:not(.tab-retoucher) .rtOnly{display:none}
 #abWrap{right:0;width:auto!important;background:#0b0c0e}
 #abWrap img{transform:none!important}
 #abWrap .abTag{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:#000c;color:#d4af37;font-size:12px;padding:3px 10px;border-radius:12px;letter-spacing:.05em}
+.profBox{margin:2px 0 8px}.profBox summary{cursor:pointer;color:var(--gold);font-size:12px;padding:3px 0}
+#profGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:4px}
+#profGrid button{padding:2px;display:flex;flex-direction:column;gap:2px;border:2px solid transparent;background:none;min-width:0}
+#profGrid button.on{border-color:var(--gold)}
+#profGrid .pfi{display:block;width:100%;aspect-ratio:1;background:#222 center/cover no-repeat;border-radius:3px}
+#profGrid i{font-style:normal;font-size:10px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
