@@ -82,6 +82,7 @@ ipcMain.handle('readHead', async (e, p, n) => {
   const fh = await fsp.open(p, 'r'); try { const b = Buffer.alloc(n); const r = await fh.read(b, 0, n, 0); return new Uint8Array(b.buffer, 0, r.bytesRead); } finally { await fh.close(); }
 });
 ipcMain.handle('readText', async (e, p) => { try { return await fsp.readFile(p, 'utf8'); } catch (x) { return null; } });
+ipcMain.on('writeTextSync', (e, p, s) => { try { fs.mkdirSync(path.dirname(p), {recursive: true}); fs.writeFileSync(p, s, 'utf8'); e.returnValue = true; } catch (err) { e.returnValue = false; } });
 ipcMain.handle('writeText', async (e, p, s) => { await fsp.mkdir(path.dirname(p), {recursive: true}); await fsp.writeFile(p, s, 'utf8'); return true; });
 ipcMain.handle('writeBin', async (e, p, data) => { await fsp.mkdir(path.dirname(p), {recursive: true}); await fsp.writeFile(p, Buffer.from(data)); return true; });
 ipcMain.handle('exists', (e, p) => fs.existsSync(p));

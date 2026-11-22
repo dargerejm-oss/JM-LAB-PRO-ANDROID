@@ -552,6 +552,9 @@ function renderStyle0(c, S) {
     Qe: g("Temperature") / 100 * 28 * Z, se: g("Teinte") / 100 * 22 * Z, c: g("Teinte"), I: g("Hautes SANS GRIS") / 100 * Z, O: g("Ombres") / 100 * Z, R: g("Vibrance") / 100 * Z,
     On: 1 + g("Saturation") / 100 * Z, He: g("Clarte") / 100 * Z, Zb: g("Noir") / 100 * Z, Zw: g("Blanc") / 100 * Z, Zd: g("Dehaze") / 100 * Z, Zv: g("Vignette") / 100 * Z,
     In: S.profile || "LABO PRO EV5", Z: Z, w: W, h: H, y0: 0};
+  // table de couleurs (comme Lightroom / DxO) : le moteur est calcule pour N x N x N couleurs types, puis chaque point
+  // de la photo lit la table (25 fois plus rapide, ecart invisible) ; vignettage = depend de la position -> calcul complet
+  var TAB = S.jm !== false && !P.Zv ? jmLut(P, S.lutN || 65) : null;
   // par bandes, pour ne pas reserver trop de memoire d'un coup sur les grandes photos
   var band = Math.max(1, Math.floor(4000000 / W));
   for (var y = 0; y < H; y += band) {
@@ -562,7 +565,7 @@ function renderStyle0(c, S) {
       px[i] = r + wb + ti * 0.8; px[i + 1] = gg - ti; px[i + 2] = b - wb + ti * 0.5;
     }
     if (S.skin) pre = new Uint8ClampedArray(px);
-    if (S.jm !== false) { P.px = px; P.y0 = y; JMRUN(P); }
+    if (S.jm !== false) { P.px = px; P.y0 = y; if (TAB) jmLutApply(px, TAB); else JMRUN(P); }
     // protection de la peau : le profil peut renforcer les couleurs, mais pas sur la peau (au-dela de +10 %)
     if (pre) for (i = 0; i < px.length; i += 4) {
       if (!isSkin(pre[i], pre[i + 1], pre[i + 2])) continue;
@@ -588,6 +591,33 @@ function renderStyle0(c, S) {
       for (i = 0; i < q.length; i += 4) { q[i] = TR[q[i]]; q[i + 1] = TG[q[i + 1]]; q[i + 2] = TB[q[i + 2]]; }
       x.putImageData(id2, 0, y);
     }
+  }
+}
+var JMLUTC = null;
+function jmLut(P, N) {
+  var key = N + "|" + JSON.stringify(P, function (k, v) { return k === "px" || k === "y0" || k === "w" || k === "h" ? undefined : v; });
+  if (JMLUTC && JMLUTC.key === key) return JMLUTC.t;
+  var st = 255 / (N - 1), g = new Uint8ClampedArray(N * N * N * 4), o = 0;
+  for (var b = 0; b < N; b++) for (var gg = 0; gg < N; gg++) for (var r = 0; r < N; r++) { g[o] = Math.round(r * st); g[o + 1] = Math.round(gg * st); g[o + 2] = Math.round(b * st); g[o + 3] = 255; o += 4; }
+  var Q = {}; for (var k in P) Q[k] = P[k]; Q.px = g; Q.y0 = 0; JMRUN(Q);
+  var L = new Float32Array(N * N * N * 3); for (var i = 0, j = 0; i < g.length; i += 4, j += 3) { L[j] = g[i]; L[j + 1] = g[i + 1]; L[j + 2] = g[i + 2]; }
+  var t = {N: N, L: L}; JMLUTC = {key: key, t: t}; return t;
+}
+function jmLutApply(px, T) { // interpolation tetraedrique
+  var N = T.N, L = T.L, s = (N - 1) / 255, NN = N * N, M2 = N - 2;
+  for (var i = 0; i < px.length; i += 4) {
+    var fr = px[i] * s, fg = px[i + 1] * s, fb = px[i + 2] * s, r0 = fr | 0, g0 = fg | 0, b0 = fb | 0;
+    if (r0 > M2) r0 = M2; if (g0 > M2) g0 = M2; if (b0 > M2) b0 = M2;
+    var dr = fr - r0, dg = fg - g0, db = fb - b0, c0 = (b0 * NN + g0 * N + r0) * 3, c7 = c0 + (NN + N + 1) * 3, a, b, w0, w1, w2, w3;
+    if (dr >= dg) { if (dg >= db) { a = c0 + 3; b = c0 + (N + 1) * 3; w0 = 1 - dr; w1 = dr - dg; w2 = dg - db; w3 = db; }
+      else if (dr >= db) { a = c0 + 3; b = c0 + (NN + 1) * 3; w0 = 1 - dr; w1 = dr - db; w2 = db - dg; w3 = dg; }
+      else { a = c0 + NN * 3; b = c0 + (NN + 1) * 3; w0 = 1 - db; w1 = db - dr; w2 = dr - dg; w3 = dg; } }
+    else { if (db >= dg) { a = c0 + NN * 3; b = c0 + (NN + N) * 3; w0 = 1 - db; w1 = db - dg; w2 = dg - dr; w3 = dr; }
+      else if (db >= dr) { a = c0 + N * 3; b = c0 + (NN + N) * 3; w0 = 1 - dg; w1 = dg - db; w2 = db - dr; w3 = dr; }
+      else { a = c0 + N * 3; b = c0 + (N + 1) * 3; w0 = 1 - dg; w1 = dg - dr; w2 = dr - db; w3 = db; } }
+    px[i] = w0 * L[c0] + w1 * L[a] + w2 * L[b] + w3 * L[c7];
+    px[i + 1] = w0 * L[c0 + 1] + w1 * L[a + 1] + w2 * L[b + 1] + w3 * L[c7 + 1];
+    px[i + 2] = w0 * L[c0 + 2] + w1 * L[a + 2] + w2 * L[b + 2] + w3 * L[c7 + 2];
   }
 }
 function curveLut(pts) { // courbe passant par les points, monotone (Fritsch-Carlson)
@@ -627,7 +657,7 @@ async function develop(m) {
   return out;
 }
 
-var queue = Promise.resolve(), PCACHE = null;
+var queue = Promise.resolve(), PCACHE = null, DCACHE = null;
 self.onmessage = function (e) {
   var m = e.data;
   if (m.develop) {
@@ -641,7 +671,7 @@ self.onmessage = function (e) {
       var out = [];
       for (var i = 0; i < m.profs.length; i++) {
         var c = canvas(base.width, base.height); c.getContext("2d").drawImage(base, 0, 0);
-        try { renderStyle(c, m.profs[i]); } catch (e) {}
+        try { m.profs[i].lutN = 33; renderStyle(c, m.profs[i]); } catch (e) {}
         if (m.profs[i].rot) c = rotQ(c, m.profs[i].rot);
         out.push(await c.convertToBlob({type: "image/jpeg", quality: 0.85}));
       }
@@ -661,9 +691,20 @@ self.onmessage = function (e) {
         var k2 = Math.min(1, (m.max || 2400) / Math.max(bm.width, bm.height)); cv = canvas(bm.width * k2, bm.height * k2); var cx2 = cv.getContext("2d"); cx2.imageSmoothingQuality = "high"; cx2.drawImage(bm, 0, 0, cv.width, cv.height); bm.close();
         if (m.src) { var keep = canvas(cv.width, cv.height); keep.getContext("2d").drawImage(cv, 0, 0); PCACHE = {key: ck, c: keep}; }
       }
-      if (m.heals && m.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(cv, m.heals); }
-      DBI = null; if (m.style) renderStyle(cv, m.style);
-      var n = m.ret ? await portraitRetouch(cv, m.ret) : 0;
+      // apercu rapide pendant qu'on glisse : image plus petite (4 fois moins de calcul), l'image nette suit quand on lache
+      if (m.fast && Math.max(cv.width, cv.height) > m.fast) { var kf = m.fast / Math.max(cv.width, cv.height), cf = canvas(Math.round(cv.width * kf), Math.round(cv.height * kf)), xf = cf.getContext("2d"); xf.imageSmoothingQuality = "medium"; xf.drawImage(cv, 0, 0, cf.width, cf.height); cv = cf; }
+      // correcteur + defloutage gardes en memoire : bouger un autre curseur ne les refait pas
+      var st = m.style, dk = ck + "|" + (m.fast || 0) + "|" + JSON.stringify(m.heals || []) + "|" + JSON.stringify(st && st.deblur && st.deblur.amt > 0 ? st.deblur : null);
+      if (DCACHE && DCACHE.key === dk && DCACHE.c.width === cv.width) { cv.getContext("2d").drawImage(DCACHE.c, 0, 0); DBI = DCACHE.dbi; if (st) { st = Object.assign({}, st); st.deblur = null; } }
+      else {
+        if (m.heals && m.heals.length) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } JMHEAL(cv, m.heals); }
+        DBI = null;
+        if (st && st.deblur && st.deblur.amt > 0) { if (!JMC) { importScripts("vendor/jmlab_core.js"); JMC = true; } if (typeof DEBLUR === "undefined") importScripts("deblur.js"); try { DBI = DEBLUR.apply(cv, st.deblur); } catch (e) {} st = Object.assign({}, st); st.deblur = null; }
+        if ((m.heals && m.heals.length) || DBI) { var kc = canvas(cv.width, cv.height); kc.getContext("2d").drawImage(cv, 0, 0); DCACHE = {key: dk, c: kc, dbi: DBI}; }
+      }
+      if (st) { st = Object.assign({}, st); st.lutN = 33; }
+      var dbi0 = DBI; if (st) renderStyle(cv, st); if (dbi0) DBI = dbi0;
+      self.PRKEY = m.src ? ck : null; var n = 0; try { n = m.ret ? await portraitRetouch(cv, m.ret) : 0; } finally { self.PRKEY = null; }
       if (m.style && m.style.tilt) { var th = m.style.tilt * Math.PI / 180, W2 = cv.width, H2 = cv.height, cs = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th)), kz = Math.max((W2 * cs + H2 * sn) / W2, (W2 * sn + H2 * cs) / H2), c3 = canvas(W2, H2), x3 = c3.getContext("2d"); x3.imageSmoothingQuality = "high"; x3.translate(W2 / 2, H2 / 2); x3.rotate(-th); x3.scale(kz, kz); x3.drawImage(cv, -W2 / 2, -H2 / 2); cv = c3; }
       if (m.style && m.style.crop) cv = cropC(cv, m.style.crop);
       if (m.style && m.style.rot) cv = rotQ(cv, m.style.rot);

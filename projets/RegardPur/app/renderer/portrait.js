@@ -47,17 +47,22 @@ function ell(x, cx, cy, rx, ry, a) { x.beginPath(); x.ellipse(cx, cy, Math.max(1
 async function portraitRetouch(c, R) {
   var W = c.width, H = c.height, k = function (n) { return Math.max(0, Math.min(100, R[n] || 0)) / 100; };
   var lm = await initFaces(); if (!lm) return 0;
-  var res = detectFaces(lm, c, W, H), faces = res.faceLandmarks || [];
+  // apercu : visages et silhouette de la photo en cours gardes en memoire (bouger un curseur ne les recherche plus)
+  var pk = self.PRKEY ? self.PRKEY + "|" + W + "x" + H : null, hit = pk && self.PRC && self.PRC.key === pk ? self.PRC : null;
+  var res = hit ? hit.res : detectFaces(lm, c, W, H), faces = res.faceLandmarks || [];
+  if (pk && !hit) self.PRC = hit = {key: pk, res: res};
   var F = MP.FaceLandmarker, ctx = c.getContext("2d", {willReadFrequently: true});
   // separation : peau du visage et du corps, fond
   var segData = null, sw = 0, sh = 0;
   var needSeg = k("peau") > 0 || k("fondFlou") > 0 || k("fondSombre") > 0 || k("fondGris") > 0;
-  if (needSeg) {
+  if (needSeg && hit && hit.seg) { segData = hit.seg; sw = hit.sw; sh = hit.sh; }
+  else if (needSeg) {
     var sg = await initSeg();
     if (sg) {
       var ss = Math.min(1, 768 / Math.max(W, H)); sw = Math.round(W * ss); sh = Math.round(H * ss);
       var sc = canvas(sw, sh); sc.getContext("2d").drawImage(c, 0, 0, sw, sh);
       try { var r = sg.segment(sc); segData = r.categoryMask.getAsUint8Array().slice(); r.categoryMask.close(); } catch (e) { segData = null; }
+      if (hit && segData) { hit.seg = segData; hit.sw = sw; hit.sh = sh; }
     }
   }
   function segCanvas(cats) { // masque de la separation, a la taille de l'image

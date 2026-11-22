@@ -429,15 +429,29 @@ async function load(dir, items, label) {
   S.photos.filter(function (p) { return p.a && !p.a.err && p.a.aes == null; }).forEach(function (p, i) { setTimeout(function () { if (p.thumbUrl) queueNima(p); else loadThumb(p); }, 50 + i * 5); });
   if (todo.length) { quickThumbs(todo); analyse(todo); } else toast("Session reprise : " + items.length + " photos déjà analysées.");
 }
+/* enregistrement de la seance : l'analyse de chaque photo (lourde, elle ne change pas quand on retouche) est mise en texte
+   une seule fois et reutilisee ; on n'enregistre qu'une fois les curseurs relaches (5000 photos : plus de blocage) */
+var AJV = 0;
+function aJson(p) { if (p._aRef !== p.a || p._aV !== AJV) { p._aRef = p.a; p._aV = AJV; p._aj = JSON.stringify(p.a === undefined ? null : p.a); } return p._aj; }
 function saveSoon() {
   if (!N || !S.dir) return;
   clearTimeout(S.saveT);
-  S.saveT = setTimeout(function () {
-    var o = {v: 1, saved: Date.now(), photos: {}, persons: persNames, cat: $("sCat").value, client: $("tClient").value};
-    S.photos.forEach(function (p) { o.photos[p.id] = {st: p.status, au: p.auto, s: p.stars, sz: p.size, a: p.a, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined, place: p.place || undefined, rawDev: p.rawDev || undefined}; });
-    N.writeText(sessPath("session.json"), JSON.stringify(o));
-  }, 700);
+  S.saveT = setTimeout(saveNow, 1500);
 }
+function saveNow(sync) {
+  S.saveT = null; if (!N || !S.dir) return;
+  {
+    var head = {v: 1, saved: Date.now(), persons: persNames, cat: $("sCat").value, client: $("tClient").value}, parts = [];
+    S.photos.forEach(function (p) {
+      var r = JSON.stringify({st: p.status, au: p.auto, s: p.stars, sz: p.size, adj: p.adj || undefined, ret: p.ret || undefined, heals: p.heals || undefined, ov: p.ov || undefined, dev: p.dev || undefined, ai: p.ai || undefined, sig: p.sig == null ? undefined : p.sig, rot: p.rot || undefined, qc: p.qc || undefined, place: p.place || undefined, rawDev: p.rawDev || undefined});
+      parts.push(JSON.stringify(p.id) + ':{"a":' + aJson(p) + (r.length > 2 ? "," + r.slice(1) : "}"));
+    });
+    var txt = JSON.stringify(head).slice(0, -1) + ',"photos":{' + parts.join(",") + "}}";
+    if (sync && N.writeTextSync) N.writeTextSync(sessPath("session.json"), txt); else N.writeText(sessPath("session.json"), txt);
+  }
+}
+/* fermeture du programme : ce qui n'est pas encore enregistre l'est tout de suite */
+window.addEventListener("beforeunload", function () { if (S.saveT) { clearTimeout(S.saveT); saveNow(true); } });
 
 /* ---------------- vignettes immediates : petite image cachee dans la photo (EXIF), avant l'analyse ---------------- */
 var ROT = {3: 180, 6: 90, 8: -90};
@@ -480,10 +494,13 @@ function analyse(list) {
   queue = list.slice().sort(function (a, b) { return (order[a.id] == null ? 1e9 : order[a.id]) - (order[b.id] == null ? 1e9 : order[b.id]); });
   doneN = 0; totalN = queue.length; S.analysing = true; S.t0 = Date.now(); prog(); pump();
 }
+/* pendant qu'on retouche, l'analyse en arriere-plan laisse la place a l'apercu (moitie des assistants, un travail chacun) */
+function retouching() { S.busyUntil = Date.now() + 3000; clearTimeout(S.busyT); if (S.analysing) S.busyT = setTimeout(pump, 3100); }
 function pump() {
-  var rid = runId;
-  pool.forEach(function (w) {
-    while (w.inflight < 2 && queue.length) {
+  var rid = runId, calm = !(S.busyUntil > Date.now()), half = Math.ceil(pool.length / 2);
+  pool.forEach(function (w, wi) {
+    var lim = calm ? 2 : wi < half ? 1 : 0;
+    while (w.inflight < lim && queue.length) {
       var p = queue.shift(); w.inflight++;
       (function (p, w) {
         readBytes(p, true).then(function (buf) { return !buf && p.raw && N ? rawEnsure(p).then(function () { return readBytes(p, true); }) : buf; }).then(function (buf) {
@@ -608,7 +625,7 @@ async function runNima() {
     try {
       var im = new Image(); im.src = p.thumbUrl; await im.decode();
       x.drawImage(im, 0, 0, 224, 224);
-      p.a.aes = Math.round(nimaScore(net, c) * 100) / 100; p.score = score(p); p.why = reasons(p); updCard(p);
+      p.a.aes = Math.round(nimaScore(net, c) * 100) / 100; AJV++; p.score = score(p); p.why = reasons(p); updCard(p);
       if (S.view[S.cur] === p.id) showPanel();
     } catch (e) {}
     if (++n % 8 === 0) await new Promise(function (r) { setTimeout(r, 0); });
@@ -648,7 +665,7 @@ function buildPersons() {
   });
   cl.sort(function (a, b) { return b.items.length - a.items.length; });
   PERS = cl.map(function (c, i) {
-    var ids = {}; c.items.forEach(function (o) { ids[o.p.id] = 1; o.f.pid = i; });
+    var ids = {}; c.items.forEach(function (o) { ids[o.p.id] = 1; o.f.pid = i; }); AJV++;
     var rep = c.items.slice().sort(function (a, b) { return (b.f.eyeSharp || 0) - (a.f.eyeSharp || 0); })[0];
     var name = ""; Object.keys(persNames).forEach(function (k) { var o = persNames[k]; if (!name && dist(o.cen, c.cen) < 0.45) name = o.name; });
     return {i: i, cen: c.cen, ids: ids, n: Object.keys(ids).length, ic: rep.f.ic, name: name || "Personne " + (i + 1)};
@@ -1040,18 +1057,18 @@ function adjShow(p) {
   devShow(p);
 }
 function adjSet() {
-  var p = S.byId[S.view[S.cur]]; if (!p) return;
+  var p = S.byId[S.view[S.cur]]; if (!p) return; retouching();
   var old = p.adj ? {ev: p.adj.ev, wb: p.adj.wb} : null, ev = Math.round(+$("lpEv").value) / 10, wb = +$("lpWb").value;
   p.adj = (ev || wb) ? {ev: ev, wb: wb} : null;
   clearTimeout(adjSet.t); adjShow(p);
-  adjSet.t = setTimeout(function () { adjLearn(p, old && (old.ev || old.wb) ? old : null); saveSoon(); }, 600);
-  rpPreview();
+  adjSet.t = setTimeout(function () { adjLearn(p, old && (old.ev || old.wb) ? old : null); }, 600); saveSoon();
+  rpPreview(true);
 }
 $("lpEv").addEventListener("input", adjSet); $("lpWb").addEventListener("input", adjSet);
 function resetAll() {
   var L = fixTargets(); if (!L.length) return;
   L.forEach(function (p) { p.dev = null; p.adj = null; p.ret = null; if (p.ai) { p.ai = null; } full.cache.delete(p.id); updCard(p); });
-  var p = S.byId[S.view[S.cur]]; $("lpEv").value = 0; $("lpWb").value = 0; rp.cur = null; if (rp.open) rpDraw(); if (p) { devShow(p); aiShow(p); rpPreview(); }
+  var p = S.byId[S.view[S.cur]]; $("lpEv").value = 0; $("lpWb").value = 0; rp.cur = null; rp.live = false; if (rp.open) rpDraw(); if (p) { devShow(p); aiShow(p); rpPreview(); }
   saveSoon(); toast("↺ " + (L.length > 1 ? L.length + " photos remises" : "Photo remise") + " à l'origine : réglages, portrait et IA enlevés (le correcteur au pinceau est gardé).", 4000);
 }
 $("lpAdj0").onclick = resetAll;
@@ -1143,7 +1160,7 @@ function autoCrop(p, ratio) {
 $("crAuto").onclick = function () { fixTargets().forEach(function (p) { var c = autoCrop(p, $("crRatio").value); if (c) devGet(p).crop = c; }); var p = S.byId[S.view[S.cur]]; if (p) { devShow(p); devChanged(p); } toast("Recadrage auto appliqué (bouton « Sans » pour revenir)."); };
 $("crRatio").addEventListener("change", function () { $("crAuto").click(); });
 $("crOff").onclick = function () { fixTargets().forEach(function (p) { if (p.dev) delete p.dev.crop; }); var p = S.byId[S.view[S.cur]]; if (p) { devShow(p); devChanged(p); } };
-function devChanged(p) { saveSoon(); rpPreview(); updCard(p); clearTimeout(PFV.t); PFV.t = setTimeout(function () { if (S.byId[S.view[S.cur]] === p) profThumbs(p); }, 700); }
+function devChanged(p) { retouching(); saveSoon(); rpPreview(true); updCard(p); clearTimeout(PFV.t); if ($("profBox").open) PFV.t = setTimeout(function () { if (S.byId[S.view[S.cur]] === p) profThumbs(p); }, 1500); }
 $("rtTop").addEventListener("input", function (e) {
   var t = e.target, p = S.byId[S.view[S.cur]]; if (!p) return;
   if (t.id === "dbAmt" || t.id === "dbKind") { var dd = devGet(p); dd.deblur = dd.deblur || {}; if (t.id === "dbAmt") { dd.deblur.amt = +t.value; t.nextElementSibling.textContent = t.value; } else dd.deblur.kind = t.value; devChanged(p); return; }
@@ -1178,7 +1195,8 @@ function profThumbs(p) {
   profMark(p); $("profMsg").textContent = "⏳ Calcul des aperçus…";
   readBytes(p).then(function (b) {
     if (!b || my !== PFV.n) return;
-    var w = prevWorker(), id = "profs:" + p.id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
+    if (!PFV.w) { PFV.w = new Worker("analyse.js"); PFV.w.inflight = 0; PFV.w.jobs = {}; PFV.w.onmessage = onResult.bind(null, PFV.w); }
+    var w = PFV.w, id = "profs:" + p.id + ":" + my, c = b.buffer.byteLength === b.byteLength ? b : b.slice();
     prevWait[id] = function (r) {
       if (my !== PFV.n) return; $("profMsg").textContent = r.profs && r.profs.length ? "" : "Aperçus impossibles : " + (r.err || "");
       PFV.urls.forEach(function (u) { URL.revokeObjectURL(u); }); PFV.urls = (r.profs || []).map(function (bl) { return URL.createObjectURL(bl); });
@@ -1320,7 +1338,11 @@ async function fixRun(list) {
   var n = 0, none = 0, ai = AI.ok && N && $("fixAi").checked, gains = [], skipped = {};
   list.forEach(function (p) { var d = fixPhoto(p); if (d) { p.dev = d; n++; updCard(p); } else none++; });
   if (ai) {
-    AI.busy = true; aiShow(); var todo = list.map(function (p) { return [p, aiNeeds(p).filter(function (k) { if (aiRefused(k)) { skipped[k] = 1; return false; } return true; })]; }).filter(function (x) { return x[1].length; });
+    var todo = list.map(function (p) { return [p, aiNeeds(p).filter(function (k) { if (aiRefused(k)) { skipped[k] = 1; return false; } return true; })]; }).filter(function (x) { return x[1].length; });
+    // beaucoup de photos a reparer par l'IA : on previent du temps avant de lancer (environ 8 s par reparation)
+    var nk = todo.reduce(function (t, x) { return t + x[1].length; }, 0), mn = Math.round(nk * 8 / 60);
+    if (todo.length > 15 && mn >= 3 && !confirm("L'IA doit réparer " + todo.length + " photos : environ " + (mn >= 120 ? Math.round(mn / 60) + " heures" : mn + " minutes") + ".\n\nOK = lancer l'IA maintenant\nAnnuler = garder seulement les corrections rapides (déjà faites)")) todo = [];
+    AI.busy = true; aiShow();
     for (var i = 0; i < todo.length; i++) {
       var p = todo[i][0], ks = todo[i][1], before = p.a;
       if (p.ai) { p.ai = null; full.cache.delete(p.id); } // on repart de l'original
@@ -1358,6 +1380,9 @@ async function fixRun(list) {
   if (S.tab !== "retoucher") setTab("retoucher"); else { var pc = S.byId[S.view[S.cur]]; devShow(pc); rpPreview(); }
 }
 function fixTargets() { return S.sel.size ? Array.from(S.sel).map(function (id) { return S.byId[id]; }) : [S.byId[S.view[S.cur]]].filter(Boolean); }
+/* la case « IA » est decochee par defaut (corriger reste instantane) ; votre choix est memorise */
+try { $("fixAi").checked = localStorage.getItem("rp_fixai") === "1"; } catch (e) {}
+$("fixAi").addEventListener("change", function () { try { localStorage.setItem("rp_fixai", $("fixAi").checked ? "1" : "0"); } catch (e) {} });
 $("bFix").onclick = function () { fixRun(fixTargets()); };
 $("dvFix").onclick = function () { fixRun(fixTargets()); };
 
@@ -1438,7 +1463,7 @@ function prevSend(job) {
   if (PV.busy) { PV.next = job; return; }
   PV.busy = true;
   var go = function (b) {
-    var w = prevWorker(), msg = {id: job.key, src: job.src, heic: job.heic, preview: true, max: job.max, ret: job.eff, heals: job.heals, style: job.dst};
+    var w = prevWorker(), msg = {id: job.key, src: job.src, heic: job.heic, preview: true, max: job.max, ret: job.eff, heals: job.heals, style: job.dst, fast: job.fast || 0};
     prevWait[job.key] = function (r) { PV.busy = false; if (!r.prev && /source/.test(r.err || "")) PV.src = null; job.done(r); if (PV.next) { var n = PV.next; PV.next = null; prevSend(n); } };
     if (b) { var c = b.buffer.byteLength === b.byteLength ? b : b.slice(); msg.buf = c; w.postMessage(msg, [c.buffer]); } else w.postMessage(msg);
   };
@@ -1446,17 +1471,19 @@ function prevSend(job) {
   if (PV.src === sk) go(null);
   else readBytes(job.p).then(function (b) { if (!b) { PV.busy = false; return; } PV.src = sk; go(b); });
 }
-function rpPreview() {
+function rpPreview(fast) {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
-  var eff = rp.open ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
+  var eff = rp.open && rp.live ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
   if (dst) { delete dst.ret; delete dst.heals; if (!dst.jm && !dst.tilt && !dst.rot && !dst.crop) dst = null; }
-  clearTimeout(rp.t);
-  rp.t = setTimeout(function () {
+  clearTimeout(rp.t); clearTimeout(rp.tf);
+  // en glissant : apercu rapide tout de suite (image plus petite), puis l'image nette des qu'on s'arrete
+  var go = function (fs) {
     if (!eff && !heals.length && !dst) { fullUrl(p).then(function (u) { if ($("lpImg").dataset.id === id) $("lpImg").src = u; }); return; }
     var busy = $("rpBusy"); if (busy) busy.textContent = "⏳ Calcul de l'aperçu…";
     var my = ++rp.busy;
-    prevSend({p: p, key: "prev:" + id + ":" + my, src: id + "|" + (p.ai ? p.ai.file : "") + "|" + (p.rawDev || ""), heic: heicOf(p), max: prevSize(), eff: eff, heals: heals, dst: dst, done: function (r) {
-      if (my !== rp.busy || $("lpImg").dataset.id !== id) return;
+    prevSend({p: p, key: "prev:" + id + ":" + my, src: id + "|" + (p.ai ? p.ai.file : "") + "|" + (p.rawDev || ""), heic: heicOf(p), max: prevSize(), eff: eff, heals: heals, dst: dst, fast: fs, done: function (r) {
+      // on affiche tout resultat plus recent que celui a l'ecran (l'apercu rapide n'est plus jete quand l'image nette est demandee)
+      if (my <= (rp.shown || 0) || $("lpImg").dataset.id !== id) return; if (r.prev) rp.shown = my;
       if (busy) busy.textContent = r.prev ? (r.faces || !eff || !rp.open ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
       var hb = $("healMsg"); if (hb) hb.textContent = "";
       var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
@@ -1467,7 +1494,9 @@ function rpPreview() {
           drawLoupeMarks(p); adjShow(p); };
         img.src = rp.url; }
     }});
-  }, 120);
+  };
+  if (fast && !full.zoom) { rp.t = setTimeout(function () { go(Math.max(640, Math.round(prevSize() / 2))); }, 25); rp.tf = setTimeout(function () { go(0); }, 250); }
+  else rp.t = setTimeout(function () { go(0); }, fast ? 60 : 120);
 }
 var prevWait = {};
 /* ---------------- AMELIORATION IA (NAFNet, Real-ESRGAN) : calcul sur le PC, resultat enregistre a part ---------------- */
@@ -1648,11 +1677,11 @@ $("healUndo").onclick = function () { var p = S.byId[S.view[S.cur]]; if (p && p.
 $("healClear").onclick = function () { var p = S.byId[S.view[S.cur]]; if (p && p.heals) { p.heals = null; saveSoon(); healDrawAll(); rpPreview(); } };
 function rpToggle() {
   rp.open = !rp.open; $("rpPanel").classList.toggle("show", rp.open);
-  rp.cur = null; if (rp.open) { rpDraw(); rpPreview(); } else { var p = S.byId[S.view[S.cur]]; if (p) fullUrl(p).then(function (u) { $("lpImg").src = u; }); }
+  rp.cur = null; rp.live = false; if (rp.open) { rpDraw(); rpPreview(); } else { var p = S.byId[S.view[S.cur]]; if (p) fullUrl(p).then(function (u) { $("lpImg").src = u; }); }
 }
 $("lpRet").onclick = rpToggle;
 $("rpPanel").addEventListener("input", function (e) {
-  var t = e.target, r = rp.cur; if (!r) return;
+  var t = e.target, r = rp.cur; if (!r) return; rp.live = true;
   if (t.id === "rpStr") { r.str = +t.value; t.nextElementSibling.textContent = t.value; }
   else if (t.dataset.k) { r.v[t.dataset.k] = +t.value; t.nextElementSibling.textContent = t.value; r.preset = ""; $("rpPre").value = ""; }
   rpPreview();
@@ -1751,7 +1780,7 @@ function showLoupe() {
     var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
   } else drawLoupeMarks(p);
   drawFaces($("lpFaces"), p); adjShow(p); healDrawAll();
-  if (rp.open && $("rpPanel").dataset.for !== p.id) { $("rpPanel").dataset.for = p.id; rp.cur = null; rpDraw(); rpPreview(); }
+  if (rp.open && $("rpPanel").dataset.for !== p.id) { $("rpPanel").dataset.for = p.id; rp.cur = null; rp.live = false; rpDraw(); rpPreview(); }
   var w = p.why || {rej: [], warn: [], good: []};
   $("lpInfo").innerHTML = (p.a && !p.a.err ? "<b style='font-size:18px;color:" + colOf(p.score) + "'>" + p.score + "</b> / 100 · " + (p.status === "P" ? "<span style='color:var(--keep)'>✔ gardée</span>" : p.status === "X" ? "<span style='color:var(--rej)'>✖ rejetée</span>" : "à voir") + "<br>" : "") +
     w.rej.map(function (t) { return "<span style='color:var(--rej)'>✖ " + esc(t) + "</span>"; }).concat(w.warn.map(function (t) { return "<span style='color:var(--doubt)'>⚠ " + esc(t) + "</span>"; }), w.good.map(function (t) { return "<span style='color:var(--keep)'>✔ " + esc(t) + "</span>"; })).join("<br>");
@@ -2116,6 +2145,7 @@ function rotate(delta) {
   saveSoon(); if ($("loupe").classList.contains("show")) rpPreview();
   toast("↻ Rotation " + (delta < 0 ? "à gauche" : "à droite") + (L.some(function (p) { return p.raw; }) ? " (RAW : appliquée à l'export JPEG seulement)" : " — appliquée à l'export, l'original n'est pas modifié"));
 }
+Array.prototype.forEach.call(document.querySelectorAll(".rotL,.rotR"), function (b) { b.onclick = function () { rotate(b.classList.contains("rotL") ? -90 : 90); }; });
 function trashSel() {
   if (!N) return; var L = fixTargets(); if (!L.length) return;
   dialog("<h3>Mettre à la corbeille ?</h3><p>" + (L.length > 1 ? L.length + " photos" : L[0].name) + " iront dans la Corbeille de Windows : vous pourrez les récupérer.</p><div class='row'><button data-c='no'>Annuler</button><button data-c='yes' class='pri'>Corbeille</button></div>", async function (c) {
