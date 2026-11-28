@@ -36,7 +36,7 @@
   <div class="brand"><img src="icon.png" alt=""><div><b>Regard Pur</b><small id="folderName">Trie. Épure. Garde le regard.</small></div></div>
   <nav id="tabs">
     <button data-t="trier" class="on"><i>1</i><svg class="ic"><use href="#i-grid"/></svg>Trier</button>
-    <button data-t="retoucher"><i>2</i><svg class="ic"><use href="#i-brush"/></svg>Retoucher</button>
+    <button data-t="retoucher"><i>2</i><svg class="ic"><use href="#i-brush"/></svg>Édition</button>
     <button data-t="exporter"><i>3</i><svg class="ic"><use href="#i-export"/></svg>Exporter</button>
   </nav>
   <div class="grow"></div>
@@ -55,14 +55,21 @@
     <label class="sel expert">Exigence <i class="tip" data-tip="Souple : rejette seulement les photos vraiment ratées. Stricte : ne garde que les très bonnes.">?</i>
       <select id="sStrict"><option value="0">Souple</option><option value="1" selected>Normale</option><option value="2">Stricte</option></select>
     </label>
-    <button id="bFix" disabled data-tip="Corrige automatiquement les problèmes trouvés (exposition, léger flou, horizon, bruit, couleur) sur la sélection ou la photo choisie, puis ouvre Retoucher pour la finition"><svg class="ic"><use href="#i-magic"/></svg>Corriger les problèmes</button>
+    <button id="bFix" disabled data-tip="Corrige automatiquement les problèmes trouvés (exposition, léger flou, horizon, bruit, couleur) sur la sélection ou la photo choisie, puis ouvre Édition pour la finition"><svg class="ic"><use href="#i-magic"/></svg>Corriger les problèmes</button>
     <button id="bCompare" disabled data-tip="Comparer côte à côte la sélection (Ctrl + clic) ou la série de la photo choisie"><svg class="ic"><use href="#i-compare"/></svg>Comparer</button>
     <button class="rotL" data-tip="Tourner à gauche de 90° (touche [ ) — la sélection ou la photo affichée ; appliqué à l'export, l'original n'est pas modifié">↺</button><button class="rotR" data-tip="Tourner à droite de 90° (touche ] ) — la sélection ou la photo affichée ; appliqué à l'export, l'original n'est pas modifié">↻</button>
     <div class="grow"></div>
     <label class="sel">Taille <input type="range" id="rSize" min="120" max="360" value="200"></label>
   </div>
   <div class="subT" data-for="retoucher">
-    <span class="hint">Choisissez une photo dans la bande du bas, puis utilisez <b>Retouche rapide</b>, <b>Portrait</b> ou <b>Correcteur</b>. Tout est fait à l'export, vos originaux ne sont jamais modifiés.</span>
+    <button id="eAB" data-tip="Comparer avec l'original : ligne à glisser sur la photo (touche B)"><svg class="ic"><use href="#i-compare"/></svg>Avant / Après</button>
+    <span class="sep"></span>
+    <label class="sel">Profil <select id="eProf"></select></label>
+    <label class="sel">sur <select id="eTo"><option value="cur">cette photo</option><option value="sel">la sélection</option><option value="P">les gardées</option><option value="all">toutes les photos</option></select></label>
+    <button id="eApply" class="pri" data-tip="Applique le profil choisi : vous voyez tout de suite le résultat, sur la grande photo et dans la bande du bas">Appliquer</button>
+    <button id="ePaste" data-tip="Colle les réglages copiés (bouton Copier du panneau) sur les photos choisies à gauche">Coller les réglages</button>
+    <div class="grow"></div>
+    <span id="eCount" class="hint"></span>
   </div>
   <div class="subT" data-for="exporter">
     <span class="hint">Dernière étape : choisissez <b>quelles photos</b>, <b>où</b>, et si elles doivent être <b>retouchées</b>.</span>
@@ -88,7 +95,7 @@
     </details>
     <details class="expert"><summary>Options</summary>
       <label class="ck"><input type="checkbox" id="cGroup" checked> Regrouper les rafales et doublons</label>
-      <div class="sigRow"><button id="bStyle" class="mini" data-tip="Choisissez un dossier de photos que vous avez retouchées avec Lightroom (fichiers .xmp ou JPEG exportés) ou DxO (fichiers .dop) : Regard Pur calcule votre style habituel et le propose en un clic dans Retoucher.">Apprendre mon style (Lightroom / DxO)…</button><span id="styleInfo"></span></div>
+      <div class="sigRow"><button id="bStyle" class="mini" data-tip="Choisissez un dossier de photos que vous avez retouchées avec Lightroom (fichiers .xmp ou JPEG exportés) ou DxO (fichiers .dop) : Regard Pur calcule votre style habituel et le propose en un clic dans Édition.">Apprendre mon style (Lightroom / DxO)…</button><span id="styleInfo"></span></div>
       <div class="sigRow"><button id="bPlaces" class="mini" data-tip="Trouve la ville et le pays des photos qui ont une position GPS, avec OpenStreetMap. Utilise internet : seules les coordonnées arrondies (environ 1 km) sont envoyées. Les réponses sont gardées sur votre PC.">Lieux GPS (internet)…</button><span id="placeInfo"></span></div>
       <div class="sigRow"><button id="bSig" class="mini" data-tip="Choisissez l'image de votre signature ou de votre filigrane (PNG ou JPEG) : Regard Pur la cherche dans les coins et en bas de chaque photo, même si elle est en blanc sur la photo.">Ma signature…</button><button id="bSigScan" class="mini" style="display:none">Chercher</button><input type="file" id="fSig" accept="image/*" style="display:none"><span id="sigInfo"></span></div>
       <label class="ck"><input type="checkbox" id="cAdvance" checked> Passer à la suivante après Garder / Rejeter</label>
@@ -163,7 +170,7 @@
       <div class="row3"><button id="dvAuto" class="pri" data-tip="Règle la photo tout seul : ProLab automatique, correction selon le type de photo, peau protégée et vos habitudes apprises"><svg class="ic"><use href="#i-magic"/></svg>Auto</button><button id="dvCopy" data-tip="Copier les réglages de cette photo"><svg class="ic"><use href="#i-grid"/></svg>Copier</button><button id="dvPaste" data-tip="Coller les réglages copiés sur cette photo"><svg class="ic"><use href="#i-check"/></svg>Coller</button></div>
       <div id="typeBox"><h5 id="typeTitle">Pour ce type de photo</h5><div id="typeTools" class="chips"></div></div>
       <label class="sel full">Profil <select id="dvProf"></select></label>
-      <details id="profBox" class="profBox"><summary>Voir la photo dans chaque profil</summary><div id="profMsg" class="small"></div><div id="profGrid"></div></details>
+      <details id="profBox" class="profBox" open><summary>Voir la photo dans chaque profil</summary><div id="profMsg" class="small"></div><div id="profGrid"></div></details>
       <div class="rl"><span>Intensité</span><input type="range" id="dvDose" min="0" max="100" value="65"><b id="dvDoseV">65</b></div>
       <label class="ck"><input type="checkbox" id="dvPro" checked> ProLab automatique (exposition corrigée)</label>
       <label class="ck"><input type="checkbox" id="tuneOn"> Glisser sur la photo : ↕ choisir le réglage, ↔ le doser</label>

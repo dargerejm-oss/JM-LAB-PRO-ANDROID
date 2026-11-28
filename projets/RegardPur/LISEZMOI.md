@@ -2,6 +2,14 @@
 
 Version 3.8 : nouvelle base qui remplace `RegardPur_V1.4.py` (gardé pour mémoire).
 
+## Mode Édition (3.10, comme Aftershoot)
+- L'étape ② s'appelle **Édition** : la photo en grand, la **bande des photos en bas** (vignettes retouchées, marque ✎),
+  le panneau de réglages à droite avec **« Voir la photo dans chaque profil » ouvert**.
+- Barre du haut de l'Édition : **Avant / Après**, **Profil … sur cette photo / la sélection / les gardées / toutes** + Appliquer,
+  **Coller les réglages** sur ces mêmes photos, compteur « N photos retouchées · exportées comme vous les voyez ».
+- Ce qu'on voit en Édition est exactement ce qui est exporté (même calcul `renderStyle`).
+- **③ Exporter ne sert plus qu'à exporter** : quelles photos, où, fichiers (XMP, original joint, nommage). Aucun réglage de rendu.
+
 ## Interface (3.0)
 - **3 étapes en haut : ① Trier · ② Retoucher · ③ Exporter**, avec les outils de l'étape juste en dessous.
 - Vraies icônes (SVG), bulles d'aide « ? » au survol, colonne de gauche en sections repliables.

@@ -1367,7 +1367,7 @@ function qualOf(a, k) { // ce qu'on attend de chaque correction
 async function fixRun(list) {
   var n = 0, none = 0, ai = AI.ok && N && $("fixAi").checked, gains = [], skipped = {};
   list.forEach(function (p) { var d = fixPhoto(p); if (d) { p.dev = d; n++; updCard(p); } else none++; });
-  // on passe tout de suite dans Retoucher (profils, reglages) : l'IA continue en arriere-plan, avec la barre en bas
+  // on passe tout de suite dans Édition (profils, reglages) : l'IA continue en arriere-plan, avec la barre en bas
   if (ai && n) { if (S.tab !== "retoucher") setTab("retoucher"); else { var pc0 = S.byId[S.view[S.cur]]; devShow(pc0); rpPreview(); } }
   if (ai) {
     var todo = list.map(function (p) { return [p, aiNeeds(p).filter(function (k) { if (aiRefused(k)) { skipped[k] = 1; return false; } return true; })]; }).filter(function (x) { return x[1].length; });
@@ -1412,7 +1412,7 @@ async function fixRun(list) {
   var nn = list.filter(function (p) { return p.dev && p.dev.fix && p.dev.fix.length; }).length;
   if (!nn) { aiShow(S.byId[S.view[S.cur]]); toast("Aucun problème corrigeable sur " + (list.length > 1 ? "ces photos" : "cette photo") + "."); return; }
   var sk = Object.keys(skipped).map(function (k) { return AIW[k]; });
-  toast(nn + " photo" + (nn > 1 ? "s corrigées" : " corrigée") + ". " + (gains.length ? gains.slice(0, 3).join(" · ") + (gains.length > 3 ? "…" : "") + ". " : "") + (sk.length ? "Non proposé (souvent annulé par vous) : " + sk.join(", ") + ". " : "") + "Finition possible dans Retoucher.", 7000);
+  toast(nn + " photo" + (nn > 1 ? "s corrigées" : " corrigée") + ". " + (gains.length ? gains.slice(0, 3).join(" · ") + (gains.length > 3 ? "…" : "") + ". " : "") + (sk.length ? "Non proposé (souvent annulé par vous) : " + sk.join(", ") + ". " : "") + "Finition possible dans Édition.", 7000);
   if (S.tab !== "retoucher") setTab("retoucher"); else { var pc = S.byId[S.view[S.cur]]; devShow(pc); rpPreview(); }
 }
 function fixTargets() { return S.sel.size ? Array.from(S.sel).map(function (id) { return S.byId[id]; }) : [S.byId[S.view[S.cur]]].filter(Boolean); }
@@ -1527,6 +1527,31 @@ function warmNear() {
     });
   });
 }
+/* 3.10 Edition : vignette retouchee (pour voir dans la bande du bas ce que donnera l'export) */
+function editThumbFrom(p, blob) {
+  createImageBitmap(blob).then(function (bm) {
+    var h = 188, w = Math.max(1, Math.round(bm.width * h / bm.height)), c = document.createElement("canvas"); c.width = w; c.height = h;
+    c.getContext("2d").drawImage(bm, 0, 0, w, h); bm.close && bm.close();
+    c.toBlob(function (b) {
+      if (!b) return; if (p.editThumb) URL.revokeObjectURL(p.editThumb); p.editThumb = URL.createObjectURL(b);
+      var el = document.querySelector('#lpStrip .th[data-id="' + p.id + '"] img'); if (el) el.src = p.editThumb;
+      editCount();
+    }, "image/jpeg", 0.85);
+  }).catch(function () {});
+}
+function editCount() { var n = S.photos.filter(edited).length; var e = $("eCount"); if (e) e.textContent = n ? "✎ " + n + " photo" + (n > 1 ? "s" : "") + " retouchée" + (n > 1 ? "s" : "") + " · exportées comme vous les voyez" : "Ce que vous voyez ici est exactement ce qui sera exporté."; }
+function editTargets() {
+  var w = $("eTo").value, p = S.byId[S.view[S.cur]];
+  if (w === "sel") return S.sel.size ? Array.from(S.sel).map(function (id) { return S.byId[id]; }) : [p].filter(Boolean);
+  if (w === "P") return S.photos.filter(function (q) { return q.status === "P"; });
+  if (w === "all") return S.photos.slice();
+  return [p].filter(Boolean);
+}
+function editBar() {
+  var sel = $("eProf"); if (sel && !sel.options.length) sel.innerHTML = "<option value='cat'>Selon le type de photo (conseillé)</option>" + PROFS.map(function (o) { return "<option value='" + o[0] + "'>" + o[1] + "</option>"; }).join("");
+  var p = S.byId[S.view[S.cur]]; if (p && sel) sel.value = (p.dev && p.dev.profile) || "cat";
+  editCount();
+}
 function rpPreview(fast) {
   var p = S.byId[S.view[S.cur]]; if (!p) return;
   var eff = rp.open && rp.live ? rpEff(rp.cur) : rpEff(p.ret), heals = p.heals || [], id = p.id, dst = devStyle(p);
@@ -1543,6 +1568,7 @@ function rpPreview(fast) {
       if (busy) busy.textContent = r.prev ? (r.faces || !eff || !rp.open ? "" : "Aucun visage retouché sur cette photo.") : "Aperçu impossible : " + (r.err || "");
       var hb = $("healMsg"); if (hb) hb.textContent = "";
       var di = $("dbInfo"); if (di) di.textContent = r.db ? dbText(r.db) : "";
+      if (r.prev && !fs) editThumbFrom(p, r.prev);
       if (r.prev) { if (rp.url) URL.revokeObjectURL(rp.url); rp.url = URL.createObjectURL(r.prev); var img = $("lpImg"), oldW = img.naturalWidth;
         img.onload = function () {
           if (!full.zoom) fit();
@@ -1838,13 +1864,14 @@ function showLoupe() {
     var nx = S.byId[S.view[S.cur + 1]]; if (nx) fullUrl(nx);
   } else drawLoupeMarks(p);
   drawFaces($("lpFaces"), p); adjShow(p); healDrawAll();
+  if (S.tab === "retoucher") editBar();
   if (rp.open && $("rpPanel").dataset.for !== p.id) { $("rpPanel").dataset.for = p.id; rp.cur = null; rp.live = false; rpDraw(); rpPreview(); }
   var w = p.why || {rej: [], warn: [], good: []};
   $("lpInfo").innerHTML = (p.a && !p.a.err ? "<b style='font-size:18px;color:" + colOf(p.score) + "'>" + p.score + "</b> / 100 · " + (p.status === "P" ? "<span style='color:var(--keep)'>✔ gardée</span>" : p.status === "X" ? "<span style='color:var(--rej)'>✖ rejetée</span>" : "à voir") + "<br>" : "") +
     w.rej.map(function (t) { return "<span style='color:var(--rej)'>✖ " + esc(t) + "</span>"; }).concat(w.warn.map(function (t) { return "<span style='color:var(--doubt)'>⚠ " + esc(t) + "</span>"; }), w.good.map(function (t) { return "<span style='color:var(--keep)'>✔ " + esc(t) + "</span>"; })).join("<br>");
   // bande de vignettes
   var st = $("lpStrip"), a = Math.max(0, S.cur - 30), b = Math.min(S.view.length, S.cur + 31), h = "";
-  for (var i = a; i < b; i++) { var q = S.byId[S.view[i]]; h += '<div class="th' + (i === S.cur ? " cur" : "") + (q.status ? " " + q.status : "") + '" data-i="' + i + '">' + (q.thumbUrl ? '<img src="' + q.thumbUrl + '">' : '<span style="color:#555;padding:8px;display:block">⏳</span>') + "</div>"; }
+  for (var i = a; i < b; i++) { var q = S.byId[S.view[i]], ed = edited(q), tu = ed && q.editThumb ? q.editThumb : q.thumbUrl; h += '<div class="th' + (i === S.cur ? " cur" : "") + (q.status ? " " + q.status : "") + '" data-i="' + i + '" data-id="' + q.id + '">' + (tu ? '<img src="' + tu + '">' : '<span style="color:#555;padding:8px;display:block">⏳</span>') + (ed ? '<b class="ed">✎</b>' : "") + "</div>"; }
   st.innerHTML = h; var c = st.querySelector(".cur"); if (c) c.scrollIntoView({inline: "center", block: "nearest"});
 }
 $("lpStrip").addEventListener("click", function (e) { var t = e.target.closest(".th"); if (t) setCur(+t.dataset.i); });
@@ -1982,9 +2009,9 @@ function parseStyle(t) {
   while ((m = re.exec(t))) if (RKEY[m[1]]) v[RKEY[m[1]]] = +m[2];
   return Object.keys(v).length ? {name: name ? name.replace(/_/g, " ") : "style", v: v} : null;
 }
-/* export : les photos corrigees sont exportees TELLES QU'ON LES VOIT dans Retoucher (aucun profil choisi a l'aveugle ici) */
+/* export : les photos corrigees sont exportees TELLES QU'ON LES VOIT dans Édition (aucun profil choisi a l'aveugle ici) */
 function renderUI() {
-  return "<p class='small'>Les photos <b>corrigées ou retouchées</b> dans ② Retoucher sont exportées <b>telles que vous les voyez</b> (JPEG). Les autres sont copiées telles quelles. Pour changer le rendu (profil, couleurs…), faites-le dans Retoucher, où vous voyez le résultat.</p>" +
+  return "<p class='small'>Les photos <b>retouchées</b> dans ② Édition (✎) sont exportées <b>exactement comme vous les voyez</b> (JPEG). Les autres sont copiées telles quelles. Rien ne se règle ici : pour changer un profil ou une correction, revenez à ② Édition.</p>" +
     "<label class='opt'><input type='checkbox' id='rOrig'" + (REND.orig ? " checked" : "") + "><div>Joindre aussi l'<b>original</b> des photos corrigées</div></label>" +
     "<label class='opt'><input type='checkbox' id='rName'" + (REND.name ? " checked" : "") + "><div>Nommer les photos corrigées <b>catégorie_client_001.jpg</b> (sinon : nom d'origine + _JMD_LAB_PRO)</div></label>";
 }
@@ -2042,7 +2069,7 @@ function openExport() {
       "<label class='opt'><input type='checkbox' id='eX' checked><div><b>Fichiers pour DxO, Lightroom, Capture One</b> (XMP) à côté de toutes les photos : étoiles, vert = gardée, rouge = rejetée.</div></label>" +
       "<details class='adv'><summary>Plus d'options</summary><label class='opt'><input type='checkbox' id='eRej'><div>Ranger aussi les <b>rejetées</b> (" + nX + ") dans le sous-dossier « Rejetées » (rien n'est effacé)</div></label></details>" +
     "</div>" +
-    "<div class='card2'><h3><i>3</i>Retouche</h3>" + renderUI() +
+    "<div class='card2'><h3><i>3</i>Fichiers</h3>" + renderUI() +
       (nR ? "<p class='small' style='color:var(--gold)'>" + nR + " photo(s) corrigée(s) ou retouchée(s).</p>" : "") +
     "</div>" +
     "<div class='go'><button class='pri big' data-c='go'><svg class='ic'><use href='#i-export'/></svg>Exporter</button></div>" +
@@ -2075,7 +2102,7 @@ async function doExport() {
     if (st2 && pick[i].raw && !pick[i].rawDev) { S.jobPh = "développement du RAW (" + pick[i].name + ")"; $("progTxt").textContent = "Développement RAW " + (i + 1) + " / " + pick.length; await rawEnsure(pick[i]); }
     if (st2) {
       // developpement avec le rendu JM LAB PRO (nom comme dans l'appli : _JMD_LAB_PRO.jpg)
-      $("progTxt").textContent = "Retouche " + (k + 1) + " / " + pick.length; S.jobPh = "retouche des photos (rendu vu dans Retoucher) · " + pick[i].name;
+      $("progTxt").textContent = "Retouche " + (k + 1) + " / " + pick.length; S.jobPh = "retouche des photos (rendu vu dans Édition) · " + pick[i].name;
       var nm = st2.rotOnly ? pick[i].name.replace(/\.[^.]+$/, "") : REND.name ? (catOf(pick[i]) + "_" + (($("tClient").value || "").trim() || "seance").replace(/[\\\/:*?"<>|&\s]+/g, "_") + "_" + pad(i + 1, 3)) : pick[i].name.replace(/\.[^.]+$/, "") + "_JMD_LAB_PRO";
       try { var jpg = await developOne(pick[i], st2); await N.writeBin(join(dest, nm + ".jpg"), jpg); MAP[nm + ".jpg"] = pick[i].path; nDev++; } catch (e) { err++; }
     } else if (pick[i].ai) { // seulement l'amelioration IA : on livre la version amelioree a cote de l'original
@@ -2246,9 +2273,9 @@ function stats() {
 
 /* ---------------- guide du premier lancement ---------------- */
 var GUIDE = [
-  ["Bienvenue dans Regard Pur", "Regard Pur trie vos photos pour vous : il repère les <b>floues</b>, les <b>bougées</b>, les <b>yeux fermés</b>, les <b>expositions ratées</b> et regroupe les <b>rafales</b>. Tout se passe sur votre PC, sans internet.<br><br>Le travail se fait en <b>3 étapes</b>, en haut de l'écran : <b>① Trier · ② Retoucher · ③ Exporter</b>."],
+  ["Bienvenue dans Regard Pur", "Regard Pur trie vos photos pour vous : il repère les <b>floues</b>, les <b>bougées</b>, les <b>yeux fermés</b>, les <b>expositions ratées</b> et regroupe les <b>rafales</b>. Tout se passe sur votre PC, sans internet.<br><br>Le travail se fait en <b>3 étapes</b>, en haut de l'écran : <b>① Trier · ② Édition · ③ Exporter</b>."],
   ["① Trier", "<b>Ouvrir un dossier</b>, ou <b>Importer une carte</b> SD. L'analyse démarre toute seule.<br><b>Tri automatique</b> garde les meilleures et écarte les ratées, avec la raison écrite. Corrigez avec <b>P</b> (garder), <b>X</b> (rejeter), <b>1 à 5</b> (étoiles) : Regard Pur <b>apprend vos goûts</b>. <b>Entrée</b> : photo en grand."],
-  ["② Retoucher", "Choisissez une photo dans la bande du bas : <b>retouche rapide</b> (exposition, chaleur), <b>correcteur</b> (enlever une tache ou un objet au pinceau) et <b>retouche portrait</b> (peau, yeux, dents…). Appliquez-la à la photo, à la <b>personne</b> ou à toute la <b>série</b>."],
+  ["② Édition", "Choisissez une photo dans la bande du bas : <b>retouche rapide</b> (exposition, chaleur), <b>correcteur</b> (enlever une tache ou un objet au pinceau) et <b>retouche portrait</b> (peau, yeux, dents…). Appliquez-la à la photo, à la <b>personne</b> ou à toute la <b>série</b>."],
   ["③ Exporter", "Trois choix : <b>quelles photos</b>, <b>où</b>, et si elles doivent être <b>retouchées</b> avec le rendu JM LAB PRO. Les fichiers pour <b>DxO</b> et <b>Lightroom</b> sont écrits aussi. Vos originaux ne sont jamais modifiés."],
   ["Simple ou Expert", "En haut à droite : le mode <b>Simple</b> montre l'essentiel, le mode <b>Expert</b> tous les réglages fins. Les petits <b>?</b> expliquent chaque réglage au survol, et le bouton d'aide rappelle tous les raccourcis."]
 ];
@@ -2482,6 +2509,7 @@ function setTab(t) {
     L.classList.add("rmode");
     if (!L.classList.contains("show")) openLoupe();
     if (!rp.open) rpToggle(); else { rpDraw(); rpPreview(); }
+    editBar();
   } else {
     if (L.classList.contains("rmode")) { L.classList.remove("rmode"); if (rp.open) rpToggle(); if (heal.on) healToggle(); L.classList.remove("show"); full.zoom = false; }
     var ex = t === "exporter";
@@ -2499,6 +2527,21 @@ function isAbs(p) { return /^([a-zA-Z]:[\\\/]|[\\\/])/.test(p || ""); }
 function setMode(expert) { document.body.classList.toggle("simple", !expert); $("cExpert").checked = expert; try { localStorage.setItem("rp_expert", expert ? "1" : "0"); } catch (e) {} }
 $("cExpert").addEventListener("change", function () { setMode(this.checked); if (rp.open) rpDraw(); });
 try { setMode(localStorage.getItem("rp_expert") === "1"); } catch (e) { setMode(false); }
+
+/* ---------------- barre du mode Edition (3.10) ---------------- */
+$("eAB").onclick = function () { abToggle(); };
+$("eApply").onclick = function () {
+  var L = editTargets(), v = $("eProf").value, p = S.byId[S.view[S.cur]]; if (!L.length) return;
+  L.forEach(function (q) { var d = devGet(q); d.profile = v; delete d.neutral; if (d.pro === false && v !== "LABO PRO EV5") d.pro = true; if (q.editThumb) { URL.revokeObjectURL(q.editThumb); q.editThumb = null; } updCard(q); });
+  saveSoon(); if (p) { devShow(p); devChanged(p); }
+  showLoupe(); editCount();
+  toast("Profil appliqué à " + L.length + " photo" + (L.length > 1 ? "s" : "") + ". Faites défiler la bande du bas pour voir le résultat.");
+};
+$("ePaste").onclick = function () {
+  var L = editTargets(), p = S.byId[S.view[S.cur]]; if (!L.length) return;
+  devPasteTo(L); L.forEach(function (q) { if (q.editThumb) { URL.revokeObjectURL(q.editThumb); q.editThumb = null; } });
+  if (p) { devShow(p); adjShow(p); rpPreview(); } showLoupe(); editCount();
+};
 
 /* ---------------- boutons ---------------- */
 $("bOpen").onclick = openFolder; $("bOpen2").onclick = openFolder; $("bImport2").onclick = openImport;
